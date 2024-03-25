@@ -1,0 +1,6 @@
+export const dialerConstants = {
+  ADD_NUMBER: "ADD_NUMBER",
+  REMOVE_NUMBER: "REMOVE_NUMBER",
+  CLEAR_NUMBER: "CLEAR_NUMBER",
+  SET_VOICEMAIL: "SET_VOICEMAIL",
+};
