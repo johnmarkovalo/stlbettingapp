@@ -1,0 +1,10 @@
+interface Bet {
+  id: number;
+  betNumber: string;
+  betNumberr?: string;
+  targetAmount: string;
+  rambolAmount: string;
+  subtotal: number;
+}
+
+export default Bet;

@@ -1,44 +1,48 @@
-import React, { useEffect, useState } from "react";
-import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, {useEffect, useState} from 'react';
+import {
+  Dimensions,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import Styles from "./Styles";
-import GradientText from "../../../components/GradientText";
-import LinearGradient from "react-native-linear-gradient";
-import Colors from "../../../Styles/Colors.ts";
-import { Card } from "react-native-paper";
-import colors from "../../../Styles/Colors.ts";
+import Styles from './Styles';
+import LinearGradient from 'react-native-linear-gradient';
+import Colors from '../../../Styles/Colors.ts';
+import {Card} from 'react-native-paper';
+import colors from '../../../Styles/Colors.ts';
 
-const widthScreen = Dimensions.get("window").width;
+const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
-  const { navigation } = props;
-  const buttonData = [
-    { name: 'STL'},
-    { name: 'S3' },
-  ];
+  const {navigation} = props;
+  const buttonData = [{name: 'STL'}, {name: 'S3'}];
 
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
       <View style={Styles.mainContainer}>
         <View style={Styles.headerContainer}>
-          <GradientText style={Styles.logoText}>{"Home"}</GradientText>
+          <Text style={Styles.logoText}>{'Home'}</Text>
         </View>
         <View style={styles.card}>
-            <View style={styles.cardContent}>
-              <View style={{ width: widthScreen / 3 }}>
-                <Text style={styles.cardTitle}>DATE</Text>
-                <Text style={styles.cardSubTitle}>March 23, 2024</Text>
-              </View>
-              <View style={styles.verticalLine} />
-              <View style={{ width: widthScreen / 3 }}>
-                <Text style={styles.cardTitle}>TIME</Text>
-                <Text style={styles.cardSubTitle}>3rd Draw</Text>
-              </View>
-              <View style={styles.verticalLine} />
-              <View style={{ width: widthScreen / 3 }}>
-                <Text style={styles.cardTitle}>BOOTH</Text>
-                <Text style={styles.cardSubTitle}>ISABELA 01-001-2019</Text>
-              </View>
+          <View style={styles.cardContent}>
+            <View style={{width: widthScreen / 3}}>
+              <Text style={styles.cardTitle}>DATE</Text>
+              <Text style={styles.cardSubTitle}>March 23, 2024</Text>
             </View>
+            <View style={styles.verticalLine} />
+            <View style={{width: widthScreen / 3}}>
+              <Text style={styles.cardTitle}>TIME</Text>
+              <Text style={styles.cardSubTitle}>3rd Draw</Text>
+            </View>
+            <View style={styles.verticalLine} />
+            <View style={{width: widthScreen / 3}}>
+              <Text style={styles.cardTitle}>BOOTH</Text>
+              <Text style={styles.cardSubTitle}>ISABELA 01-001-2019</Text>
+            </View>
+          </View>
         </View>
         <View style={styles.container}>
           <ScrollView style={{marginTop: 20}}>
@@ -46,13 +50,10 @@ const Home = (props: any) => {
               <TouchableOpacity
                 key={index}
                 onPress={() => {
-                  navigation.navigate("Transac", { betType: button });
+                  navigation.navigate('Transac', {betType: button});
                 }}
-                style={[styles.button]}
-              >
-                <Text style={styles.textStyle}>
-                  {button.name}
-                </Text>
+                style={[styles.button]}>
+                <Text style={styles.textStyle}>{button.name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -63,44 +64,43 @@ const Home = (props: any) => {
   );
 };
 
-const styles =  StyleSheet.create({
+const styles = StyleSheet.create({
   headerContainer: {
     flex: 0.5,
-    flexDirection: "row",
+    flexDirection: 'row',
     marginTop: 30,
-    justifyContent: "center",
+    justifyContent: 'center',
   },
 
   card: {
     height: 60,
     elevation: 2,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 10,
   },
 
   cardContent: {
     flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-around",
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
 
   cardTitle: {
     fontSize: 16,
     color: Colors.darkGrey,
-    fontWeight: "bold",
-    alignSelf: "center",
-    textTransform: "uppercase"
+    fontWeight: 'bold',
+    alignSelf: 'center',
+    textTransform: 'uppercase',
   },
 
   cardSubTitle: {
     fontSize: 14,
     color: colors.primaryColor,
-    fontWeight: "bold",
-    alignSelf: "center",
-    textTransform: "uppercase",
+    fontWeight: 'bold',
+    alignSelf: 'center',
+    textTransform: 'uppercase',
   },
-
 
   verticalLine: {
     height: '80%', // Adjust height as needed
@@ -111,7 +111,7 @@ const styles =  StyleSheet.create({
   container: {
     flex: 3,
     justifyContent: 'flex-start',
-    alignItems: 'center'
+    alignItems: 'center',
   },
 
   button: {
@@ -122,15 +122,15 @@ const styles =  StyleSheet.create({
     margin: 10,
     height: 60,
     width: widthScreen * 0.8,
-    justifyContent: "center"
+    justifyContent: 'center',
   },
 
   textStyle: {
     fontSize: 30,
-    color: "#fff",
-    fontWeight: "bold",
-    alignSelf: "center",
-    textTransform: "uppercase"
+    color: '#fff',
+    fontWeight: 'bold',
+    alignSelf: 'center',
+    textTransform: 'uppercase',
   },
 });
 

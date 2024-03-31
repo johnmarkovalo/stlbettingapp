@@ -31,5 +31,14 @@ const images = {
   qrCode: require('../assets/Login/qrCode.png'),
   unidenLogo: require('../assets/Login/unidenLogo.png'),
   zianLogo: require('../assets/Login/zianLogo.png'),
+
+  tansfer: require('../assets/InCall/tansfer.png'),
+  addCall: require('../assets/InCall/addCall.png'),
+  record: require('../assets/InCall/record.png'),
+  recording: require('../assets/InCall/recording.png'),
+  keypadIcon: require('../assets/InCall/keypadIcon.png'),
+  hold: require('../assets/InCall/hold.png'),
+  attTransfer: require('../assets/InCall/attTransfer.png'),
+  HangUp: require('../assets/InCall/HangUp.png'),
 };
 export default images;
