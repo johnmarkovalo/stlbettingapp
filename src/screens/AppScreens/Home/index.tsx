@@ -10,9 +10,7 @@ import {
 } from 'react-native';
 
 import Styles from './Styles';
-import LinearGradient from 'react-native-linear-gradient';
 import Colors from '../../../Styles/Colors.ts';
-import {Card} from 'react-native-paper';
 import colors from '../../../Styles/Colors.ts';
 
 const widthScreen = Dimensions.get('window').width;
@@ -65,13 +63,6 @@ const Home = (props: any) => {
 };
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    flex: 0.5,
-    flexDirection: 'row',
-    marginTop: 30,
-    justifyContent: 'center',
-  },
-
   card: {
     height: 60,
     elevation: 2,
