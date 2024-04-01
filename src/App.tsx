@@ -5,7 +5,7 @@
  * @format
  */
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {StatusBar, useColorScheme} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 // import {Provider} from 'react-redux';
@@ -14,11 +14,34 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {MD3LightTheme as DefaultTheme, PaperProvider} from 'react-native-paper';
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 import Navigation from './navigation';
-
+import {initializeDatabase, closeDatabaseConnection} from './helper/sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const theme = {
   ...DefaultTheme,
 };
 function App(): React.JSX.Element {
+  useEffect(() => {
+    const checkAndInitializeDatabase = async () => {
+      try {
+        const isDatabaseInitialized = await AsyncStorage.getItem(
+          'isDatabaseInitialized',
+        );
+        if (!isDatabaseInitialized) {
+          await initializeDatabase();
+          await AsyncStorage.setItem('isDatabaseInitialized', 'true');
+        }
+      } catch (error) {
+        console.error('Error initializing database:', error);
+      }
+    };
+
+    checkAndInitializeDatabase();
+
+    // Clean up function to close database connection when component unmounts
+    return () => {
+      closeDatabaseConnection();
+    };
+  }, []);
   const isDarkMode = useColorScheme() === 'dark';
 
   const backgroundStyle = {

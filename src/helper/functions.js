@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import moment from 'moment';
 
 export const sleep = milliseconds => {
   return new Promise(resolve => {
@@ -91,4 +92,25 @@ export const formatNumberWithCommas = value => {
 
   // Return only the integer part without the decimal part
   return '₱' + integerPart;
+};
+
+export const formatTime = (hour, minute) => {
+  const formattedHour = hour < 10 ? `0${hour}` : `${hour}`;
+  const formattedMinute = minute < 10 ? `0${minute}` : `${minute}`;
+  return `${formattedHour}:${formattedMinute}`;
+};
+
+export const getCurrentDraw = draws => {
+  const currentTime = moment().format('HH:mm');
+
+  // Find the draw that matches the current time
+  const currentDraw = draws.find(draw => {
+    const start = moment(draw.start, 'HH:mm');
+    const end = moment(draw.end, 'HH:mm');
+    return moment(currentTime, 'HH:mm').isBetween(start, end);
+  });
+  if (!currentDraw) {
+    return null;
+  }
+  return draws.indexOf(currentDraw) + 1;
 };
