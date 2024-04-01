@@ -1,48 +1,75 @@
 import React from 'react';
-import {TouchableOpacity, Text, StyleSheet} from 'react-native';
-import Bet from '../models/Bet';
+import {TouchableOpacity, Text, StyleSheet, View} from 'react-native';
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
+import Transaction from '../models/Transaction';
+import Colors from '../Styles/Colors';
+import colors from '../Styles/Colors';
+import moment from 'moment';
+import {formatNumberWithCommas} from '../helper';
 
-type BetProps = {
-  item: Bet;
+type TransactionProps = {
+  item: Transaction;
   onPress: () => void;
-  backgroundColor: string;
-  textColor: string;
 };
 
-export const BetItem = ({
-  item,
-  onPress,
-  backgroundColor,
-  textColor,
-}: BetProps) => {
+export const TransactionItem = ({item, onPress}: TransactionProps) => {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[styles.item, {backgroundColor}]}>
-      <Text style={[styles.title, {color: textColor}]}>{item.betNumber}</Text>
-    </TouchableOpacity>
+    <View>
+      <TouchableOpacity style={styles.container} onPress={onPress}>
+        <View style={[{flexDirection: 'row', alignItems: 'center'}]}>
+          <Text style={[{color: colors.darkGrey, fontSize: 25}]}>
+            {item.trans_no + '. '}
+          </Text>
+          <View>
+            <Text style={styles.numberStyle}>{item.ticketcode}</Text>
+            <Text style={styles.subNumberStyle}>
+              {moment(item.bettime, 'hh:mm:ss').format('hh:mm A')}
+            </Text>
+          </View>
+        </View>
+        <Text
+          style={[
+            styles.numberStyle,
+            {color: colors.mediumGreen, fontSize: 20},
+          ]}>
+          {formatNumberWithCommas(item.declared_gross)}
+        </Text>
+      </TouchableOpacity>
+      <View style={styles.line} />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // item: {
-  //   padding: 10,
-  //   marginVertical: 8,
-  //   marginHorizontal: 16,
-  //   alignItems: 'center',
-  //   justifyContent: 'center',
-  //   borderWidth: 1,
-  //   borderRadius: 5,
-  // },
-
-  item: {
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
+  container: {
+    padding: 5,
+    marginVertical: 0,
+    marginHorizontal: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 
-  title: {
+  numberContainer: {
+    flexDirection: 'column',
+  },
+
+  numberStyle: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: colors.Black,
+  },
+
+  subNumberStyle: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    color: colors.darkGrey,
+  },
+
+  line: {
+    alignSelf: 'center',
+    height: 1, // Adjust height as needed
+    width: '95%',
+    backgroundColor: colors.darkGrey,
   },
 });

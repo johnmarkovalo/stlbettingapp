@@ -171,7 +171,7 @@ const TransacScreen = (props: any) => {
     } else if (rambolAmount.isFocus && rambolAmount.value.length === 0) {
       {
         changeFocus('betNumber');
-        bottomDrawerRef?.current?.open(hp(43));
+        bottomDrawerRef?.current?.open(hp(45));
       }
     }
   };
@@ -292,7 +292,7 @@ const TransacScreen = (props: any) => {
               style={styles.inputContainerStyle}
               onPress={() => {
                 changeFocus('betNumber');
-                bottomDrawerRef?.current?.open(hp(43));
+                bottomDrawerRef?.current?.open(hp(45));
               }}>
               {betNumber.isFocus && (
                 // <Animated.View style={{opacity}}>
@@ -310,7 +310,7 @@ const TransacScreen = (props: any) => {
               style={styles.inputContainerStyle}
               onPress={() => {
                 changeFocus('targetAmount');
-                bottomDrawerRef?.current?.open(hp(43));
+                bottomDrawerRef?.current?.open(hp(45));
               }}>
               {targetAmount.isFocus && (
                 // <Animated.View style={{opacity}}>
@@ -328,7 +328,7 @@ const TransacScreen = (props: any) => {
               style={styles.inputContainerStyle}
               onPress={() => {
                 changeFocus('rambolAmount');
-                bottomDrawerRef?.current?.open(hp(43));
+                bottomDrawerRef?.current?.open(hp(45));
               }}>
               {rambolAmount.isFocus && (
                 // <Animated.View style={{opacity}}>
@@ -361,7 +361,7 @@ const TransacScreen = (props: any) => {
         <View style={styles.keyBoardWrapper}>
           <TouchableOpacity
             style={styles.showKeyBoard}
-            onPress={() => bottomDrawerRef?.current?.open(hp(43))}>
+            onPress={() => bottomDrawerRef?.current?.open(hp(45))}>
             <MaterialIcons name="dialpad" size={30} color="white" />
           </TouchableOpacity>
         </View>
@@ -369,7 +369,7 @@ const TransacScreen = (props: any) => {
           ref={bottomDrawerRef}
           backdropOpacity={0}
           openOnMount
-          initialHeight={hp(43)}>
+          initialHeight={hp(45)}>
           <View style={styles.keyboardContainer}>
             <View style={styles.wrapper}>
               {/* 1 */}

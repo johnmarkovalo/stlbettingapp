@@ -16,7 +16,10 @@ import colors from '../../../Styles/Colors.ts';
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
   const {navigation} = props;
-  const buttonData = [{name: 'STL'}, {name: 'S3'}];
+  const betTypes = [
+    {id: 1, name: 'S3'},
+    {id: 2, name: 'STL'},
+  ];
 
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
@@ -44,7 +47,7 @@ const Home = (props: any) => {
         </View>
         <View style={styles.container}>
           <ScrollView style={{marginTop: 20}}>
-            {buttonData.map((button, index) => (
+            {betTypes.map((button, index) => (
               <TouchableOpacity
                 key={index}
                 onPress={() => {
