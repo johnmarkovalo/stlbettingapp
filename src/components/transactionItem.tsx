@@ -23,7 +23,7 @@ export const TransactionItem = ({item, onPress}: TransactionProps) => {
           <View>
             <Text style={styles.numberStyle}>{item.ticketcode}</Text>
             <Text style={styles.subNumberStyle}>
-              {moment(item.bettime, 'hh:mm:ss').format('hh:mm A')}
+              {moment(item.created_at, 'hh:mm:ss').format('hh:mm A')}
             </Text>
           </View>
         </View>
@@ -32,7 +32,7 @@ export const TransactionItem = ({item, onPress}: TransactionProps) => {
             styles.numberStyle,
             {color: colors.mediumGreen, fontSize: 20},
           ]}>
-          {formatNumberWithCommas(item.declared_gross)}
+          {formatNumberWithCommas(item.total)}
         </Text>
       </TouchableOpacity>
       <View style={styles.line} />

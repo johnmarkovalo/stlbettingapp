@@ -1,5 +1,6 @@
 interface Bet {
   id: number;
+  transid: number;
   betNumber: string;
   betNumberr?: string;
   targetAmount: string;

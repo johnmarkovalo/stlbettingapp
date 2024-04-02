@@ -14,12 +14,15 @@ import DropDownPicker from 'react-native-dropdown-picker';
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 
-const TypeModal = ({setType, type, hide}: any) => {
+const TypeModal = ({setType, type, types, hide}: any) => {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState([
-    {label: 'S3', value: 1},
-    {label: 'STL', value: 2},
-  ]);
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    types.map((item: any) => {
+      setItems(old => [...old, {label: item.name, value: item.id}]);
+    });
+  }, []);
   function hideModal() {
     hide();
   }

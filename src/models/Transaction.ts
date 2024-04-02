@@ -8,11 +8,9 @@ interface Transaction {
   bettime: string;
   bettypeid: number;
   trans_no: number;
-  declared_gross?: number;
-  remarks?: string;
-  gateway: string;
+  total: number;
   status: string;
-  synced: boolean;
+  created_at: string;
 }
 
 export default Transaction;

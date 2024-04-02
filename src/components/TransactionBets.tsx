@@ -12,6 +12,7 @@ import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
+import {getBetsByTransaction, closeDatabaseConnection} from '../helper/sqlite';
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
@@ -76,27 +77,17 @@ const TransactionBets = ({transaction, hide}: any) => {
   };
 
   useEffect(() => {
-    const fetchBets = async () => {
-      // try {
-      //   const BaseURL = await appConfig.getApiUrl();
-      //   const url = `${BaseURL}${appConfig.apiPathPrefix}/callNotes/${call_id}/${note}`; // Construct the full URL
-      //   const response = await axios.put(url, {
-      //     // Pass the URL as a string
-      //     headers: {
-      //       'Content-Type': 'application/json',
-      //       Authorization: `Bearer ${token}`,
-      //     },
-      //   });
-      //   setNote(response.data.data);
-      // } catch (err) {
-      //   // ... error handling
-      // } finally {
-      // }
-    };
-    if (transaction) {
-      fetchBets();
-    }
+    getBetsByTransaction(transaction.id, bets => {
+      setBets(bets);
+      console.log('Bets:', bets);
+    });
   }, [transaction]);
+
+  useEffect(() => {
+    return () => {
+      closeDatabaseConnection();
+    };
+  }, []);
 
   useEffect(() => {
     let total = 0;
@@ -115,7 +106,7 @@ const TransactionBets = ({transaction, hide}: any) => {
       <View style={styles.modalView}>
         {/* Header */}
         <View style={styles.modalHeaderContainer}>
-          <Text style={styles.modalTitle}>{'Transaction ID'}</Text>
+          <Text style={styles.modalTitle}>{transaction.ticketcode}</Text>
           <TouchableOpacity
             onPress={hide}
             style={{
