@@ -114,3 +114,9 @@ export const getCurrentDraw = draws => {
   }
   return draws.indexOf(currentDraw) + 1;
 };
+
+export const checkIfTriple = num => {
+  //Check if all characters are the same
+  const str = String(num);
+  return str.split('').every(v => v === str[0]);
+};

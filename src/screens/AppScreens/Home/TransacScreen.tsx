@@ -22,6 +22,7 @@ import BottomDrawer, {
 } from 'react-native-animated-bottom-drawer';
 import Bet from '../../../models/Bet.ts';
 import {BetItem} from '../../../components/BetItem.tsx';
+import {checkIfTriple} from '../../../helper/functions.js';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
@@ -81,7 +82,7 @@ const TransacScreen = (props: any) => {
       changeFocus('targetAmount');
     }
     if (targetAmount.value.length === 3 && targetAmount.isFocus) {
-      changeFocus('rambolAmount');
+      if (!checkIfTriple(betNumber.value)) changeFocus('rambolAmount');
     }
     if (rambolAmount.value.length === 3 && rambolAmount.isFocus) {
     }
@@ -106,10 +107,18 @@ const TransacScreen = (props: any) => {
         value: prevState.value + input,
       }));
     } else if (rambolAmount.isFocus && rambolAmount.value.length < 3) {
-      setRambolAmount(prevState => ({
-        ...prevState,
-        value: prevState.value + input,
-      }));
+      if (!checkIfTriple(betNumber.value))
+        setRambolAmount(prevState => ({
+          ...prevState,
+          value: prevState.value + input,
+        }));
+      else
+        Alert.alert(
+          'Triple Digit',
+          'You cannot enter rambol amount if tripple digit.',
+          [{text: 'OK', onPress: () => console.log('OK Pressed')}],
+          {cancelable: false},
+        );
     }
   };
 
@@ -196,12 +205,14 @@ const TransacScreen = (props: any) => {
   };
 
   const onNoTarget = () => {
-    if (targetAmount.isFocus) {
+    if (targetAmount.isFocus && !checkIfTriple(betNumber.value)) {
       setTargetAmount(prevState => ({
         ...prevState,
         value: '0',
       }));
       changeFocus('rambolAmount');
+    } else if (targetAmount.isFocus && checkIfTriple(betNumber.value)) {
+      addBet();
     }
   };
 
