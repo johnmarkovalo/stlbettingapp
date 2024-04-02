@@ -120,3 +120,19 @@ export const checkIfTriple = num => {
   const str = String(num);
   return str.split('').every(v => v === str[0]);
 };
+
+export const sortNumber = number => {
+  const str = String(number);
+  const sorted = str.split('').sort().join('');
+  return sorted;
+};
+
+export const convertToTransData = bets => {
+  let transdata = '';
+  for (let n = 0; n < bets.length; n++) {
+    transdata += bets[n].betNumber;
+    transdata += ' ' + bets[n].targetAmount;
+    transdata += ' ' + bets[n].rambolAmount + ', ';
+  }
+  return transdata;
+};

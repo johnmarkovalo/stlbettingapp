@@ -289,6 +289,34 @@ const getTransactions = (
   });
 };
 
+const getLatestTransaction = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+  callback: (transaction: any) => void,
+) => {
+  const db = openDatabaseConnection();
+  db.transaction((tx: any) => {
+    tx.executeSql(
+      'SELECT * FROM trans WHERE betdate = ? AND bettime = ? AND bettypeid = ? ORDER BY trans_no DESC LIMIT 1',
+      [betdate, bettime, bettypeid],
+      (tx: any, results: any) => {
+        const rows = results.rows;
+        const len = rows.length;
+        if (len > 0) {
+          const transaction = rows.item(0);
+          callback(transaction);
+        } else {
+          callback(null);
+        }
+      },
+      (error: any) => {
+        console.error('Error fetching transactions:', error);
+      },
+    );
+  });
+};
+
 const getBetsByTransaction = (
   transid: number,
   callback: (bets: Bet[]) => void,
@@ -324,6 +352,58 @@ const getBetsByTransaction = (
   });
 };
 
+const insertTransaction = (
+  transaction: Transaction,
+  bets: Bet[],
+  callback: (transactionId: number) => void,
+) => {
+  const db = openDatabaseConnection();
+  db.transaction((tx: any) => {
+    tx.executeSql(
+      'INSERT INTO trans (ticketcode, transdata, betdate, bettime, bettypeid, trans_no, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        transaction.ticketcode,
+        transaction.trans_data,
+        transaction.betdate,
+        transaction.bettime,
+        transaction.bettypeid,
+        transaction.trans_no,
+        transaction.total,
+        transaction.status,
+      ],
+      (tx: any, results: any) => {
+        const insertedId = results.insertId;
+        callback(insertedId); // Pass the inserted ID back to the callback
+
+        // Insert bets associated with the transaction
+        bets.forEach((bet: Bet) => {
+          tx.executeSql(
+            'INSERT INTO bet (transid, tranno, betnumber, betnumberr, target, rambol, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [
+              insertedId,
+              bet.tranno,
+              bet.betNumber,
+              bet.betNumberr,
+              bet.targetAmount,
+              bet.rambolAmount,
+              bet.subtotal,
+            ],
+            () => {
+              console.log('Bet inserted successfully');
+            },
+            (error: any) => {
+              console.error('Error inserting bet:', error);
+            },
+          );
+        });
+      },
+      (error: any) => {
+        console.error('Error inserting transaction:', error);
+      },
+    );
+  });
+};
+
 const closeDatabaseConnection = () => {
   const db = openDatabaseConnection();
   db.close();
@@ -333,6 +413,8 @@ export {
   initializeDatabase,
   getActiveTypes,
   getTransactions,
+  getLatestTransaction,
   getBetsByTransaction,
+  insertTransaction,
   closeDatabaseConnection,
 };

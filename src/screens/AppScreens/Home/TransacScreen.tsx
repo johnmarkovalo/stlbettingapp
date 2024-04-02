@@ -22,12 +22,25 @@ import BottomDrawer, {
 } from 'react-native-animated-bottom-drawer';
 import Bet from '../../../models/Bet.ts';
 import {BetItem} from '../../../components/BetItem.tsx';
-import {checkIfTriple} from '../../../helper/functions.js';
+import {
+  checkIfTriple,
+  convertToTransData,
+  getCurrentDraw,
+  sortNumber,
+} from '../../../helper/functions.js';
+import moment from 'moment';
+import Transaction from '../../../models/Transaction.ts';
+import {
+  getLatestTransaction,
+  insertTransaction,
+} from '../../../helper/sqlite.ts';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
   const bottomDrawerRef = useRef<BottomDrawerMethods>(null);
   const betType = props.route.params.betType;
+  const betDate = moment().format('YYYY-MM-DD');
+  const [currentDraw, setCurrentDraw] = useState(null);
   const [totalAmount, setTotalAmount] = useState(0);
   const [betNumber, setBetNumber] = useState({
     value: '',
@@ -43,22 +56,25 @@ const TransacScreen = (props: any) => {
   });
   const [bets, setBets] = useState<Bet[]>([
     {
-      id: 1,
+      tranno: 1,
       betNumber: '123',
+      betNumberr: '123',
       targetAmount: '100',
       rambolAmount: '20',
       subtotal: 120,
     },
     {
-      id: 2,
+      tranno: 2,
       betNumber: '456',
+      betNumberr: '456',
       targetAmount: '5',
       rambolAmount: '0',
       subtotal: 5,
     },
     {
-      id: 3,
+      tranno: 3,
       betNumber: '789',
+      betNumberr: '789',
       targetAmount: '20',
       rambolAmount: '10',
       subtotal: 30,
@@ -93,6 +109,27 @@ const TransacScreen = (props: any) => {
       bets.reduce((total, current) => total + parseFloat(current.subtotal), 0),
     );
   }, [bets]);
+
+  useEffect(() => {
+    // Define a function to recalculate the current draw
+    const recalculateCurrentDraw = () => {
+      const currentDraw = getCurrentDraw(betType.draws);
+      //Check if currentDraw is not null
+      if (currentDraw !== null) setCurrentDraw(currentDraw);
+      else props.navigation.goBack();
+    };
+
+    // Recalculate current draw initially when the component mounts
+    recalculateCurrentDraw();
+
+    // Set up interval for periodic recalculation (every 60 seconds)
+    const intervalId = setInterval(recalculateCurrentDraw, 60000);
+
+    // Clean up interval when the component unmounts
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [betType]);
 
   const onKeyPress = (input: string) => {
     // Map first if what is focused
@@ -179,7 +216,7 @@ const TransacScreen = (props: any) => {
       }));
     } else if (rambolAmount.isFocus && rambolAmount.value.length === 0) {
       {
-        changeFocus('betNumber');
+        changeFocus('targetAmount');
         bottomDrawerRef?.current?.open(hp(45));
       }
     }
@@ -204,7 +241,7 @@ const TransacScreen = (props: any) => {
     }
   };
 
-  const onNoTarget = () => {
+  const onNext = () => {
     if (targetAmount.isFocus && !checkIfTriple(betNumber.value)) {
       setTargetAmount(prevState => ({
         ...prevState,
@@ -245,8 +282,9 @@ const TransacScreen = (props: any) => {
     if (betNumber.value && (targetAmount.value || rambolAmount.value)) {
       setBets(prevState => [
         {
-          id: Math.random(),
           betNumber: betNumber.value,
+          betNumberr: sortNumber(betNumber.value),
+          tranno: bets.length + 1,
           targetAmount: targetAmount.value === '' ? '0' : targetAmount.value,
           rambolAmount: rambolAmount.value === '' ? '0' : targetAmount.value,
           subtotal: Number(targetAmount.value) + Number(rambolAmount.value),
@@ -263,6 +301,41 @@ const TransacScreen = (props: any) => {
 
   const removeBet = (item: Bet) => {
     setBets(prevState => prevState.filter(bet => bet.id !== item.id));
+  };
+
+  const createTransaction = () => {
+    if (bets.length <= 0) {
+      Alert.alert('Error', 'Please add at least one bet');
+    } else {
+      getLatestTransaction(betDate, currentDraw, betType.id, trans => {
+        let latestTrans = trans;
+        let ticketcode =
+          '2852' +
+          '-' +
+          currentDraw +
+          betType.id +
+          '-' +
+          moment().format('YYMMDD-HHmmss');
+        let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
+        let trans_data = convertToTransData(bets);
+        const transaction: Transaction = {
+          ticketcode: ticketcode,
+          betdate: betDate,
+          bettime: currentDraw ?? 1,
+          bettypeid: betType.id,
+          trans_no: trans_no,
+          total: totalAmount,
+          trans_data: trans_data,
+          status: 'saved',
+        };
+        insertTransaction(transaction, bets, trans => {
+          if (trans) {
+            setBets([]);
+            setTotalAmount(0);
+          }
+        });
+      });
+    }
   };
 
   return (
@@ -402,12 +475,16 @@ const TransacScreen = (props: any) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onLongPress={() => {}}
-                  onPress={() => onNoTarget()}
+                  onPress={() => onNext()}
                   style={[
                     styles.keyButtonWrapper,
-                    {backgroundColor: Colors.mediumYellow},
+                    {backgroundColor: Colors.teal},
                   ]}>
-                  <Text style={styles.keyButtonText}>{'NT'}</Text>
+                  <MaterialIcons
+                    style={styles.keyButtonText}
+                    name="arrow-forward"
+                    size={20}
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -502,7 +579,9 @@ const TransacScreen = (props: any) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onLongPress={() => {}}
-                  onPress={() => {}}
+                  onPress={() => {
+                    createTransaction();
+                  }}
                   style={[
                     styles.keyButtonWrapper,
                     {backgroundColor: Colors.mediumGreen},

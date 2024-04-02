@@ -102,12 +102,14 @@ const Home = (props: any) => {
                 onPress={() => {
                   navigation.navigate('Transac', {betType: button});
                 }}
-                style={
-                  getCurrentDraw(button.draws) === null
-                    ? styles.buttonDisabled
-                    : styles.button
-                }
-                disabled={getCurrentDraw(button.draws) === null}>
+                // style={
+                //   getCurrentDraw(button.draws) === null
+                //     ? styles.buttonDisabled
+                //     : styles.button
+                // }
+                style={styles.button}
+                // disabled={getCurrentDraw(button.draws) === null}
+              >
                 <Text style={styles.textStyle}>{button.name}</Text>
               </TouchableOpacity>
             ))}

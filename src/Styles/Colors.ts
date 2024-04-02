@@ -17,6 +17,7 @@ const colors = {
   mediumYellow: '#EBB30E',
   red: '#FF0000',
   green: '#00A300',
+  teal: 'teal',
 };
 
 export default colors;
