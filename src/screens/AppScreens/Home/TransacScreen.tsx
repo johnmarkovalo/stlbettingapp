@@ -34,6 +34,7 @@ import {
   getLatestTransaction,
   insertTransaction,
 } from '../../../helper/sqlite.ts';
+import {testPrint} from '../../../helper/printer.js';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
