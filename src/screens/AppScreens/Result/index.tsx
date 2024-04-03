@@ -17,13 +17,21 @@ import {
 } from 'react-native-responsive-screen';
 import Colors from '../../../Styles/Colors.ts';
 import Transaction from '../../../models/Transaction.ts';
-import {TransactionItem} from '../../../components/transactionItem.tsx';
+import {ResultTransactionItem} from '../../../components/ResultTransactionItem.tsx';
 import {formatNumberWithCommas} from '../../../helper';
-import TransactionBets from '../../../components/TransactionBets.tsx';
+import ResultTransactionBets from '../../../components/ResultTransactionBets.tsx';
 import DatePicker from 'react-native-date-picker';
 import moment from 'moment';
 import DrawModal from '../../../components/DrawModal.tsx';
 import TypeModal from '../../../components/TypeModal.tsx';
+import Type from '../../../models/Type.ts';
+import {
+  getResult,
+  getWinners,
+  closeDatabaseConnection,
+  getActiveTypes,
+  updateTransactionStatus,
+} from '../../../helper/sqlite.ts';
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -40,57 +48,81 @@ const Result = (props: any) => {
   //Draw
   const [draw, setDraw] = useState(1);
   //Type
-  const [type, setType] = useState(1);
-  const betTypes = [
-    {name: 'S3', id: 1},
-    {name: 'STL', id: 2},
-  ];
+  const [type, setType] = useState(2);
+  const [betTypes, setBetTypes] = useState([]);
   function typeLabel() {
-    const matchingItems = betTypes.filter(item => item.id === type);
+    const matchingItems: Type[] = betTypes.filter(
+      (item: Type) => item.id === type,
+    );
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
   //Result
-  const [result, setResult] = useState(253);
+  const [result, setResult] = useState({result: 0});
   //Transaction
   const [totalAmount, setTotalAmount] = useState(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: 1,
-      ticketcode: '4062–3732–3434–3031',
-      keycode: 'A1677842777',
-      betdate: '2024-01-02',
-      betdraw: 1,
-      bettime: '11:56:42',
-      bettypeid: 1,
-      trans_no: 1,
-      declared_gross: 1123,
-      gateway: 'Retrofit',
-      status: 'VALID',
-      synced: true,
-    },
-    {
-      id: 2,
-      ticketcode: '4062–3732–3434–3041',
-      keycode: 'A1677842777',
-      betdate: '2024-01-02',
-      betdraw: 1,
-      bettime: '23:51:22',
-      bettypeid: 1,
-      trans_no: 2,
-      declared_gross: 123,
-      gateway: 'Retrofit',
-      status: 'VALID',
-      synced: false,
-    },
-  ]);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction>();
+  const [transactions, setTransactions] = useState([]);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
-  const renderItem = ({item}: {item: Transaction}) => {
+  useEffect(() => {
+    // Define the criteria for fetching transactions
+    getActiveTypes((types: Type[]) => {
+      setBetTypes(types);
+      setType(types[0].id);
+      setDraw(getCurrentDraw(types[0].draws) ?? 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    getResult(moment(betDate).format('YYYY-MM-DD'), draw, type, result => {
+      console.log('result', result);
+      if (result) {
+        setResult(result);
+        getWinners(
+          moment(betDate).format('YYYY-MM-DD'),
+          draw,
+          type,
+          result,
+          transactions => {
+            console.log('transactions', transactions);
+            if (transactions.length > 0) {
+              setTransactions(transactions);
+            } else setTransactions([]);
+          },
+        );
+      } else {
+        setResult({result: 0});
+        setTransactions([]);
+      }
+    });
+  }, [betDate, type, draw]);
+
+  useEffect(() => {
+    return () => {
+      closeDatabaseConnection();
+    };
+  }, []);
+
+  const renderItem = ({item}: {item: any}) => {
     return (
-      <TransactionItem
+      <ResultTransactionItem
         item={item}
         onPress={() => {
           betModalShow(item);
+        }}
+        onLongPress={() => {
+          // updateTransactionStatus(item.id, 'scanned');
+          // getWinners(
+          //   moment(betDate).format('YYYY-MM-DD'),
+          //   draw,
+          //   type,
+          //   result,
+          //   transactions => {
+          //     console.log('transactions', transactions);
+          //     if (transactions.length > 0) {
+          //       setTransactions(transactions);
+          //     } else setTransactions([]);
+          //   },
+          // );
         }}
       />
     );
@@ -99,7 +131,7 @@ const Result = (props: any) => {
   useEffect(() => {
     let total = 0;
     transactions.map(item => {
-      total += item.declared_gross;
+      total += item.total;
     });
     setTotalAmount(total);
   }, [transactions]);
@@ -110,8 +142,8 @@ const Result = (props: any) => {
     // setNote({id: null, note: null});
   };
 
-  const betModalShow = (transaction: Transaction) => {
-    // setBets({ ...note });
+  const betModalShow = (transaction: any) => {
+    setSelectedTransaction(transaction);
     setBetModalVisible(true);
   };
 
@@ -140,8 +172,9 @@ const Result = (props: any) => {
         transparent={true}
         visible={betModalVisible}
         onRequestClose={betModalHide}>
-        <TransactionBets
+        <ResultTransactionBets
           hide={betModalHide}
+          result={result}
           transaction={selectedTransaction}
         />
       </Modal>
@@ -172,7 +205,12 @@ const Result = (props: any) => {
         transparent={true}
         visible={typeModalVisible}
         onRequestClose={typeModalHide}>
-        <TypeModal hide={typeModalHide} type={type} setType={setType} />
+        <TypeModal
+          hide={typeModalHide}
+          type={type}
+          types={betTypes}
+          setType={setType}
+        />
       </Modal>
       <View style={Styles.mainContainer}>
         <View style={Styles.headerContainer}>
@@ -223,17 +261,17 @@ const Result = (props: any) => {
               style={[
                 {fontWeight: 'bold', fontSize: 30, color: Colors.mediumBlue},
               ]}>
-              {result}
+              {result.result}
             </Text>
           </Text>
         </View>
         {/* Transaction List */}
         <FlatList data={transactions} renderItem={renderItem} />
         <View style={Styles.line} />
-        {/* Print Sales */}
-        {/* <TouchableOpacity style={styles.buttonStyle} onPress={() => {}}>
-          <Text style={styles.buttonTextStyle}>Print Sales</Text>
-        </TouchableOpacity> */}
+        {/* Scan Ticket */}
+        <TouchableOpacity style={styles.buttonStyle} onPress={() => {}}>
+          <Text style={styles.buttonTextStyle}>Scan Ticket</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -303,7 +341,7 @@ const styles = StyleSheet.create({
 
   buttonStyle: {
     width: wp(97),
-    marginVertical: 10,
+    marginVertical: 15,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',

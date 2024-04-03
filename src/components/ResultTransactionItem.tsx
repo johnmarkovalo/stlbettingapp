@@ -9,28 +9,40 @@ import {formatNumberWithCommas} from '../helper';
 type TransactionProps = {
   item: Transaction;
   onPress: () => void;
+  onLongPress: () => void;
 };
 
-export const TransactionItem = ({item, onPress}: TransactionProps) => {
+export const ResultTransactionItem = ({
+  item,
+  onPress,
+  onLongPress,
+}: TransactionProps) => {
   return (
     <View>
-      <TouchableOpacity style={styles.container} onPress={onPress}>
+      <TouchableOpacity
+        style={styles.container}
+        onPress={onPress}
+        onLongPress={onLongPress}>
         <View style={[{flexDirection: 'row', alignItems: 'center'}]}>
           <Text style={[{color: Colors.darkGrey, fontSize: 25}]}>
             {item.trans_no + '. '}
           </Text>
           <View>
-            <Text style={styles.numberStyle}>{item.ticketcode}</Text>
+            <Text
+              style={
+                item.status === 'scanned'
+                  ? styles.scannedNumberStyle
+                  : styles.numberStyle
+              }>
+              {item.ticketcode}
+            </Text>
             <Text style={styles.subNumberStyle}>
               {moment(item.created_at, 'hh:mm:ss').format('hh:mm A')}
             </Text>
           </View>
         </View>
         <Text
-          style={[
-            styles.numberStyle,
-            {color: Colors.mediumGreen, fontSize: 20},
-          ]}>
+          style={[styles.numberStyle, {color: Colors.mediumRed, fontSize: 20}]}>
           {formatNumberWithCommas(item.total)}
         </Text>
       </TouchableOpacity>
@@ -57,6 +69,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.Black,
+  },
+
+  scannedNumberStyle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.mediumGreen,
   },
 
   subNumberStyle: {

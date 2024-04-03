@@ -12,12 +12,15 @@ import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
-import {getBetsByTransaction, closeDatabaseConnection} from '../helper/sqlite';
+import {
+  getWinningTransactionBets,
+  closeDatabaseConnection,
+} from '../helper/sqlite';
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 
-const TransactionBets = ({transaction, hide}: any) => {
+const ResultTransactionBets = ({hide, result, transaction}: any) => {
   const [totalAmount, setTotalAmount] = useState(0);
   const [bets, setBets] = useState<Bet[]>([
     {
@@ -77,7 +80,8 @@ const TransactionBets = ({transaction, hide}: any) => {
   };
 
   useEffect(() => {
-    getBetsByTransaction(transaction.id, bets => {
+    getWinningTransactionBets(transaction.id, result, bets => {
+      console.log('bets', bets);
       setBets(bets);
     });
   }, [transaction]);
@@ -203,4 +207,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default TransactionBets;
+export default ResultTransactionBets;

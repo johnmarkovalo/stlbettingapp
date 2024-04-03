@@ -121,6 +121,12 @@ export const checkIfTriple = num => {
   return str.split('').every(v => v === str[0]);
 };
 
+export const checkIfDouble = num => {
+  //Check if 2 characters are the same
+  const str = String(num);
+  return str.split('').some((v, i) => v === str[i + 1]);
+};
+
 export const sortNumber = number => {
   const str = String(number);
   const sorted = str.split('').sort().join('');
