@@ -34,7 +34,7 @@ import {
   getLatestTransaction,
   insertTransaction,
 } from '../../../helper/sqlite.ts';
-import {testPrint} from '../../../helper/printer.js';
+import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
@@ -331,6 +331,8 @@ const TransacScreen = (props: any) => {
         };
         insertTransaction(transaction, bets, trans => {
           if (trans) {
+            listPairedDevices();
+            printTransaction(transaction, betType, bets);
             setBets([]);
             setTotalAmount(0);
           }

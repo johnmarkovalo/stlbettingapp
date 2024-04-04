@@ -19,57 +19,7 @@ const heightScreen = Dimensions.get('window').height;
 
 const TransactionBets = ({transaction, hide}: any) => {
   const [totalAmount, setTotalAmount] = useState(0);
-  const [bets, setBets] = useState<Bet[]>([
-    {
-      id: 1,
-      betNumber: '123',
-      targetAmount: '100',
-      rambolAmount: '20',
-      subtotal: 120,
-    },
-    {
-      id: 2,
-      betNumber: '456',
-      targetAmount: '5',
-      rambolAmount: '0',
-      subtotal: 5,
-    },
-    {
-      id: 3,
-      betNumber: '789',
-      targetAmount: '20',
-      rambolAmount: '10',
-      subtotal: 30,
-    },
-    {
-      id: 4,
-      betNumber: '123',
-      targetAmount: '100',
-      rambolAmount: '20',
-      subtotal: 120,
-    },
-    {
-      id: 5,
-      betNumber: '456',
-      targetAmount: '5',
-      rambolAmount: '0',
-      subtotal: 5,
-    },
-    {
-      id: 6,
-      betNumber: '789',
-      targetAmount: '20',
-      rambolAmount: '10',
-      subtotal: 30,
-    },
-    {
-      id: 7,
-      betNumber: '123',
-      targetAmount: '100',
-      rambolAmount: '20',
-      subtotal: 120,
-    },
-  ]);
+  const [bets, setBets] = useState<Bet[]>([]);
 
   const renderItem = ({item}: {item: Bet}) => {
     const index = bets.indexOf(item);
