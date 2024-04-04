@@ -30,6 +30,7 @@ import {
   getActiveTypes,
 } from '../../../helper/sqlite.ts';
 import Type from '../../../models/Type.ts';
+import {listPairedDevices, printSales} from '../../../helper/printer.js';
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -46,7 +47,7 @@ const History = (props: any) => {
   //Draw
   const [draw, setDraw] = useState(1);
   //Type
-  const [type, setType] = useState(0);
+  const [type, setType] = useState(1);
   const [betTypes, setBetTypes] = useState([]);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
@@ -231,9 +232,16 @@ const History = (props: any) => {
         <FlatList data={transactions} renderItem={renderItem} />
         <View style={Styles.line} />
         {/* Print Sales */}
-        <TouchableOpacity style={styles.buttonStyle} onPress={() => {}}>
-          <Text style={styles.buttonTextStyle}>Print Sales</Text>
-        </TouchableOpacity>
+        {transactions.length > 0 && (
+          <TouchableOpacity
+            style={styles.buttonStyle}
+            onPress={() => {
+              listPairedDevices();
+              printSales(betDate, draw, typeLabel(), totalAmount);
+            }}>
+            <Text style={styles.buttonTextStyle}>Print Sales</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -255,7 +263,7 @@ const styles = StyleSheet.create({
   },
 
   cardTitle: {
-    fontSize: 13,
+    fontSize: 16,
     color: Colors.darkGrey,
     fontWeight: 'bold',
     alignSelf: 'center',
