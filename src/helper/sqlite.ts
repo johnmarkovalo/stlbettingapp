@@ -349,94 +349,77 @@ const closeDatabaseConnection = () => {
 };
 
 //Insert Functions
-const inserTypes = (
-  active: string,
-  bettype: string,
-  bettypeid: number,
-  wintar: number,
-  winram: number,
-  winram2: number,
-  maxlength: number,
-  cnt: string,
-  perc: string,
-  divisible: number,
-  limits: number,
-  capping: number,
-  start11: number,
-  start11m: number,
-  end11: number,
-  end11m: number,
-  start4: number,
-  start4m: number,
-  end4: number,
-  end4m: number,
-  start9: number,
-  start9m: number,
-  end9: number,
-  end9m: number,
-) => {
+const updateTypes = (types: any) => {
   const db = openDatabaseConnection();
   db.transaction((tx: any) => {
-    tx.executeSql(
-      'SELECT 1 FROM settings WHERE bettypeid=?',
-      [bettypeid],
-      (tx: any, results: any) => {
-        const cs = results.rows;
-        const cv = {
-          active: active,
-          bettype: bettype,
-          wintar: wintar,
-          winram: winram,
-          winram2: winram2,
-          maxlength: maxlength,
-          cnt: cnt,
-          perc: perc,
-          divisible: divisible,
-          limits: limits,
-          capping: capping,
-          bettypeid: bettypeid,
-          start11: start11,
-          start11m: start11m,
-          end11: end11,
-          end11m: end11m,
-          start4: start4,
-          start4m: start4m,
-          end4: end4,
-          end4m: end4m,
-          start9: start9,
-          start9m: start9m,
-          end9: end9,
-          end9m: end9m,
-        };
+    tx.executeSql('DELETE FROM settings', [], (tx: any, results: any) => {
+      console.log('deleted');
+    });
+  });
+  types.forEach(type => {
+    db.transaction((tx: any) => {
+      tx.executeSql(
+        'SELECT 1 FROM settings WHERE bettypeid=?',
+        [type.bettypeid],
+        (tx: any, results: any) => {
+          const cs = results.rows;
+          const cv = {
+            active: type.active,
+            bettype: type.bettype,
+            wintar: type.wintar,
+            winram: type.winram,
+            winram2: type.winram2,
+            maxlength: type.maxlength,
+            cnt: type.cnt,
+            perc: type.perc,
+            divisible: type.divisible,
+            limits: type.limits,
+            capping: type.capping,
+            bettypeid: type.bettypeid,
+            start11: type.start11,
+            start11m: type.start11m,
+            end11: type.end11,
+            end11m: type.end11m,
+            start4: type.start4,
+            start4m: type.start4m,
+            end4: type.end4,
+            end4m: type.end4m,
+            start9: type.start9,
+            start9m: type.start9m,
+            end9: type.end9,
+            end9m: type.end9m,
+          };
 
-        if (cs.length === 0) {
-          tx.executeSql(
-            'INSERT OR REPLACE INTO settings (active, bettype, wintar, winram, winram2, maxlength, cnt, perc, divisible, limits, capping, bettypeid, start11, start11m, end11, end11m, start4, start4m, end4, end4m, start9, start9m, end9, end9m) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            Object.values(cv),
-            () => {
-              console.log('Setting inserted successfully');
-            },
-            (error: any) => {
-              console.error('Error inserting setting:', error);
-            },
-          );
-        } else {
-          tx.executeSql(
-            'UPDATE settings SET active=?, bettype=?, wintar=?, winram=?, winram2=?, maxlength=?, cnt=?, perc=?, divisible=?, limits=?, capping=?, start11=?, start11m=?, end11=?, end11m=?, start4=?, start4m=?, end4=?, end4m=?, start9=?, start9m=?, end9=?, end9m=? WHERE bettypeid=?',
-            [...Object.values(cv), bettypeid],
-            () => {
-              console.log('Setting updated successfully');
-            },
-            (error: any) => {
-              console.error('Error updating setting:', error);
-            },
-          );
-        }
-      },
-      (error: any) => {
-        console.error('Error fetching setting:', error);
-      },
-    );
+          if (cs.length === 0) {
+            tx.executeSql(
+              'INSERT OR REPLACE INTO settings (active, bettype, wintar, winram, winram2, maxlength, cnt, perc, divisible, limits, capping, bettypeid, start11, start11m, end11, end11m, start4, start4m, end4, end4m, start9, start9m, end9, end9m) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              Object.values(cv),
+              () => {
+                console.log('Setting inserted successfully');
+              },
+              (error: any) => {
+                console.error('Error inserting setting:', error);
+              },
+            );
+          } else {
+            delete cv.bettypeid;
+            tx.executeSql(
+              'UPDATE settings SET active=?, bettype=?, wintar=?, winram=?, winram2=?, maxlength=?, cnt=?, perc=?, divisible=?, limits=?, capping=?, start11=?, start11m=?, end11=?, end11m=?, start4=?, start4m=?, end4=?, end4m=?, start9=?, start9m=?, end9=?, end9m=? WHERE bettypeid=?',
+              [...Object.values(cv), type.bettypeid],
+              () => {
+                console.log('Setting updated successfully');
+              },
+              (error: any) => {
+                console.error('Error updating setting:', error);
+              },
+            );
+          }
+        },
+        (error: any) => {
+          console.error('Error fetching setting:', error);
+        },
+      );
+    });
   });
 };
 
@@ -566,6 +549,7 @@ export {
   getWinners,
   getResult,
   insertTransaction,
+  updateTypes,
   updateTransactionStatus,
   closeDatabaseConnection,
 };

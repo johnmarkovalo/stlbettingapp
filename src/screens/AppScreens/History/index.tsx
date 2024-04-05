@@ -24,7 +24,8 @@ import DatePicker from 'react-native-date-picker';
 import moment from 'moment';
 import DrawModal from '../../../components/DrawModal.tsx';
 import TypeModal from '../../../components/TypeModal.tsx';
-import {useSelector} from 'react-redux';
+import {useSelector, useDispatch} from 'react-redux';
+import {typesActions} from '../../../store/actions';
 import {
   getTransactions,
   closeDatabaseConnection,
@@ -38,6 +39,8 @@ const widthScreen = Dimensions.get('window').width;
 const History = (props: any) => {
   const {navigation} = props;
   const user = useSelector(state => state.auth.user);
+  const betTypes = useSelector(state => state.types.types);
+  const dispatch = useDispatch();
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [drawModalVisible, setDrawModalVisible] = useState(false);
@@ -50,7 +53,6 @@ const History = (props: any) => {
   const [draw, setDraw] = useState(1);
   //Type
   const [type, setType] = useState(1);
-  const [betTypes, setBetTypes] = useState([]);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.id === type,
@@ -65,7 +67,7 @@ const History = (props: any) => {
   useEffect(() => {
     // Define the criteria for fetching transactions
     getActiveTypes((types: Type[]) => {
-      setBetTypes(types);
+      dispatch(typesActions.update(types));
       setType(types[0].id);
       setDraw(getCurrentDraw(types[0].draws) ?? 1);
     });

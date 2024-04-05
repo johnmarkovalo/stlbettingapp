@@ -18,12 +18,27 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import {useDispatch, useSelector} from 'react-redux';
-import {userActions} from '../../../store/actions';
+import {userActions, typesActions} from '../../../store/actions';
+import {syncBetTypesAPI} from '../../../helper/api';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {updateTypes} from '../../../helper/sqlite';
 const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
   const {navigation} = props;
-  const buttonData = [{name: 'STL'}, {name: 'S3'}];
+  const user = useSelector(state => state.auth.user);
+  const token = useSelector(state => state.auth.token);
   const dispatch = useDispatch();
+  const [apiUrl, setApiUrl] = useState('');
+  const [agent, setAgent] = useState({});
+
+  useEffect(() => {
+    (async () => {
+      setApiUrl(await AsyncStorage.getItem('API_URL'));
+      setAgent({...user});
+    })();
+  }, []);
+
   const logout = () => {
     Alert.alert('Confirmation', 'Are you sure you want to log out?', [
       {
@@ -37,6 +52,16 @@ const Setting = (props: any) => {
         text: 'No',
       },
     ]);
+  };
+
+  const syncBetTypes = async () => {
+    syncBetTypesAPI(apiUrl, token, (types: any) => {
+      if (types) {
+        updateTypes(types);
+        Alert.alert('Success', 'Bet types synced');
+        dispatch(typesActions.update(types));
+      }
+    });
   };
 
   return (
@@ -56,11 +81,15 @@ const Setting = (props: any) => {
                 />
               </View>
               <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Zian</Text>
-                <Text style={styles.cardSubTitle}>ISABELA 02-002-2024</Text>
+                <Text style={styles.cardTitle}>{agent.agent_name}</Text>
+                <Text style={styles.cardSubTitle}>{agent.agent_series}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.card} onPress={() => {}}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                syncBetTypes();
+              }}>
               <View style={styles.cardAvatar}>
                 <MaterialIcon
                   name="cloud-sync"
