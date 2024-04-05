@@ -20,7 +20,7 @@ async function printSales(betDate, betTime, betType, totalAmount) {
 }
 
 async function printTransaction(transaction, betType, bets) {
-  const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'} Draw | ${betType.name}`;
+  const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'} Draw | ${betType.name.replace(/\s/g, '')}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const ticket = `${transaction.ticketcode}`;
   const total = `TOTAL: <b>${transaction.total}.00</b>`;
@@ -28,46 +28,42 @@ async function printTransaction(transaction, betType, bets) {
   await bets.forEach(bet => {
     let target = bet.targetAmount.toString() + ' T';
     let rambol = bet.rambolAmount.toString() + ' R';
-    let targatCanWin = formatNumberWithCommas(
-      betType.wintar * bet.targetAmount,
-    );
-    let rambolCanWin = checkIfDouble(bet.betNumber)
-      ? formatNumberWithCommas(bet.rambolAmount * betType.winram2)
-      : formatNumberWithCommas(bet.rambolAmount * betType.winram);
-    if (bet.targetAmount > 0)
-      betString += justifySpaceBetween(bet.betNumber, target, targatCanWin);
-    if (bet.rambolAmount > 0)
-      betString += justifySpaceBetween(bet.betNumber, rambol, rambolCanWin);
+    betString += justifySpaceBetween(bet.betNumber, target, rambol);
   });
   const textToPrint =
-    "<qrcode size='20'>" +
-    transaction.ticketcode +
-    '</qrcode>\n' +
     // '<img>http://philippinestl.com/downloads/zianLogo.png</img>\n' +
+    '--------------------------------' +
     '       SMALL TOWN LOTTERY       ' +
     '              ZIAN              ' +
     '--------------------------------' +
     padStringToLength32(infoHeader) +
-    padStringToLength32(dateTime) +
+    padStringToLength32('Printed: ' + dateTime) +
     '<b>' +
     padStringToLength32(ticket) +
     '</b>' +
-    '--------------------------------' +
+    padStringToLength32('Agent: John Mark Ovalo') +
+    '                                ' +
+    padStringToLength32('1PHP T WINS ' + betType.wintar) +
+    padStringToLength32('1PHP R WINS ' + betType.winram) +
+    padStringToLength32('1PHP Double R WINS ' + betType.winram2) +
+    '                                ' +
     'No.            Bet        CanWin' +
     '--------------------------------' +
     betString +
     '--------------------------------' +
     padStringToLength32(total) +
     '                                       ' +
-    '   Winning tickets should be   ' +
-    '   claimed within 1 week after  ' +
+    '      Valid for 1 month after   ' +
     '   betting, otherwise forfeited ' +
     '       No Ticket, No Payout     ' +
     '                                ' +
-    '        Issued by: Zian        ' +
     '\n\n' +
     '  ____________________________  ' +
     "    Ticket Holder's Signature   " +
+    '                                ' +
+    "\n<qrcode size='47'>" +
+    transaction.ticketcode +
+    '</qrcode>\n ' +
     '\n\n ';
   print(textToPrint);
 }
