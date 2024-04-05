@@ -360,11 +360,21 @@ const TransacScreen = (props: any) => {
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <View style={{width: widthScreen / 3}}>
-              <Text style={styles.cardSubTitle}>March 23, 2024</Text>
+              <Text style={styles.cardSubTitle}>
+                {moment().format('MMM DD, YYYY')}
+              </Text>
             </View>
             <View style={styles.verticalLine} />
             <View style={{width: widthScreen / 3}}>
-              <Text style={styles.cardSubTitle}>3rd Draw</Text>
+              <Text style={styles.cardSubTitle}>
+                {currentDraw === 1
+                  ? '1ST DRAW'
+                  : currentDraw === 2
+                    ? '2ND DRAW'
+                    : currentDraw === 3
+                      ? '3RD DRAW'
+                      : 'BET CLOSED'}
+              </Text>
             </View>
             <View style={styles.verticalLine} />
             <View style={{width: widthScreen / 3}}>
