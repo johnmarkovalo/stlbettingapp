@@ -8,33 +8,57 @@ import {
   Keyboard,
 } from 'react-native';
 import {ActivityIndicator, Text} from 'react-native-paper';
-// import {useDispatch, useSelector} from 'react-redux';
-import {useNavigation} from '@react-navigation/native';
+import {useDispatch, useSelector} from 'react-redux';
+import {StackActions, useNavigation} from '@react-navigation/native';
 import FastImage from 'react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Styles from './Styles';
 import Colors from '../../Styles/Colors';
 import Images from '../../Styles/Images';
-// import {userActions} from '../../store/actions';
+import {userActions} from '../../store/actions';
 import LinearGradient from 'react-native-linear-gradient';
 import {launchImageLibrary} from 'react-native-image-picker';
 import RNQRGenerator from 'rn-qr-generator';
+import {PermissionsAndroid} from 'react-native';
 import {
   Camera,
   useCameraDevice,
   useCodeScanner,
 } from 'react-native-vision-camera';
+import axios from 'axios';
 
 const LoginScreen = props => {
   const [showLogin, setShowLogin] = useState(false);
-  // const dispatch = useDispatch();
-  // const {loggingIn} = useSelector(state => state.auth);
+  const dispatch = useDispatch();
   const {loggingIn} = useRef(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [username, onChangeUsername] = useState('');
   const [password, onChangePassword] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const cameraDevice = useCameraDevice('back');
+  const [cameraDevice, setCameraDevice] = useState(useCameraDevice('back'));
+  const [apiUrl, setApiUrl] = useState('');
+
+  async function requestCameraPermission() {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Camera Permission',
+          message: 'App needs access to your camera.',
+          buttonPositive: 'OK',
+        },
+      );
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log('Camera permission granted');
+        // You can now proceed to use the camera
+      } else {
+        console.log('Camera permission denied');
+        // Handle denied permission
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }
 
   function handleSubmit() {
     Keyboard.dismiss();
@@ -53,7 +77,7 @@ const LoginScreen = props => {
 
   useEffect(() => {
     (async () => {
-      AsyncStorage.removeItem('API_URL');
+      setApiUrl(await AsyncStorage.getItem('API_URL'));
     })();
   }, []);
 
@@ -67,6 +91,7 @@ const LoginScreen = props => {
       () => setKeyboardVisible(false),
     );
 
+    requestCameraPermission();
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
@@ -100,43 +125,23 @@ const LoginScreen = props => {
     }
   };
 
-  const splitUrlAndToken = inputString => {
-    // Check if ':' is present in the string
-    if (!inputString.includes(':')) {
-      throw new Error('String does not contain a colon (:) separator.');
-    }
-
-    // Find the last index of ':'
-    const lastIndex = inputString.lastIndexOf(':');
-
-    // Extract the URL and token based on the last ':' position
-    const url = inputString.substring(0, lastIndex);
-    const token = inputString.substring(lastIndex + 1);
-
-    // Validate the URL (basic validation for demonstration purposes)
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      throw new Error('Invalid URL format.');
-    }
-
-    // Validate the token (example validation, adjust as needed)
-    if (token.length === 0) {
-      throw new Error('Token is empty.');
-    }
-
-    // Further validations can be added here as per requirements
-
-    return {url, token};
-  };
-
-  const processQR = async qr_token => {
+  const processQR = async (qr_token: string) => {
+    console.log(apiUrl + 'login');
     try {
-      const {url, token} = splitUrlAndToken(qr_token);
-
-      console.log(`Scanned ${JSON.stringify(qr_token)} codes!`);
-      // save the base API url
-      // await AsyncStorage.setItem('API_URL', url);
-      // @ts-ignore
-      // dispatch(userActions.loginUser({Authorization: `Bearer ${token}`}));
+      axios
+        .post(apiUrl + 'login', {
+          encodedString: qr_token,
+        })
+        .then((response: any) => {
+          console.log(response.data);
+          if (response?.data?.token) {
+            dispatch(
+              userActions.login(response.data.agent, response.data.token),
+            );
+          } else {
+            alert('Invalid QR code');
+          }
+        });
     } catch (e) {
       alert(e.message);
     }

@@ -5,14 +5,12 @@
  */
 import {createStackNavigator} from '@react-navigation/stack';
 import React from 'react';
-// import {useSelector} from 'react-redux';
+import {useSelector} from 'react-redux';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
 import {NavigationContainer} from '@react-navigation/native';
-import header from "@react-navigation/stack/src/views/Header/Header";
 
 export default function Navigation() {
-  // const alert = useSelector(state => state.alert);
   return (
     <NavigationContainer>
       <RootNavigator />
@@ -25,8 +23,8 @@ export default function Navigation() {
 const Stack = createStackNavigator();
 
 function RootNavigator() {
-  // const authentication = useSelector(state => state.auth);
-  const authentication = true
+  const authentication = useSelector(state => state.auth.loggedIn);
+  console.log('auth', authentication);
   return (
     <Stack.Navigator screenOptions={{headerShown: false}}>
       {authentication ? (

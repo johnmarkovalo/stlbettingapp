@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import {useSelector} from 'react-redux';
 import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import {
@@ -21,11 +22,13 @@ import Type from '../../../models/Type.ts';
 
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
+  const user = useSelector(state => state.auth.user);
   const {navigation} = props;
   const [betTypes, setBetTypes] = useState([]);
   const [currentDraw, setCurrentDraw] = useState(null);
 
   useEffect(() => {
+    console.log('user', user);
     getActiveTypes((types: Type[]) => {
       setBetTypes(types);
     });
@@ -90,7 +93,7 @@ const Home = (props: any) => {
             <View style={styles.verticalLine} />
             <View style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>BOOTH</Text>
-              <Text style={styles.cardSubTitle}>ISABELA 01-001-2019</Text>
+              <Text style={styles.cardSubTitle}>{user?.agent_series}</Text>
             </View>
           </View>
         </View>

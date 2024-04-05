@@ -1,7 +1,9 @@
 import ThermalPrinterModule from 'react-native-thermal-printer';
+import {useSelector} from 'react-redux';
 import {checkIfDouble} from '.';
 import moment from 'moment';
 
+const user = useSelector(state => state.auth.user);
 async function printSales(betDate, betTime, betType, totalAmount) {
   const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
@@ -41,7 +43,7 @@ async function printTransaction(transaction, betType, bets) {
     '<b>' +
     padStringToLength32(ticket) +
     '</b>' +
-    padStringToLength32('Agent: John Mark Ovalo') +
+    padStringToLength32('Agent: ' + user.agent_name) +
     '                                ' +
     padStringToLength32('1PHP T WINS ' + betType.wintar) +
     padStringToLength32('1PHP R WINS ' + betType.winram) +

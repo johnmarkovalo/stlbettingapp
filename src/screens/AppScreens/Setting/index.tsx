@@ -7,20 +7,37 @@ import {
   Dimensions,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Styles from './Styles';
-import navigation from '../../../navigation';
 import colors from '../../../Styles/Colors';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import {useDispatch, useSelector} from 'react-redux';
+import {userActions} from '../../../store/actions';
 const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
   const {navigation} = props;
   const buttonData = [{name: 'STL'}, {name: 'S3'}];
+  const dispatch = useDispatch();
+  const logout = () => {
+    Alert.alert('Confirmation', 'Are you sure you want to log out?', [
+      {
+        text: 'Yes',
+        onPress: () => {
+          // @ts-ignore
+          dispatch(userActions.logout());
+        },
+      },
+      {
+        text: 'No',
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
@@ -56,7 +73,11 @@ const Setting = (props: any) => {
               </View>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.buttonStyle} onPress={() => {}}>
+          <TouchableOpacity
+            style={styles.buttonStyle}
+            onPress={() => {
+              logout();
+            }}>
             <Text style={styles.buttonTextStyle}>Logout</Text>
           </TouchableOpacity>
         </View>

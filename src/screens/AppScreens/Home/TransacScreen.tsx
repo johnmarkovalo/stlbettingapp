@@ -35,9 +35,11 @@ import {
   insertTransaction,
 } from '../../../helper/sqlite.ts';
 import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
+import {useSelector} from 'react-redux';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
+  const user = useSelector(state => state.auth.user);
   const bottomDrawerRef = useRef<BottomDrawerMethods>(null);
   const betType = props.route.params.betType;
   const betDate = moment().format('YYYY-MM-DD');
@@ -378,7 +380,7 @@ const TransacScreen = (props: any) => {
             </View>
             <View style={styles.verticalLine} />
             <View style={{width: widthScreen / 3}}>
-              <Text style={styles.cardSubTitle}>ISABELA 01-001-2019</Text>
+              <Text style={styles.cardSubTitle}>{user?.agent_series}</Text>
             </View>
           </View>
         </View>

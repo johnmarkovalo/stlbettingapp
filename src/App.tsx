@@ -8,9 +8,9 @@
 import React, {useEffect} from 'react';
 import {StatusBar, useColorScheme} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-// import {Provider} from 'react-redux';
-// import {store, persistor} from './store/store';
-// import {PersistGate} from 'redux-persist/integration/react';
+import {Provider} from 'react-redux';
+import {store, persistor} from './store/store';
+import {PersistGate} from 'redux-persist/integration/react';
 import {MD3LightTheme as DefaultTheme, PaperProvider} from 'react-native-paper';
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 import Navigation from './navigation';
@@ -29,6 +29,10 @@ function App(): React.JSX.Element {
         if (!isDatabaseInitialized) {
           await initializeDatabase();
           await AsyncStorage.setItem('isDatabaseInitialized', 'true');
+          await AsyncStorage.setItem(
+            'API_URL',
+            'http://zian-api-v1.philippinestl.com/api/v2/',
+          );
         }
       } catch (error) {
         console.error('Error initializing database:', error);
@@ -49,19 +53,19 @@ function App(): React.JSX.Element {
   };
 
   return (
-    // <Provider store={store}>
-    //   <PersistGate loading={null} persistor={persistor}>
-    <SafeAreaProvider>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <PaperProvider theme={theme}>
-        <Navigation />
-      </PaperProvider>
-    </SafeAreaProvider>
-    //   </PersistGate>
-    // </Provider>
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <SafeAreaProvider>
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={backgroundStyle.backgroundColor}
+          />
+          <PaperProvider theme={theme}>
+            <Navigation />
+          </PaperProvider>
+        </SafeAreaProvider>
+      </PersistGate>
+    </Provider>
   );
 }
 

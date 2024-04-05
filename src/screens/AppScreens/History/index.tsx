@@ -24,6 +24,7 @@ import DatePicker from 'react-native-date-picker';
 import moment from 'moment';
 import DrawModal from '../../../components/DrawModal.tsx';
 import TypeModal from '../../../components/TypeModal.tsx';
+import {useSelector} from 'react-redux';
 import {
   getTransactions,
   closeDatabaseConnection,
@@ -36,6 +37,7 @@ const widthScreen = Dimensions.get('window').width;
 
 const History = (props: any) => {
   const {navigation} = props;
+  const user = useSelector(state => state.auth.user);
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [drawModalVisible, setDrawModalVisible] = useState(false);
