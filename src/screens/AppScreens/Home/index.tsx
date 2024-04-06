@@ -23,16 +23,16 @@ import Type from '../../../models/Type.ts';
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
   const user = useSelector(state => state.auth.user);
+  const types = useSelector(state => state.types.types);
   const {navigation} = props;
   const [betTypes, setBetTypes] = useState([]);
   const [currentDraw, setCurrentDraw] = useState(null);
 
   useEffect(() => {
-    console.log('user', user);
     getActiveTypes((types: Type[]) => {
       setBetTypes(types);
     });
-  }, []);
+  }, [types]);
 
   useEffect(() => {
     // Define a function to recalculate the current draw
@@ -55,7 +55,7 @@ const Home = (props: any) => {
     return () => {
       clearInterval(intervalId);
     };
-  }, [betTypes]);
+  }, [betTypes, types]);
 
   useEffect(() => {
     return () => {
@@ -105,14 +105,12 @@ const Home = (props: any) => {
                 onPress={() => {
                   navigation.navigate('Transac', {betType: button});
                 }}
-                // style={
-                //   getCurrentDraw(button.draws) === null
-                //     ? styles.buttonDisabled
-                //     : styles.button
-                // }
-                style={styles.button}
-                // disabled={getCurrentDraw(button.draws) === null}
-              >
+                style={
+                  getCurrentDraw(button.draws) === null
+                    ? styles.buttonDisabled
+                    : styles.button
+                }
+                disabled={getCurrentDraw(button.draws) === null}>
                 <Text style={styles.textStyle}>{button.name}</Text>
               </TouchableOpacity>
             ))}

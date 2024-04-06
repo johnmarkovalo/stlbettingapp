@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   Dimensions,
   FlatList,
@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 
 import Styles from './Styles';
@@ -18,7 +19,11 @@ import {
 import Colors from '../../../Styles/Colors.ts';
 import Transaction from '../../../models/Transaction.ts';
 import {TransactionItem} from '../../../components/transactionItem.tsx';
-import {formatNumberWithCommas, getCurrentDraw} from '../../../helper';
+import {
+  checkInternetConnection,
+  formatNumberWithCommas,
+  getCurrentDraw,
+} from '../../../helper';
 import TransactionBets from '../../../components/TransactionBets.tsx';
 import DatePicker from 'react-native-date-picker';
 import moment from 'moment';
@@ -30,15 +35,20 @@ import {
   getTransactions,
   closeDatabaseConnection,
   getActiveTypes,
+  updateTransactionStatus,
+  getBetsByTransaction,
 } from '../../../helper/sqlite.ts';
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
+import {sendTransactionAPI} from '../../../helper/api.ts';
 
 const widthScreen = Dimensions.get('window').width;
 
 const History = (props: any) => {
   const {navigation} = props;
+  const internetStatusCheck = useRef(checkInternetConnection());
   const user = useSelector(state => state.auth.user);
+  const token = useSelector(state => state.auth.token);
   const betTypes = useSelector(state => state.types.types);
   const dispatch = useDispatch();
   const [betModalVisible, setBetModalVisible] = useState(false);
@@ -52,10 +62,10 @@ const History = (props: any) => {
   //Draw
   const [draw, setDraw] = useState(1);
   //Type
-  const [type, setType] = useState(1);
+  const [type, setType] = useState(2);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
-      (item: Type) => item.id === type,
+      (item: Type) => item.bettypeid === type,
     );
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
@@ -68,7 +78,7 @@ const History = (props: any) => {
     // Define the criteria for fetching transactions
     getActiveTypes((types: Type[]) => {
       dispatch(typesActions.update(types));
-      setType(types[0].id);
+      setType(types[0].bettypeid);
       setDraw(getCurrentDraw(types[0].draws) ?? 1);
     });
   }, []);
@@ -80,7 +90,7 @@ const History = (props: any) => {
       type,
       transactions => {
         setTransactions(transactions);
-        console.log('Transactions:', transactions);
+        console.log('History transactions:', transactions);
       },
     );
   }, [betDate, type, draw]);
@@ -95,6 +105,9 @@ const History = (props: any) => {
     return (
       <TransactionItem
         item={item}
+        onLongPress={() => {
+          resendTransaction(item);
+        }}
         onPress={() => {
           betModalShow(item);
         }}
@@ -136,6 +149,40 @@ const History = (props: any) => {
 
   const typeModalShow = () => {
     setTypeModalVisible(true);
+  };
+
+  const resendTransaction = (transaction: Transaction) => {
+    if (internetStatusCheck.current.isConnected()) {
+      getBetsByTransaction(transaction.id, bets => {
+        let newTransaction = {
+          ...transaction,
+          trans_data: transaction.transdata,
+          status: 'VALID',
+          gateway: 'Retrofit',
+          keycode: user.keycode,
+          remarks: '',
+          printed_at: transaction.created_at,
+          declared_gross: totalAmount,
+          bets: bets,
+        };
+        console.log(newTransaction);
+        sendTransactionAPI(token, newTransaction, (result: any) => {
+          updateTransactionStatus(newTransaction.id, 'synced');
+          setTransactions(prevTransactions =>
+            prevTransactions.map((item: Transaction) => {
+              if (item.ticketcode === newTransaction.ticketcode) {
+                return {...item, status: 'synced'}; // Update only matching item
+              } else {
+                return item; // Preserve other items
+              }
+            }),
+          );
+        });
+      });
+      // Alert.alert('Printed');
+    } else {
+      Alert.alert('No internet connection');
+    }
   };
 
   return (

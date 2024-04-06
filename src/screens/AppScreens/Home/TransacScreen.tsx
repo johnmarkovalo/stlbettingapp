@@ -24,6 +24,7 @@ import Bet from '../../../models/Bet.ts';
 import {BetItem} from '../../../components/BetItem.tsx';
 import {
   checkIfTriple,
+  checkInternetConnection,
   convertToTransData,
   getCurrentDraw,
   sortNumber,
@@ -33,13 +34,18 @@ import Transaction from '../../../models/Transaction.ts';
 import {
   getLatestTransaction,
   insertTransaction,
+  updateTransactionStatus,
 } from '../../../helper/sqlite.ts';
 import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
 import {useSelector} from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {sendTransactionAPI} from '../../../helper/api.ts';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
   const user = useSelector(state => state.auth.user);
+  const token = useSelector(state => state.auth.token);
+  const internetStatusCheck = useRef(checkInternetConnection());
   const bottomDrawerRef = useRef<BottomDrawerMethods>(null);
   const betType = props.route.params.betType;
   const betDate = moment().format('YYYY-MM-DD');
@@ -57,32 +63,7 @@ const TransacScreen = (props: any) => {
     value: '',
     isFocus: false,
   });
-  const [bets, setBets] = useState<Bet[]>([
-    {
-      tranno: 1,
-      betNumber: '123',
-      betNumberr: '123',
-      targetAmount: '100',
-      rambolAmount: '20',
-      subtotal: 120,
-    },
-    {
-      tranno: 2,
-      betNumber: '456',
-      betNumberr: '456',
-      targetAmount: '5',
-      rambolAmount: '0',
-      subtotal: 5,
-    },
-    {
-      tranno: 3,
-      betNumber: '789',
-      betNumberr: '789',
-      targetAmount: '20',
-      rambolAmount: '10',
-      subtotal: 30,
-    },
-  ]);
+  const [bets, setBets] = useState<Bet[]>([]);
 
   const renderItem = ({item}: {item: Bet}) => {
     return (
@@ -288,8 +269,10 @@ const TransacScreen = (props: any) => {
           betNumber: betNumber.value,
           betNumberr: sortNumber(betNumber.value),
           tranno: bets.length + 1,
-          targetAmount: targetAmount.value === '' ? '0' : targetAmount.value,
-          rambolAmount: rambolAmount.value === '' ? '0' : targetAmount.value,
+          targetAmount:
+            targetAmount.value === '' ? 0 : parseInt(targetAmount.value),
+          rambolAmount:
+            rambolAmount.value === '' ? 0 : parseInt(targetAmount.value),
           subtotal: Number(targetAmount.value) + Number(rambolAmount.value),
         },
         ...prevState,
@@ -310,10 +293,9 @@ const TransacScreen = (props: any) => {
     if (bets.length <= 0) {
       Alert.alert('Error', 'Please add at least one bet');
     } else {
-      getLatestTransaction(betDate, currentDraw, betType.id, trans => {
-        let latestTrans = trans;
+      getLatestTransaction(betDate, currentDraw, betType.id, latestTrans => {
         let ticketcode =
-          '2852' +
+          user.keycode.substring(user.keycode.length - 4) +
           '-' +
           currentDraw +
           betType.id +
@@ -331,10 +313,26 @@ const TransacScreen = (props: any) => {
           trans_data: trans_data,
           status: 'saved',
         };
-        insertTransaction(transaction, bets, trans => {
-          if (trans) {
+        insertTransaction(transaction, bets, transactionId => {
+          if (transactionId) {
             listPairedDevices();
-            printTransaction(transaction, betType, bets);
+            printTransaction(transaction, betType, bets, user);
+            updateTransactionStatus(transactionId, 'printed');
+            if (internetStatusCheck.current.isConnected()) {
+              let newTransaction = {
+                ...transaction,
+                status: 'VALID',
+                gateway: 'Retrofit',
+                keycode: user.keycode,
+                remarks: '',
+                printed_at: moment().format('YYYY-MM-DD HH:mm:ss'),
+                declared_gross: totalAmount,
+                bets: bets,
+              };
+              sendTransactionAPI(token, newTransaction, (types: any) => {
+                updateTransactionStatus(transactionId, 'synced');
+              });
+            }
             setBets([]);
             setTotalAmount(0);
           }

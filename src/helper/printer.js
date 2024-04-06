@@ -2,8 +2,6 @@ import ThermalPrinterModule from 'react-native-thermal-printer';
 import {useSelector} from 'react-redux';
 import {checkIfDouble} from '.';
 import moment from 'moment';
-
-const user = useSelector(state => state.auth.user);
 async function printSales(betDate, betTime, betType, totalAmount) {
   const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
@@ -21,7 +19,7 @@ async function printSales(betDate, betTime, betType, totalAmount) {
   print(textToPrint);
 }
 
-async function printTransaction(transaction, betType, bets) {
+async function printTransaction(transaction, betType, bets, user) {
   const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'} Draw | ${betType.name.replace(/\s/g, '')}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const ticket = `${transaction.ticketcode}`;
@@ -43,7 +41,7 @@ async function printTransaction(transaction, betType, bets) {
     '<b>' +
     padStringToLength32(ticket) +
     '</b>' +
-    padStringToLength32('Agent: ' + user.agent_name) +
+    padStringToLength32('Agent: ' + user.agent_series) +
     '                                ' +
     padStringToLength32('1PHP T WINS ' + betType.wintar) +
     padStringToLength32('1PHP R WINS ' + betType.winram) +
@@ -119,7 +117,6 @@ function padStringToLength32(inputString) {
 }
 
 function justifySpaceBetween(str1, str2, str3) {
-  console.log(str1, str2, str3);
   // Calculate the length of each string
   var length2 = str2.length;
   var length3 = str3.length;

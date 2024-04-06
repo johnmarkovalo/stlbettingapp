@@ -3,8 +3,8 @@ interface Bet {
   tranno: number;
   betNumber: string;
   betNumberr?: string;
-  targetAmount: string;
-  rambolAmount: string;
+  targetAmount: number;
+  rambolAmount: number;
   subtotal: number;
 }
 

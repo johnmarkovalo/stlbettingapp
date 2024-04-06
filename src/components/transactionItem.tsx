@@ -9,18 +9,37 @@ import {formatNumberWithCommas} from '../helper';
 type TransactionProps = {
   item: Transaction;
   onPress: () => void;
+  onLongPress: () => void;
 };
 
-export const TransactionItem = ({item, onPress}: TransactionProps) => {
+export const TransactionItem = ({
+  item,
+  onPress,
+  onLongPress,
+}: TransactionProps) => {
+  function checkValid(item) {
+    if (item.status === 'synced' || item.status === 'scanned') {
+      return true;
+    }
+    return false;
+  }
   return (
     <View>
-      <TouchableOpacity style={styles.container} onPress={onPress}>
+      <TouchableOpacity
+        style={styles.container}
+        onPress={onPress}
+        onLongPress={onLongPress}>
         <View style={[{flexDirection: 'row', alignItems: 'center'}]}>
           <Text style={[{color: Colors.darkGrey, fontSize: 25}]}>
             {item.trans_no + '. '}
           </Text>
           <View>
-            <Text style={styles.numberStyle}>{item.ticketcode}</Text>
+            {checkValid(item) && (
+              <Text style={styles.numberStyle}>{item.ticketcode}</Text>
+            )}
+            {!checkValid(item) && (
+              <Text style={styles.syncedNumberStyle}>{item.ticketcode}</Text>
+            )}
             <Text style={styles.subNumberStyle}>
               {moment(item.created_at, 'hh:mm:ss').format('hh:mm A')}
             </Text>
@@ -51,6 +70,12 @@ const styles = StyleSheet.create({
 
   numberContainer: {
     flexDirection: 'column',
+  },
+
+  syncedNumberStyle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.mediumRed,
   },
 
   numberStyle: {

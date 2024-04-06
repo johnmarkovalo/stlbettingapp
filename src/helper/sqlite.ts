@@ -133,6 +133,7 @@ const getActiveTypes = (callback: (types: Type[]) => void) => {
           const {
             id,
             bettype,
+            bettypeid,
             limits,
             capping,
             wintar,
@@ -160,7 +161,8 @@ const getActiveTypes = (callback: (types: Type[]) => void) => {
             {start: formatTime(start9, start9m), end: formatTime(end9, end9m)},
           ];
           types.push({
-            id,
+            id: bettypeid,
+            bettypeid: bettypeid,
             name: bettype,
             limit: limits,
             capping,
@@ -202,6 +204,35 @@ const getTransactions = (
       },
       (error: any) => {
         console.error('Error fetching transactions:', error);
+      },
+    );
+  });
+};
+
+const getTransactionByTicketCode = (
+  ticketcode: string,
+  callback: (transaction: any) => void,
+) => {
+  const db = openDatabaseConnection();
+  console.log('checking local db');
+  db.transaction((tx: any) => {
+    tx.executeSql(
+      'SELECT * FROM trans WHERE ticketcode = ? LIMIT 1',
+      [ticketcode],
+      (tx: any, results: any) => {
+        const rows = results.rows;
+        const len = rows.length;
+        if (len > 0) {
+          console.log('found in local db');
+          const transaction = rows.item(0);
+          callback(transaction);
+        } else {
+          console.log('not found in local db');
+          callback(null);
+        }
+      },
+      (error: any) => {
+        console.error('Error fetching transaction:', error);
       },
     );
   });
@@ -268,48 +299,43 @@ const getResult = (
 };
 
 const getWinners = (
-  betDate: string,
-  betTime: number,
-  betTypeId: number,
+  betType: any,
   result: any,
   callback: (transactions: any[]) => void,
 ) => {
-  getBetTypeById(betTypeId, (betType: any) => {
-    const db = openDatabaseConnection();
-    db.transaction((tx: any) => {
-      tx.executeSql(
-        'SELECT trans.ticketcode, trans.id, trans.status, trans.created_at, trans.trans_no, ' +
-          'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END + CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END) as total ' +
-          'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
-          'WHERE trans.betdate = ? ' +
-          'AND trans.bettime = ? ' +
-          'AND trans.bettypeid = ? ' +
-          'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
-          'GROUP BY trans.ticketcode',
-        [
-          result.result,
-          betType.wintar,
-          result.resultr,
-          checkIfDouble(result.result) ? betType.winram2 : betType.winram,
-          betDate,
-          betTime,
-          betTypeId,
-          result.result,
-          result.resultr,
-        ],
-        (tx: any, results: any) => {
-          const rows = results.rows;
-          console.log('rows', rows);
-          const len = rows.length;
-          const transactions: any[] = [];
-          for (let i = 0; i < len; i++) {
-            const transaction = rows.item(i);
-            transactions.push(transaction);
-          }
-          callback(transactions);
-        },
-      );
-    });
+  const db = openDatabaseConnection();
+  db.transaction((tx: any) => {
+    tx.executeSql(
+      'SELECT trans.ticketcode, trans.id, trans.status, trans.created_at, trans.trans_no, ' +
+        'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END + CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END) as total ' +
+        'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
+        'WHERE trans.betdate = ? ' +
+        'AND trans.bettime = ? ' +
+        'AND trans.bettypeid = ? ' +
+        'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
+        'GROUP BY trans.ticketcode',
+      [
+        result.result,
+        betType.wintar,
+        result.resultr,
+        checkIfDouble(result.result) ? betType.winram2 : betType.winram,
+        result.betdate,
+        result.bettime,
+        result.bettypeid,
+        result.result,
+        result.resultr,
+      ],
+      (tx: any, results: any) => {
+        const rows = results.rows;
+        const len = rows.length;
+        const transactions: any[] = [];
+        for (let i = 0; i < len; i++) {
+          const transaction = rows.item(i);
+          if (transaction.total > 0) transactions.push(transaction);
+        }
+        callback(transactions);
+      },
+    );
   });
 };
 
@@ -349,7 +375,7 @@ const closeDatabaseConnection = () => {
 };
 
 //Insert Functions
-const updateTypes = (types: any) => {
+const insertTypes = (types: any) => {
   const db = openDatabaseConnection();
   db.transaction((tx: any) => {
     tx.executeSql('DELETE FROM settings', [], (tx: any, results: any) => {
@@ -421,6 +447,56 @@ const updateTypes = (types: any) => {
       );
     });
   });
+
+  db.transaction((tx: any) => {
+    tx.executeSql('SELECT * FROM settings', [], (tx: any, results: any) => {
+      const rows = results.rows.raw(); // Extract raw rows
+      const len = rows.length;
+      const newTypes: Type[] = [];
+      for (let i = 0; i < len; i++) {
+        const {
+          id,
+          bettype,
+          limits,
+          capping,
+          wintar,
+          winram,
+          winram2,
+          start11,
+          start11m,
+          end11,
+          end11m,
+          start4,
+          start4m,
+          end4,
+          end4m,
+          start9,
+          start9m,
+          end9,
+          end9m,
+        } = rows[i];
+        const draws = [
+          {
+            start: formatTime(start11, start11m),
+            end: formatTime(end11, end11m),
+          },
+          {start: formatTime(start4, start4m), end: formatTime(end4, end4m)},
+          {start: formatTime(start9, start9m), end: formatTime(end9, end9m)},
+        ];
+        newTypes.push({
+          id: bettypeid,
+          name: bettype,
+          limit: limits,
+          capping,
+          wintar,
+          winram,
+          winram2,
+          draws,
+        });
+      }
+      callback(newTypes);
+    });
+  });
 };
 
 const insertTransaction = (
@@ -475,6 +551,29 @@ const insertTransaction = (
   });
 };
 
+const insertResult = (result: any, callback: (resultId: number) => void) => {
+  const db = openDatabaseConnection();
+  db.transaction((tx: any) => {
+    tx.executeSql(
+      'INSERT INTO result (bettypeid, result, resultr, betdate, bettime) VALUES (?, ?, ?, ?, ?)',
+      [
+        result.bettypeid,
+        result.result,
+        result.resultr,
+        result.betdate,
+        result.bettime,
+      ],
+      (tx: any, results: any) => {
+        const insertedId = results.insertId;
+        callback(insertedId);
+      },
+      (error: any) => {
+        console.error('Error inserting result:', error);
+      },
+    );
+  });
+};
+
 //Update Functions
 const updateTransactionStatus = (transactionId: number, status: string) => {
   const db = openDatabaseConnection();
@@ -483,7 +582,9 @@ const updateTransactionStatus = (transactionId: number, status: string) => {
       'UPDATE trans SET status = ? WHERE id = ?',
       [status, transactionId],
       () => {
-        console.log('Transaction status updated successfully');
+        console.log(
+          'Transaction ' + transactionId + ' status updated to ' + status,
+        );
       },
       (error: any) => {
         console.error('Error updating transaction status:', error);
@@ -543,13 +644,15 @@ export {
   initializeDatabase,
   getActiveTypes,
   getTransactions,
+  getTransactionByTicketCode,
   getLatestTransaction,
   getBetsByTransaction,
   getWinningTransactionBets,
   getWinners,
   getResult,
   insertTransaction,
-  updateTypes,
+  insertTypes,
+  insertResult,
   updateTransactionStatus,
   closeDatabaseConnection,
 };

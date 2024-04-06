@@ -1,5 +1,6 @@
 interface Type {
   id: number;
+  bettypeid: number;
   name: string;
   limit: number;
   capping: number;

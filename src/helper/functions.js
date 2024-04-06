@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
+import NetInfo from '@react-native-community/netinfo';
 
 export const sleep = milliseconds => {
   return new Promise(resolve => {
@@ -141,4 +142,77 @@ export const convertToTransData = bets => {
     transdata += ' ' + bets[n].rambolAmount + ', ';
   }
   return transdata;
+};
+
+export const formatBetTypes = betTypes => {
+  return betTypes.map(betType => {
+    const {
+      id,
+      bettype,
+      bettypeid,
+      limits,
+      capping,
+      wintar,
+      winram,
+      winram2,
+      start11,
+      start11m,
+      end11,
+      end11m,
+      start4,
+      start4m,
+      end4,
+      end4m,
+      start9,
+      start9m,
+      end9,
+      end9m,
+    } = betType;
+    const draws = [
+      {
+        start: formatTime(start11, start11m),
+        end: formatTime(end11, end11m),
+      },
+      {start: formatTime(start4, start4m), end: formatTime(end4, end4m)},
+      {start: formatTime(start9, start9m), end: formatTime(end9, end9m)},
+    ];
+    return {
+      id: bettypeid,
+      bettypeid: bettypeid,
+      name: bettype,
+      limit: limits,
+      capping,
+      wintar,
+      winram,
+      winram2,
+      draws,
+    };
+  });
+};
+
+export const checkInternetConnection = () => {
+  let isConnected = false;
+  let isSlow = true; // New variable for slow connection
+
+  const updateConnectionStatus = state => {
+    // Rough speed check (adjust threshold as needed)
+    isConnected = state.isInternetReachable;
+    if (isConnected) {
+      if (state.details && state.details.strength < 50) {
+        isSlow = true;
+      } else {
+        isSlow = false;
+      }
+    }
+  };
+
+  NetInfo.addEventListener(updateConnectionStatus);
+
+  const cleanup = () => NetInfo.removeEventListener(updateConnectionStatus);
+
+  return {
+    isConnected: () => isConnected,
+    isSlow: () => isSlow,
+    cleanup,
+  };
 };

@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   SafeAreaView,
   View,
@@ -20,23 +20,24 @@ import {
 import {useDispatch, useSelector} from 'react-redux';
 import {userActions, typesActions} from '../../../store/actions';
 import {syncBetTypesAPI} from '../../../helper/api';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {updateTypes} from '../../../helper/sqlite';
+import {insertTypes} from '../../../helper/sqlite';
+import {
+  formatBetTypes,
+  checkInternetConnection,
+} from '../../../helper/functions';
+import {appConfig} from '../../../config/appConfig';
 const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
+  const internetStatusCheck = useRef(checkInternetConnection());
   const {navigation} = props;
   const user = useSelector(state => state.auth.user);
   const token = useSelector(state => state.auth.token);
   const dispatch = useDispatch();
-  const [apiUrl, setApiUrl] = useState('');
   const [agent, setAgent] = useState({});
 
   useEffect(() => {
-    (async () => {
-      setApiUrl(await AsyncStorage.getItem('API_URL'));
-      setAgent({...user});
-    })();
+    setAgent({...user});
   }, []);
 
   const logout = () => {
@@ -55,11 +56,19 @@ const Setting = (props: any) => {
   };
 
   const syncBetTypes = async () => {
-    syncBetTypesAPI(apiUrl, token, (types: any) => {
+    if (!internetStatusCheck.current.isConnected()) {
+      Alert.alert('Error', 'No internet connection');
+      return;
+    }
+    if (internetStatusCheck.current.isSlow()) {
+      Alert.alert('Error', 'Slow internet connection');
+      return;
+    }
+    syncBetTypesAPI(token, (types: any) => {
       if (types) {
-        updateTypes(types);
+        insertTypes(types);
         Alert.alert('Success', 'Bet types synced');
-        dispatch(typesActions.update(types));
+        dispatch(typesActions.update(formatBetTypes(types)));
       }
     });
   };

@@ -20,7 +20,7 @@ const TypeModal = ({setType, type, types, hide}: any) => {
 
   useEffect(() => {
     types.map((item: any) => {
-      setItems(old => [...old, {label: item.name, value: item.id}]);
+      setItems(old => [...old, {label: item.name, value: item.bettypeid}]);
     });
   }, []);
   function hideModal() {

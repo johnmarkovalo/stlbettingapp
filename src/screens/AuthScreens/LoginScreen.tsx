@@ -26,17 +26,17 @@ import {
   useCodeScanner,
 } from 'react-native-vision-camera';
 import axios from 'axios';
+import {appConfig} from '../../config/appConfig';
+import _ from 'lodash';
 
 const LoginScreen = props => {
   const [showLogin, setShowLogin] = useState(false);
   const dispatch = useDispatch();
-  const {loggingIn} = useRef(false);
+  const [loggingIn, setLoggingIn] = useState(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
-  const [username, onChangeUsername] = useState('');
-  const [password, onChangePassword] = useState('');
+  const [pinCode, onChangePinCode] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [cameraDevice, setCameraDevice] = useState(useCameraDevice('back'));
-  const [apiUrl, setApiUrl] = useState('');
 
   async function requestCameraPermission() {
     try {
@@ -63,23 +63,31 @@ const LoginScreen = props => {
   function handleSubmit() {
     Keyboard.dismiss();
     AsyncStorage.removeItem('API_URL');
-    if (username.length && password.length && !loggingIn) {
-      const combined = `${username}:${password}`;
-      const base64encoded = Buffer.from(combined).toString('base64');
-      // dispatch(
-      //   // @ts-ignore
-      //   userActions.loginUser({Authorization: `Basic ${base64encoded}`}),
-      // );
+    if (pinCode.length && !loggingIn) {
+      try {
+        setLoggingIn(true);
+        axios
+          .post(appConfig.apiUrl + 'login', {
+            pinCode: pinCode,
+          })
+          .then((response: any) => {
+            console.log(response.data);
+            if (response?.data?.token) {
+              dispatch(
+                userActions.login(response.data.agent, response.data.token),
+              );
+              setLoggingIn(false);
+            } else {
+              alert('Invalid QR code');
+            }
+          });
+      } catch (e) {
+        alert(e.message);
+      }
     } else {
       alert('username & password are required');
     }
   }
-
-  useEffect(() => {
-    (async () => {
-      setApiUrl(await AsyncStorage.getItem('API_URL'));
-    })();
-  }, []);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -126,10 +134,10 @@ const LoginScreen = props => {
   };
 
   const processQR = async (qr_token: string) => {
-    console.log(apiUrl + 'login');
     try {
+      setLoggingIn(true);
       axios
-        .post(apiUrl + 'login', {
+        .post(appConfig.apiUrl + 'login', {
           encodedString: qr_token,
         })
         .then((response: any) => {
@@ -138,6 +146,7 @@ const LoginScreen = props => {
             dispatch(
               userActions.login(response.data.agent, response.data.token),
             );
+            setLoggingIn(false);
           } else {
             alert('Invalid QR code');
           }
@@ -147,12 +156,13 @@ const LoginScreen = props => {
     }
   };
 
+  const debounceCodeScanned = _.debounce(codes => {
+    setEnableQRCam(false);
+    processQR(codes[0].value);
+  }, 300);
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
-    onCodeScanned: codes => {
-      setEnableQRCam(false);
-      processQR(codes[0].value);
-    },
+    onCodeScanned: debounceCodeScanned,
   });
 
   if (enableQRCam) {
@@ -222,19 +232,9 @@ const LoginScreen = props => {
               <View style={Styles.InputContainer}>
                 <TextInput
                   style={Styles.loginInput}
-                  onChangeText={onChangeUsername}
-                  value={username}
-                  placeholder="Username"
-                  placeholderTextColor={Colors.darkGrey}
-                />
-              </View>
-              <View style={Styles.InputContainer}>
-                <TextInput
-                  style={Styles.loginInput}
-                  onChangeText={onChangePassword}
-                  value={password}
-                  secureTextEntry={true}
-                  placeholder="Password"
+                  onChangeText={onChangePinCode}
+                  value={pinCode}
+                  placeholder="Pincode"
                   placeholderTextColor={Colors.darkGrey}
                 />
               </View>

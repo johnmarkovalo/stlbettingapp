@@ -62,5 +62,30 @@ const styles = StyleSheet.create({
 
     elevation: 1,
   },
+
+  cameraStyle: {
+    width: 300,
+    height: 300,
+    alignSelf: 'center',
+  },
+
+  loginBtn: {
+    height: 43,
+    width: '100%',
+    alignSelf: 'center',
+    borderRadius: 10,
+    margin: 5,
+  },
+  loginBtnInner: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginBtnText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-ExtraBold',
+    color: Colors.White,
+  },
 });
 export default styles;
