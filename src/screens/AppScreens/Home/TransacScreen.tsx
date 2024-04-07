@@ -17,10 +17,13 @@ import {
 import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import moment from 'moment';
+import {useSelector} from 'react-redux';
 import BottomDrawer, {
   BottomDrawerMethods,
 } from 'react-native-animated-bottom-drawer';
 import Bet from '../../../models/Bet.ts';
+import Transaction from '../../../models/Transaction.ts';
 import {BetItem} from '../../../components/BetItem.tsx';
 import {
   checkIfTriple,
@@ -29,16 +32,12 @@ import {
   getCurrentDraw,
   sortNumber,
 } from '../../../helper/functions.js';
-import moment from 'moment';
-import Transaction from '../../../models/Transaction.ts';
 import {
   getLatestTransaction,
   insertTransaction,
   updateTransactionStatus,
 } from '../../../helper/sqlite.ts';
 import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
-import {useSelector} from 'react-redux';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {sendTransactionAPI} from '../../../helper/api.ts';
 
 const widthScreen = Dimensions.get('window').width;
@@ -77,6 +76,8 @@ const TransacScreen = (props: any) => {
   };
 
   useEffect(() => {
+    0;
+    if (checkCapping()) return;
     // Check the length after state has been updated
     if (betNumber.value.length === 3 && betNumber.isFocus) {
       changeFocus('targetAmount');
@@ -115,6 +116,17 @@ const TransacScreen = (props: any) => {
     };
   }, [betType]);
 
+  function checkCapping() {
+    if (
+      targetAmount.value > betType.capping ||
+      rambolAmount.value > betType.capping
+    ) {
+      Alert.alert('Amount', 'Amount cannot be greater than ' + betType.capping);
+      return true;
+    }
+    return false;
+  }
+
   const onKeyPress = (input: string) => {
     // Map first if what is focused
     if (betNumber.isFocus && betNumber.value.length < 3) {
@@ -144,6 +156,7 @@ const TransacScreen = (props: any) => {
   };
 
   const changeFocus = (type: string) => {
+    if (checkCapping()) return;
     setBetNumber({
       value: betNumber.value,
       isFocus: false,
@@ -226,6 +239,7 @@ const TransacScreen = (props: any) => {
   };
 
   const onNext = () => {
+    if (checkCapping()) return;
     if (targetAmount.isFocus && !checkIfTriple(betNumber.value)) {
       setTargetAmount(prevState => ({
         ...prevState,
@@ -263,6 +277,7 @@ const TransacScreen = (props: any) => {
   };
 
   const addBet = () => {
+    if (checkCapping()) return;
     if (betNumber.value && (targetAmount.value || rambolAmount.value)) {
       setBets(prevState => [
         {
@@ -272,7 +287,7 @@ const TransacScreen = (props: any) => {
           targetAmount:
             targetAmount.value === '' ? 0 : parseInt(targetAmount.value),
           rambolAmount:
-            rambolAmount.value === '' ? 0 : parseInt(targetAmount.value),
+            rambolAmount.value === '' ? 0 : parseInt(rambolAmount.value),
           subtotal: Number(targetAmount.value) + Number(rambolAmount.value),
         },
         ...prevState,
