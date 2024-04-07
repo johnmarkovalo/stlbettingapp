@@ -33,6 +33,7 @@ import {
   sortNumber,
 } from '../../../helper/functions.js';
 import {
+  closeDatabaseConnection,
   getLatestTransaction,
   insertTransaction,
   updateTransactionStatus,
@@ -115,6 +116,12 @@ const TransacScreen = (props: any) => {
       clearInterval(intervalId);
     };
   }, [betType]);
+
+  useEffect(() => {
+    return () => {
+      closeDatabaseConnection();
+    };
+  }, []);
 
   function checkCapping() {
     if (
@@ -304,57 +311,58 @@ const TransacScreen = (props: any) => {
     setBets(prevState => prevState.filter(bet => bet.id !== item.id));
   };
 
-  const createTransaction = () => {
+  const createTransaction = async () => {
     if (bets.length <= 0) {
       Alert.alert('Error', 'Please add at least one bet');
     } else {
-      getLatestTransaction(betDate, currentDraw, betType.id, latestTrans => {
-        let ticketcode =
-          user.keycode.substring(user.keycode.length - 4) +
-          '-' +
-          currentDraw +
-          betType.id +
-          '-' +
-          moment().format('YYMMDD-HHmmss');
-        let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
-        let trans_data = convertToTransData(bets);
-        let now = moment().format('YYYY-MM-DD HH:mm:ss');
-        const transaction: Transaction = {
-          ticketcode: ticketcode,
-          betdate: betDate,
-          bettime: currentDraw ?? 1,
-          bettypeid: betType.id,
-          trans_no: trans_no,
-          total: totalAmount,
-          trans_data: trans_data,
-          status: 'saved',
-          created_at: now,
-        };
-        insertTransaction(transaction, bets, transactionId => {
-          if (transactionId) {
-            listPairedDevices();
-            printTransaction(transaction, betType, bets, user);
-            updateTransactionStatus(transactionId, 'printed');
-            if (internetStatusCheck.current.isConnected()) {
-              let newTransaction = {
-                ...transaction,
-                status: 'VALID',
-                gateway: 'Retrofit',
-                keycode: user.keycode,
-                remarks: '',
-                printed_at: now,
-                declared_gross: totalAmount,
-                bets: bets,
-              };
-              sendTransactionAPI(token, newTransaction, (types: any) => {
-                updateTransactionStatus(transactionId, 'synced');
-              });
-            }
-            setBets([]);
-            setTotalAmount(0);
-          }
-        });
-      });
+      const latestTrans = await getLatestTransaction(
+        betDate,
+        currentDraw,
+        betType.id,
+      );
+      let ticketcode =
+        user.keycode.substring(user.keycode.length - 4) +
+        '-' +
+        currentDraw +
+        betType.id +
+        '-' +
+        moment().format('YYMMDD-HHmmss');
+      let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
+      let trans_data = convertToTransData(bets);
+      let now = moment().format('YYYY-MM-DD HH:mm:ss');
+      const transaction: Transaction = {
+        ticketcode: ticketcode,
+        betdate: betDate,
+        bettime: currentDraw ?? 1,
+        bettypeid: betType.id,
+        trans_no: trans_no,
+        total: totalAmount,
+        trans_data: trans_data,
+        status: 'saved',
+        created_at: now,
+      };
+      const transactionId = await insertTransaction(transaction, bets);
+      if (transactionId) {
+        listPairedDevices();
+        printTransaction(transaction, betType, bets, user);
+        updateTransactionStatus(transactionId, 'printed');
+        if (internetStatusCheck.current.isConnected()) {
+          let newTransaction = {
+            ...transaction,
+            status: 'VALID',
+            gateway: 'Retrofit',
+            keycode: user.keycode,
+            remarks: '',
+            printed_at: now,
+            declared_gross: totalAmount,
+            bets: bets,
+          };
+          await sendTransactionAPI(token, newTransaction);
+          updateTransactionStatus(transactionId, 'synced');
+        }
+        setBets([]);
+        setTotalAmount(0);
+      }
     }
   };
 
@@ -626,7 +634,6 @@ const TransacScreen = (props: any) => {
             </View>
           </View>
         </BottomDrawer>
-        <View style={Styles.line} />
       </View>
     </SafeAreaView>
   );

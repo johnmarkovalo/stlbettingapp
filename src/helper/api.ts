@@ -1,46 +1,38 @@
 import axios from 'axios';
 import {appConfig} from '../config/appConfig';
-const syncBetTypesAPI = async (
-  token: string,
-  callback: (types: any) => void,
-) => {
-  axios
-    .get(appConfig.apiUrl + 'betTypes', {
+const syncBetTypesAPI = async (token: string) => {
+  try {
+    console.log('checking server db');
+
+    const response = await axios.get(appConfig.apiUrl + 'betTypes', {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-    })
-    .then(response => {
-      callback(response.data);
     });
+    return response.data;
+  } catch (error) {
+    console.error(error.message);
+    throw error;
+  }
 };
 
-const sendTransactionAPI = async (
-  token: string,
-  transaction,
-  callback: (result: any) => void,
-) => {
+const sendTransactionAPI = async (token: string, transaction) => {
   console.log('transaction', {...transaction});
-  axios
-    .post(
-      appConfig.apiUrl + 'transactions',
-      {...transaction},
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+  const response = await axios.post(
+    appConfig.apiUrl + 'transactions',
+    {...transaction},
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
       },
-    )
-    .then(response => {
-      callback(response.data);
-      console.log('Transaction sent successfully');
-    })
-    .catch(error => {
-      console.error(error.message);
-    });
+    },
+  );
+
+  console.log('Transaction sent successfully');
+  return response.data;
 };
 
 const syncResultAPI = async (
@@ -48,22 +40,30 @@ const syncResultAPI = async (
   type: number,
   draw: number,
   date: string,
-  callback: (types: any) => void,
 ) => {
   console.log('checking server db');
-  axios
-    .get(appConfig.apiUrl + 'results/' + type + '/draws/' + draw, {
-      params: {date},
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+
+  try {
+    const response = await axios.get(
+      appConfig.apiUrl + 'results/' + type + '/draws/' + draw,
+      {
+        params: {date},
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       },
-    })
-    .then(response => {
-      if (JSON.stringify(response.data) !== '{}') {
-        callback(response.data);
-      } else callback(null);
-    });
+    );
+
+    if (JSON.stringify(response.data) !== '{}') {
+      return response.data; // Return the result if it's not empty
+    } else {
+      return null; // Return null if the response data is empty
+    }
+  } catch (error) {
+    console.error('Error fetching results:', error);
+    throw error; // Re-throw the error to allow callers to handle it
+  }
 };
 
 const checkTransactionAPI = async (

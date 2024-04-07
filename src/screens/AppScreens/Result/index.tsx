@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import Styles from './Styles';
@@ -32,26 +34,19 @@ import Type from '../../../models/Type.ts';
 import {
   getResult,
   getWinners,
-  closeDatabaseConnection,
-  getActiveTypes,
   updateTransactionStatus,
   insertResult,
   getTransactionByTicketCode,
-  getBetsByTransaction,
   getWinningTransactionBets,
+  closeDatabaseConnection,
 } from '../../../helper/sqlite.ts';
 import {useSelector} from 'react-redux';
 import {checkTransactionAPI, syncResultAPI} from '../../../helper/api.ts';
-import RNQRGenerator from 'rn-qr-generator';
 import {
   Camera,
   useCameraDevice,
   useCodeScanner,
 } from 'react-native-vision-camera';
-
-import LinearGradient from 'react-native-linear-gradient';
-import _ from 'lodash';
-import {types} from '../../../store/reducers/types.reducer.ts';
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -60,6 +55,7 @@ const Result = (props: any) => {
   const internetStatusCheck = useRef(checkInternetConnection());
   const token = useSelector(state => state.auth.token);
   const [enableQRCam, setEnableQRCam] = useState(false);
+  const [refresh, setRefresh] = useState(false);
   const [cameraDevice, setCameraDevice] = useState(useCameraDevice('back'));
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
@@ -90,78 +86,111 @@ const Result = (props: any) => {
 
   const processQR = async (ticketcode: string) => {
     try {
-      //Count ticketcode length
-      console.log(ticketcode);
-      const ticketCodeLength = ticketcode.length;
-      if (ticketCodeLength !== 21) {
-        Alert.alert('Invalid QR code');
-        return;
-      } else {
-        console.log('valid QR code');
-        //Check if ticketcode exists in transactions
-        getTransactionByTicketCode(ticketcode, transaction => {
-          if (transaction) {
-            console.log('valid ticket');
-            getWinningTransactionBets(transaction.id, result, bets => {
-              console.log(bets);
-              if (bets) {
-                updateTransactionStatus(transaction.id, 'scanned');
-                Alert.alert('Valid Winning ticket');
-              } else {
-                Alert.alert('Valid ticket, But not a winning ticket');
-              }
-            });
-          } else {
-            if (!internetStatusCheck.current.isConnected()) {
-              console.error('Error', 'No internet connection');
-              return;
-            }
-            if (internetStatusCheck.current.isSlow()) {
-              console.error('Error', 'Slow internet connection');
-              return;
-            }
-            checkTransactionAPI(ticketcode, token, transaction => {
-              if (transaction) {
-                console.log(transaction);
-              } else {
-                Alert.alert('invalid Ticket');
-                console.log('transaction not found in server db');
-              }
-            });
-          }
-        });
-      }
-      // const qr_token = await RNQRGenerator.generate({
-      //   value: ticketcode,
-      //   size: 500,
-      // axios
-      //   .post(appConfig.apiUrl + 'login', {
-      //     encodedString: qr_token,
-      //   })
-      //   .then((response: any) => {
-      //     console.log(response.data);
-      //     if (response?.data?.token) {
-      //       dispatch(
-      //         userActions.login(response.data.agent, response.data.token),
-      //       );
-      //     } else {
-      //       alert('Invalid QR code');
+      // if (enableQRCam) return;
+      // console.log(ticketcode);
+      // //Check if ticketcode exists in transactions
+      // getTransactionByTicketCode(ticketcode, transaction => {
+      //   if (transaction) {
+      //     console.log('valid ticket');
+      //     getWinningTransactionBets(transaction.id, result, bets => {
+      //       console.log(bets);
+      //       if (bets) {
+      //         updateTransactionStatus(transaction.id, 'scanned');
+      //         Alert.alert('Valid Winning ticket');
+      //       } else {
+      //         Alert.alert('Valid ticket, But not a winning ticket');
+      //       }
+      //     });
+      //   } else {
+      //     if (!internetStatusCheck.current.isConnected()) {
+      //       console.error('Error', 'No internet connection');
+      //       return;
       //     }
-      //   });
+      //     if (internetStatusCheck.current.isSlow()) {
+      //       console.error('Error', 'Slow internet connection');
+      //       return;
+      //     }
+      //     checkTransactionAPI(ticketcode, token, transaction => {
+      //       if (transaction) {
+      //         console.log(transaction);
+      //       } else {
+      //         Alert.alert('invalid Ticket');
+      //         console.log('transaction not found in server db');
+      //       }
+      //     });
+      //   }
+      // });
     } catch (e) {
       console.error(e.message);
     }
   };
 
-  const debounceCodeScanned = _.debounce(codes => {
-    setEnableQRCam(false);
-    processQR(codes[0].value);
-  }, 300);
-
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
-    onCodeScanned: debounceCodeScanned,
+    onCodeScanned: codes => {
+      setEnableQRCam(false);
+      if (codes[0].value.length === 21) {
+        processQR(codes[0].value);
+      } else Alert.alert('Invalid QR code');
+    },
   });
+
+  const fetchData = async () => {
+    setRefresh(true);
+
+    try {
+      setBetType(betTypes.find(item => item.bettypeid === betTypeId));
+      const localResult = await getResult(
+        moment(betDate).format('YYYY-MM-DD'),
+        draw,
+        betTypeId,
+      );
+
+      if (localResult) {
+        setResult(localResult);
+        await getNewWinners(localResult);
+      } else {
+        if (
+          !internetStatusCheck.current.isConnected() ||
+          internetStatusCheck.current.isSlow()
+        ) {
+          console.error('Error', 'No/Slow internet connection');
+          setResult({result: 0});
+          setTransactions([]);
+          return;
+        }
+
+        const serverResult = await syncResultAPI(
+          token,
+          betTypeId,
+          draw,
+          moment(betDate).format('YYYY-MM-DD'),
+        );
+
+        if (serverResult) {
+          await insertResult(serverResult); // Assuming insertResult returns a Promise
+          setResult(serverResult);
+          await getNewWinners(serverResult);
+        } else {
+          setResult({result: 0});
+          setTransactions([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      // Handle the error appropriately (e.g., display an error message)
+    } finally {
+      setRefresh(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefresh(true);
+    fetchData();
+    setTimeout(() => {
+      setRefresh(false);
+    }, 1000); // Refresh indicator will be visible for at least 1 second
+  };
 
   useEffect(() => {
     setBetTypeId(betTypes[0].bettypeid);
@@ -169,62 +198,35 @@ const Result = (props: any) => {
   }, []);
 
   useEffect(() => {
-    setBetType(betTypes.find(item => item.bettypeid === betTypeId));
-    getResult(
-      moment(betDate).format('YYYY-MM-DD'),
-      draw,
-      betTypeId,
-      localResult => {
-        console.log('result_local', localResult);
-        if (localResult) {
-          setResult(localResult);
-          getNewWinners(localResult);
-        } else {
-          if (!internetStatusCheck.current.isConnected()) {
-            console.error('Error', 'No internet connection');
-            return;
-          }
-          if (internetStatusCheck.current.isSlow()) {
-            console.error('Error', 'Slow internet connection');
-            return;
-          }
-
-          syncResultAPI(
-            token,
-            betTypeId,
-            draw,
-            moment(betDate).format('YYYY-MM-DD'),
-            (serverResult: any) => {
-              if (serverResult) {
-                console.log('result_server', serverResult);
-                insertResult(serverResult, (resultId: number) => {});
-                setResult(serverResult);
-                getNewWinners(serverResult);
-              } else {
-                setResult({result: 0});
-                setTransactions([]);
-              }
-            },
-          );
-        }
-      },
-    );
-  }, [betDate, betTypeId, draw]);
-
-  useEffect(() => {
     return () => {
       closeDatabaseConnection();
     };
   }, []);
 
-  function getNewWinners(newResult) {
-    if (newResult.result === 0 || betType === null) return;
-    getWinners(betType, newResult, transactions => {
-      console.log('transactions', transactions);
-      if (transactions.length > 0) {
-        setTransactions(transactions);
-      } else setTransactions([]);
+  useEffect(() => {
+    fetchData();
+  }, [betDate, betTypeId, draw]);
+
+  useEffect(() => {
+    navigation.addListener('focus', () => {
+      fetchData();
     });
+  }, [navigation]);
+
+  async function getNewWinners(newResult) {
+    if (newResult.result === 0 || betType === null) return;
+    const transactions = await getWinners(betType, newResult);
+    if (transactions.length > 0) {
+      setTransactions(transactions);
+      let total = 0;
+      transactions.map(item => {
+        total += item.total;
+      });
+      setTotalAmount(total);
+    } else {
+      setTransactions([]);
+      setTotalAmount(0);
+    }
   }
 
   function scanTicket(ticketcode: string) {
@@ -258,14 +260,6 @@ const Result = (props: any) => {
       />
     );
   };
-
-  useEffect(() => {
-    let total = 0;
-    transactions.map(item => {
-      total += item.total;
-    });
-    setTotalAmount(total);
-  }, [transactions]);
 
   //Modals
   const betModalHide = () => {
@@ -400,31 +394,44 @@ const Result = (props: any) => {
           </View>
         </View>
         {/* Hits */}
-        <View style={styles.hitsContainer}>
-          <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
-            Hits:
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 30, color: Colors.primaryColor},
-              ]}>
-              {' ' + formatNumberWithCommas(totalAmount)}
+        {refresh && <ActivityIndicator />}
+        {!refresh && (
+          <View style={styles.hitsContainer}>
+            <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
+              Hits:
+              <Text
+                style={[
+                  {
+                    fontWeight: 'bold',
+                    fontSize: 30,
+                    color: Colors.primaryColor,
+                  },
+                ]}>
+                {' ' + formatNumberWithCommas(totalAmount)}
+              </Text>
             </Text>
-          </Text>
-          <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
-            Result:
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 30, color: Colors.mediumBlue},
-              ]}>
-              {result.result}
+            <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
+              Result:
+              <Text
+                style={[
+                  {fontWeight: 'bold', fontSize: 30, color: Colors.mediumBlue},
+                ]}>
+                {result.result}
+              </Text>
             </Text>
-          </Text>
-        </View>
-        {/* Transaction List */}
-        {transactions.length > 0 && (
-          <FlatList data={transactions} renderItem={renderItem} />
+          </View>
         )}
-        {transactions.length == 0 && result.result !== 0 && (
+        {/* Transaction List */}
+        {!refresh && transactions.length > 0 && (
+          <FlatList
+            data={transactions}
+            renderItem={renderItem}
+            refreshControl={
+              <RefreshControl refreshing={refresh} onRefresh={onRefresh} />
+            }
+          />
+        )}
+        {!refresh && transactions.length == 0 && result.result !== 0 && (
           <View style={styles.container}>
             <Text
               style={[
@@ -434,7 +441,7 @@ const Result = (props: any) => {
             </Text>
           </View>
         )}
-        {result.result === 0 && (
+        {!refresh && result.result === 0 && (
           <View style={styles.container}>
             <Text
               style={[
@@ -444,7 +451,6 @@ const Result = (props: any) => {
             </Text>
           </View>
         )}
-        <View style={Styles.line} />
         {/* Scan Ticket */}
         <TouchableOpacity
           style={styles.buttonStyle}

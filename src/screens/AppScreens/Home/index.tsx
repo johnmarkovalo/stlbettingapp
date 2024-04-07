@@ -9,29 +9,36 @@ import {
   View,
 } from 'react-native';
 
-import {useSelector} from 'react-redux';
+import {useSelector, useDispatch} from 'react-redux';
 import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import {
-  getActiveTypes,
   closeDatabaseConnection,
+  getActiveTypes,
 } from '../../../helper/sqlite.ts';
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
 import Type from '../../../models/Type.ts';
+import {typesActions} from '../../../store/actions/types.actions.ts';
 
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
   const user = useSelector(state => state.auth.user);
   const types = useSelector(state => state.types.types);
+  const dispatch = useDispatch();
   const {navigation} = props;
   const [betTypes, setBetTypes] = useState([]);
   const [currentDraw, setCurrentDraw] = useState(null);
 
   useEffect(() => {
-    getActiveTypes((types: Type[]) => {
-      setBetTypes(types);
-    });
+    const fetchData = async () => {
+      const types = await getActiveTypes();
+      if (types) {
+        setBetTypes(types);
+        dispatch(typesActions.update(types));
+      }
+    };
+    fetchData();
   }, [types]);
 
   useEffect(() => {
@@ -116,7 +123,6 @@ const Home = (props: any) => {
             ))}
           </ScrollView>
         </View>
-        <View style={Styles.line} />
       </View>
     </SafeAreaView>
   );

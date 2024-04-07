@@ -12,7 +12,7 @@ import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
-import {getBetsByTransaction, closeDatabaseConnection} from '../helper/sqlite';
+import {closeDatabaseConnection, getBetsByTransaction} from '../helper/sqlite';
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
@@ -27,16 +27,14 @@ const TransactionBets = ({transaction, hide}: any) => {
   };
 
   useEffect(() => {
-    getBetsByTransaction(transaction.id, bets => {
-      setBets(bets);
-    });
-  }, [transaction]);
-
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
+    const fetchData = async () => {
+      const bets = await getBetsByTransaction(transaction.id);
+      if (bets) {
+        setBets(bets);
+      }
     };
-  }, []);
+    fetchData();
+  }, [transaction]);
 
   useEffect(() => {
     let total = 0;
@@ -45,6 +43,12 @@ const TransactionBets = ({transaction, hide}: any) => {
     });
     setTotalAmount(total);
   }, [bets]);
+
+  useEffect(() => {
+    return () => {
+      closeDatabaseConnection();
+    };
+  }, []);
 
   function hideModal() {
     hide();

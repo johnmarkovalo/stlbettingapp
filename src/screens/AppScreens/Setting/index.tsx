@@ -21,7 +21,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {userActions, typesActions} from '../../../store/actions';
 import {syncBetTypesAPI} from '../../../helper/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {insertTypes} from '../../../helper/sqlite';
+import {closeDatabaseConnection, insertTypes} from '../../../helper/sqlite';
 import {
   formatBetTypes,
   checkInternetConnection,
@@ -38,6 +38,12 @@ const Setting = (props: any) => {
 
   useEffect(() => {
     setAgent({...user});
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      closeDatabaseConnection();
+    };
   }, []);
 
   const logout = () => {
@@ -64,13 +70,12 @@ const Setting = (props: any) => {
       Alert.alert('Error', 'Slow internet connection');
       return;
     }
-    syncBetTypesAPI(token, (types: any) => {
-      if (types) {
-        insertTypes(types);
-        Alert.alert('Success', 'Bet types synced');
-        dispatch(typesActions.update(formatBetTypes(types)));
-      }
-    });
+    const types = await syncBetTypesAPI(token);
+    if (types) {
+      insertTypes(types);
+      Alert.alert('Success', 'Bet types synced');
+      dispatch(typesActions.update(formatBetTypes(types)));
+    }
   };
 
   return (
@@ -119,7 +124,6 @@ const Setting = (props: any) => {
             <Text style={styles.buttonTextStyle}>Logout</Text>
           </TouchableOpacity>
         </View>
-        <View style={Styles.line} />
       </View>
     </SafeAreaView>
   );

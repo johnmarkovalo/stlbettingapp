@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import Styles from './Styles';
@@ -30,13 +32,11 @@ import moment from 'moment';
 import DrawModal from '../../../components/DrawModal.tsx';
 import TypeModal from '../../../components/TypeModal.tsx';
 import {useSelector, useDispatch} from 'react-redux';
-import {typesActions} from '../../../store/actions';
 import {
   getTransactions,
-  closeDatabaseConnection,
-  getActiveTypes,
   updateTransactionStatus,
   getBetsByTransaction,
+  closeDatabaseConnection,
 } from '../../../helper/sqlite.ts';
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
@@ -50,6 +50,7 @@ const History = (props: any) => {
   const user = useSelector(state => state.auth.user);
   const token = useSelector(state => state.auth.token);
   const betTypes = useSelector(state => state.types.types);
+  const [refresh, setRefresh] = useState(false);
   const dispatch = useDispatch();
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
@@ -74,26 +75,68 @@ const History = (props: any) => {
   const [transactions, setTransactions] = useState([]);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction>();
 
+  const fetchData = async () => {
+    setRefresh(true);
+    try {
+      const transactions = await getTransactions(
+        moment(betDate).format('YYYY-MM-DD'),
+        draw,
+        type,
+      );
+      console.log('History fetchData', transactions);
+      setTransactions(transactions);
+      let total = 0;
+      transactions.map(item => {
+        total += item.total;
+      });
+      setTotalAmount(total);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setRefresh(false);
+    }
+  };
+
+  const syncTransactions = async () => {
+    setRefresh(true);
+    try {
+      const promises = transactions.map(transaction => {
+        if (transaction.status === 'printed') {
+          return resendTransaction(transaction); // Assuming resendTransaction returns a Promise
+        } else {
+          return Promise.resolve(); // Return a resolved Promise if already synced
+        }
+      });
+      await Promise.all(promises);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setRefresh(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefresh(true);
+    syncTransactions();
+    setTimeout(() => {
+      setRefresh(false);
+    }, 1000); // Refresh indicator will be visible for at least 1 second
+  };
+
   useEffect(() => {
-    // Define the criteria for fetching transactions
-    getActiveTypes((types: Type[]) => {
-      dispatch(typesActions.update(types));
-      setType(types[0].bettypeid);
-      setDraw(getCurrentDraw(types[0].draws) ?? 1);
-    });
+    setType(betTypes[0].bettypeid);
   }, []);
 
   useEffect(() => {
-    getTransactions(
-      moment(betDate).format('YYYY-MM-DD'),
-      draw,
-      type,
-      transactions => {
-        setTransactions(transactions);
-        console.log('History transactions:', transactions);
-      },
-    );
+    fetchData();
   }, [betDate, type, draw]);
+
+  useEffect(() => {
+    navigation.addListener('focus', () => {
+      // setDraw(getCurrentDraw(betTypes[0].draws) ?? 1);
+      fetchData();
+    });
+  }, [navigation]);
 
   useEffect(() => {
     return () => {
@@ -114,14 +157,6 @@ const History = (props: any) => {
       />
     );
   };
-
-  useEffect(() => {
-    let total = 0;
-    transactions.map(item => {
-      total += item.total;
-    });
-    setTotalAmount(total);
-  }, [transactions]);
 
   //Modals
   const betModalHide = () => {
@@ -151,38 +186,42 @@ const History = (props: any) => {
     setTypeModalVisible(true);
   };
 
-  const resendTransaction = (transaction: Transaction) => {
-    if (internetStatusCheck.current.isConnected()) {
-      getBetsByTransaction(transaction.id, bets => {
-        let newTransaction = {
-          ...transaction,
-          trans_data: transaction.transdata,
-          status: 'VALID',
-          gateway: 'Retrofit',
-          keycode: user.keycode,
-          remarks: '',
-          printed_at: transaction.created_at,
-          declared_gross: totalAmount,
-          bets: bets,
-        };
-        console.log(newTransaction);
-        sendTransactionAPI(token, newTransaction, (result: any) => {
-          updateTransactionStatus(newTransaction.id, 'synced');
-          setTransactions(prevTransactions =>
-            prevTransactions.map((item: Transaction) => {
-              if (item.ticketcode === newTransaction.ticketcode) {
-                return {...item, status: 'synced'}; // Update only matching item
-              } else {
-                return item; // Preserve other items
-              }
-            }),
-          );
-        });
-      });
-      // Alert.alert('Printed');
-    } else {
-      Alert.alert('No internet connection');
-    }
+  const resendTransaction = async (transaction: Transaction) => {
+    return new Promise(async (resolve, reject) => {
+      if (internetStatusCheck.current.isConnected()) {
+        const bets = await getBetsByTransaction(transaction.id);
+        if (bets) {
+          let newTransaction = {
+            ...transaction,
+            status: 'VALID',
+            gateway: 'Retrofit',
+            keycode: user.keycode,
+            remarks: '',
+            printed_at: transaction.created_at,
+            declared_gross: totalAmount,
+            bets: bets,
+          };
+          console.log(newTransaction);
+          const response = await sendTransactionAPI(token, newTransaction);
+          if (response) {
+            updateTransactionStatus(newTransaction.id, 'synced');
+            setTransactions(prevTransactions =>
+              prevTransactions.map((item: Transaction) => {
+                if (item.ticketcode === newTransaction.ticketcode) {
+                  return {...item, status: 'synced'}; // Update only matching item
+                } else {
+                  return item; // Preserve other items
+                }
+              }),
+            );
+          }
+        }
+        // Alert.alert('Printed');
+      } else {
+        Alert.alert('No internet connection');
+      }
+      resolve(true);
+    });
   };
 
   return (
@@ -268,20 +307,30 @@ const History = (props: any) => {
           </View>
         </View>
         {/* Total */}
-        <View style={[styles.container, {justifyContent: 'center'}]}>
-          <Text style={[{fontSize: 20, color: Colors.Black, marginRight: 5}]}>
-            Total:
-          </Text>
-          <Text
-            style={[
-              {fontWeight: 'bold', fontSize: 30, color: Colors.mediumGreen},
-            ]}>
-            {formatNumberWithCommas(totalAmount)}
-          </Text>
-        </View>
+        {refresh && <ActivityIndicator />}
+        {!refresh && (
+          <View style={[styles.container, {justifyContent: 'center'}]}>
+            <Text style={[{fontSize: 20, color: Colors.Black, marginRight: 5}]}>
+              Total:
+            </Text>
+            <Text
+              style={[
+                {fontWeight: 'bold', fontSize: 30, color: Colors.mediumGreen},
+              ]}>
+              {formatNumberWithCommas(totalAmount)}
+            </Text>
+          </View>
+        )}
         {/* Transaction List */}
-        <FlatList data={transactions} renderItem={renderItem} />
-        <View style={Styles.line} />
+        {!refresh && (
+          <FlatList
+            data={transactions}
+            renderItem={renderItem}
+            refreshControl={
+              <RefreshControl refreshing={refresh} onRefresh={onRefresh} />
+            }
+          />
+        )}
         {/* Print Sales */}
         {transactions.length > 0 && (
           <TouchableOpacity
