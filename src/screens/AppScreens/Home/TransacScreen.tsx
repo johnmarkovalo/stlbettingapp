@@ -303,6 +303,7 @@ const TransacScreen = (props: any) => {
           moment().format('YYMMDD-HHmmss');
         let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
         let trans_data = convertToTransData(bets);
+        let now = moment().format('YYYY-MM-DD HH:mm:ss');
         const transaction: Transaction = {
           ticketcode: ticketcode,
           betdate: betDate,
@@ -312,6 +313,7 @@ const TransacScreen = (props: any) => {
           total: totalAmount,
           trans_data: trans_data,
           status: 'saved',
+          created_at: now,
         };
         insertTransaction(transaction, bets, transactionId => {
           if (transactionId) {
@@ -325,7 +327,7 @@ const TransacScreen = (props: any) => {
                 gateway: 'Retrofit',
                 keycode: user.keycode,
                 remarks: '',
-                printed_at: moment().format('YYYY-MM-DD HH:mm:ss'),
+                printed_at: now,
                 declared_gross: totalAmount,
                 bets: bets,
               };
