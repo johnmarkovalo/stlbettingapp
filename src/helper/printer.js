@@ -47,7 +47,7 @@ async function printTransaction(transaction, betType, bets, user) {
     padStringToLength32('1PHP R WINS ' + betType.winram) +
     padStringToLength32('1PHP Double R WINS ' + betType.winram2) +
     '                                ' +
-    'No.            Bet        CanWin' +
+    'No.          Target       Rambol' +
     '--------------------------------' +
     betString +
     '--------------------------------' +
