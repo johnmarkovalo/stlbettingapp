@@ -520,7 +520,7 @@ const insertTransaction = (
   const db = openDatabaseConnection();
   db.transaction((tx: any) => {
     tx.executeSql(
-      'INSERT INTO trans (ticketcode, transdata, betdate, bettime, bettypeid, trans_no, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO trans (ticketcode, transdata, betdate, bettime, bettypeid, trans_no, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         transaction.ticketcode,
         transaction.trans_data,
@@ -530,6 +530,7 @@ const insertTransaction = (
         transaction.trans_no,
         transaction.total,
         transaction.status,
+        transaction.created_at,
       ],
       (tx: any, results: any) => {
         const insertedId = results.insertId;
