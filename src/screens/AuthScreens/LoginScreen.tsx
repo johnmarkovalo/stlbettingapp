@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Alert,
 } from 'react-native';
 import {ActivityIndicator, Text} from 'react-native-paper';
 import {useDispatch, useSelector} from 'react-redux';
@@ -156,13 +157,19 @@ const LoginScreen = props => {
     }
   };
 
-  const debounceCodeScanned = _.debounce(codes => {
-    setEnableQRCam(false);
-    processQR(codes[0].value);
-  }, 300);
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
-    onCodeScanned: debounceCodeScanned,
+    onCodeScanned: codes => {
+      setEnableQRCam(false);
+      if (codes[0].value[codes[0].value.length - 12] === ':') {
+        //Remove the remainding string start from ':'
+        codes[0].value = codes[0].value.substring(
+          0,
+          codes[0].value.length - 12,
+        );
+        processQR(codes[0].value);
+      } else Alert.alert('Invalid QR code');
+    },
   });
 
   if (enableQRCam) {
