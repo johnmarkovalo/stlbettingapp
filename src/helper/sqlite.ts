@@ -26,7 +26,7 @@ const initializeDatabase = () => {
     tx.executeSql(
       'CREATE TABLE IF NOT EXISTS trans' +
         '(id INTEGER PRIMARY KEY AUTOINCREMENT, trans_no INTEGER, ticketcode TEXT, total INTEGER, transdata TEXT,' +
-        "bettypeid INTEGER, betdate DATE, bettime INTEGER, status TEXT DEFAULT 'saved', created_at DATE DEFAULT CURRENT_TIMESTAMP)",
+        "bettypeid INTEGER, betdate DATE, bettime INTEGER, status TEXT DEFAULT 'saved', created_at TEXT)",
     );
     tx.executeSql('CREATE INDEX index_ticketcode ON trans (ticketcode)');
     tx.executeSql(
@@ -517,6 +517,7 @@ const insertTransaction = (
   bets: Bet[],
   callback: (transactionId: number) => void,
 ) => {
+  console.log('created_at', transaction.created_at);
   const db = openDatabaseConnection();
   db.transaction((tx: any) => {
     tx.executeSql(

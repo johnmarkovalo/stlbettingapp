@@ -4,7 +4,7 @@ import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Transaction from '../models/Transaction';
 import Colors from '../Styles/Colors';
 import moment from 'moment';
-import {formatNumberWithCommas} from '../helper';
+import {convertDateTime, formatNumberWithCommas} from '../helper';
 
 type TransactionProps = {
   item: Transaction;
@@ -41,7 +41,8 @@ export const TransactionItem = ({
               <Text style={styles.syncedNumberStyle}>{item.ticketcode}</Text>
             )}
             <Text style={styles.subNumberStyle}>
-              {moment(item.created_at, 'hh:mm:ss').format('hh:mm A')}
+              {/* {moment(item.created_at, 'hh:mm:ss').format('hh:mm A')} */}
+              {convertDateTime(item.created_at)}
             </Text>
           </View>
         </View>

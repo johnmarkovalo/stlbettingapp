@@ -216,3 +216,21 @@ export const checkInternetConnection = () => {
     cleanup,
   };
 };
+
+export const convertDateTime = timestamp => {
+  const dateComponents = timestamp.split(/[- :]/); // Split by delimiters
+
+  const date = new Date(
+    ...dateComponents.map(Number), // Convert strings to numbers
+  );
+  let hours = date.getHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12; // Convert to 12-hour clock
+  hours = hours ? hours : 12; // Handle midnight (12 AM should stay as 12)
+
+  const minutes = date.getMinutes().toString().padStart(2, '0'); // Ensure 2-digit minutes
+
+  const formattedTime = `${hours}:${minutes} ${ampm}`;
+
+  return formattedTime;
+};
