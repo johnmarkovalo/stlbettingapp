@@ -64,8 +64,11 @@ const styles = StyleSheet.create({
   },
 
   cameraStyle: {
-    width: 300,
-    height: 300,
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignSelf: 'center',
   },
 
