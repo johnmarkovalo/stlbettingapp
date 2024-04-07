@@ -28,6 +28,10 @@ const initializeDatabase = () => {
         '(id INTEGER PRIMARY KEY AUTOINCREMENT, trans_no INTEGER, ticketcode TEXT, total INTEGER, transdata TEXT,' +
         "bettypeid INTEGER, betdate DATE, bettime INTEGER, status TEXT DEFAULT 'saved', created_at DATE DEFAULT CURRENT_TIMESTAMP)",
     );
+    tx.executeSql('CREATE INDEX index_ticketcode ON trans (ticketcode)');
+    tx.executeSql(
+      'CREATE INDEX trans_composite_index ON trans (betdate, bettime, bettypeid)',
+    );
     //Create bet table
     tx.executeSql(
       'CREATE TABLE IF NOT EXISTS bet' +
@@ -39,6 +43,9 @@ const initializeDatabase = () => {
       'CREATE TABLE IF NOT EXISTS result' +
         '(id INTEGER PRIMARY KEY AUTOINCREMENT, bettypeid INTEGER, result TEXT, resultr TEXT, betdate DATE,' +
         'bettime INTEGER, created_at DATE DEFAULT CURRENT_TIMESTAMP)',
+    );
+    tx.executeSql(
+      'CREATE INDEX result_composite_index ON result (betdate, bettime, bettypeid)',
     );
   });
 
@@ -368,6 +375,12 @@ const getWinningTransactionBets = (
     );
   });
 };
+
+// const checkTransactionIfWinning = (
+//   ticketcode: string,
+//   callback: (isWinning: boolean) => void,
+
+// )
 
 const closeDatabaseConnection = () => {
   const db = openDatabaseConnection();
