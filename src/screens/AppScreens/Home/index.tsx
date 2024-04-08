@@ -15,8 +15,6 @@ import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import {
   checkLastDrawTransactionStatus,
-  closeDatabaseConnection,
-  getActiveTypes,
   getLatestTransactionDateTime,
 } from '../../../helper/sqlite.ts';
 import moment from 'moment';

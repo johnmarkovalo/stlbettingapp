@@ -36,7 +36,6 @@ import {
   getTransactions,
   updateTransactionStatus,
   getBetsByTransaction,
-  closeDatabaseConnection,
 } from '../../../helper/sqlite.ts';
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
@@ -137,12 +136,6 @@ const History = (props: any) => {
       fetchData();
     });
   }, [navigation]);
-
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
-    };
-  }, []);
 
   const renderItem = ({item}: {item: Transaction}) => {
     return (

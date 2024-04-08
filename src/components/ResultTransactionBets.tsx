@@ -12,10 +12,7 @@ import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
-import {
-  closeDatabaseConnection,
-  getWinningTransactionBets,
-} from '../helper/sqlite';
+import {getWinningTransactionBets} from '../helper/sqlite';
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
@@ -43,12 +40,6 @@ const ResultTransactionBets = ({hide, result, transaction}: any) => {
     });
     setTotalAmount(total);
   }, [bets]);
-
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
-    };
-  }, []);
 
   function hideModal() {
     hide();

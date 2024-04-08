@@ -33,7 +33,6 @@ import {
   sortNumber,
 } from '../../../helper/functions.js';
 import {
-  closeDatabaseConnection,
   getLatestTransaction,
   insertTransaction,
   updateTransactionStatus,
@@ -116,12 +115,6 @@ const TransacScreen = (props: any) => {
       clearInterval(intervalId);
     };
   }, [props.navigation]);
-
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
-    };
-  }, []);
 
   function checkCapping() {
     if (

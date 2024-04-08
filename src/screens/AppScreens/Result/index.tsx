@@ -39,7 +39,6 @@ import {
   insertResult,
   getTransactionByTicketCode,
   getWinningTransactionBets,
-  closeDatabaseConnection,
 } from '../../../helper/sqlite.ts';
 import {useSelector} from 'react-redux';
 import {checkTransactionAPI, syncResultAPI} from '../../../helper/api.ts';
@@ -210,12 +209,6 @@ const Result = (props: any) => {
   useEffect(() => {
     setBetTypeId(betTypes[0].bettypeid);
     setDraw(getCurrentDraw(betTypes[0].draws) ?? 1);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
-    };
   }, []);
 
   useEffect(() => {

@@ -20,8 +20,7 @@ import {
 import {useDispatch, useSelector} from 'react-redux';
 import {userActions, typesActions} from '../../../store/actions';
 import {syncBetTypesAPI} from '../../../helper/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {closeDatabaseConnection, insertTypes} from '../../../helper/sqlite';
+import {insertTypes} from '../../../helper/sqlite';
 import {
   formatBetTypes,
   checkInternetConnection,
@@ -38,12 +37,6 @@ const Setting = (props: any) => {
 
   useEffect(() => {
     setAgent({...user});
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
-    };
   }, []);
 
   const logout = () => {
