@@ -68,12 +68,12 @@ const Result = (props: any) => {
   const [betDate, setBetDate] = useState<Date>(moment().toDate());
   const minDate = moment().subtract(1, 'weeks').toDate();
   const maxDate = moment().toDate();
-  //Draw
-  const [draw, setDraw] = useState(1);
   //Type
   const betTypes = useSelector(state => state.types.types);
   const [betTypeId, setBetTypeId] = useState(2);
   const [betType, setBetType] = useState(betTypes[0]);
+  //Draw
+  const [draw, setDraw] = useState(getCurrentDraw(betTypes[0].draws ?? 1));
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === betTypeId,
@@ -93,13 +93,15 @@ const Result = (props: any) => {
       if (!internetStatusCheck.current.isConnected()) {
         Alert.alert('No internet connection');
       }
-      let response = await checkTransactionAPI(ticketcode, token);
-      if (response) {
-        setAlertModalVisible(true);
-        setModalMessage({
-          title: 'Scanned Ticket',
-          message: response.message,
-        });
+      if (!enableQRCam) {
+        let response = await checkTransactionAPI(ticketcode, token);
+        if (response) {
+          setAlertModalVisible(true);
+          setModalMessage({
+            title: 'Scanned Ticket',
+            message: response.message,
+          });
+        }
       }
       // if (enableQRCam) return;
       // //Check if ticketcode exists in transactions

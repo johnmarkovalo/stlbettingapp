@@ -59,10 +59,10 @@ const History = (props: any) => {
   const [betDate, setBetDate] = useState<Date>(moment().toDate());
   const minDate = moment().subtract(1, 'weeks').toDate();
   const maxDate = moment().toDate();
-  //Draw
-  const [draw, setDraw] = useState(1);
   //Type
   const [type, setType] = useState(2);
+  //Draw
+  const [draw, setDraw] = useState(getCurrentDraw(betTypes[0].draws) ?? 1);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === type,
@@ -99,16 +99,37 @@ const History = (props: any) => {
   const syncTransactions = async () => {
     setRefresh(true);
     try {
+      if (!internetStatusCheck.current.isConnected()) {
+        Alert.alert('Error', 'No internet connection');
+        return; // Exit function if no internet connection
+      }
+
       const promises = transactions.map(transaction => {
         if (transaction.status === 'printed') {
-          return resendTransaction(transaction); // Assuming resendTransaction returns a Promise
+          return resendTransaction(transaction);
         } else {
-          return Promise.resolve(); // Return a resolved Promise if already synced
+          return Promise.resolve();
         }
       });
-      await Promise.all(promises);
+
+      let pendingPromises = promises.length; // Track promises
+      await Promise.all(
+        promises.map(async promise => {
+          try {
+            await promise;
+          } catch (error) {
+            console.error('Error in a transaction:', error);
+            // Handle specific error for this transaction
+          } finally {
+            pendingPromises--;
+            if (pendingPromises === 0) {
+              setRefresh(false); // Set refresh to false only when all promises are done.
+            }
+          }
+        }),
+      );
     } catch (error) {
-      console.log(error);
+      console.error(error);
     } finally {
       setRefresh(false);
     }
@@ -177,7 +198,7 @@ const History = (props: any) => {
   };
 
   const resendTransaction = async (transaction: Transaction) => {
-    return new Promise(async (resolve, reject) => {
+    try {
       if (internetStatusCheck.current.isConnected()) {
         const bets = await getBetsByTransaction(transaction.id);
         if (bets) {
@@ -191,7 +212,6 @@ const History = (props: any) => {
             declared_gross: totalAmount,
             bets: bets,
           };
-          console.log(newTransaction);
           const response = await sendTransactionAPI(token, newTransaction);
           if (response) {
             updateTransactionStatus(newTransaction.id, 'synced');
@@ -204,14 +224,19 @@ const History = (props: any) => {
                 }
               }),
             );
+            return true; // Resolve promise after successful processing
           }
         }
         // Alert.alert('Printed');
       } else {
         Alert.alert('No internet connection');
       }
-      resolve(true);
-    });
+      return false; // Resolve promise indicating no successful processing
+    } catch (error) {
+      console.error('Error in resendTransaction:', error);
+      // Handle error and potentially retry the transaction
+      return false;
+    }
   };
 
   return (
