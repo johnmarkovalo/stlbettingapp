@@ -141,9 +141,6 @@ const History = (props: any) => {
     return (
       <TransactionItem
         item={item}
-        onLongPress={() => {
-          resendTransaction(item);
-        }}
         onPress={() => {
           betModalShow(item);
         }}

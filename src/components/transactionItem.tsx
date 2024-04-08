@@ -9,14 +9,9 @@ import {convertDateTime, formatNumberWithCommas} from '../helper';
 type TransactionProps = {
   item: Transaction;
   onPress: () => void;
-  onLongPress: () => void;
 };
 
-export const TransactionItem = ({
-  item,
-  onPress,
-  onLongPress,
-}: TransactionProps) => {
+export const TransactionItem = ({item, onPress}: TransactionProps) => {
   function checkValid(item) {
     if (item.status === 'synced' || item.status === 'scanned') {
       return true;
@@ -25,10 +20,7 @@ export const TransactionItem = ({
   }
   return (
     <View>
-      <TouchableOpacity
-        style={styles.container}
-        onPress={onPress}
-        onLongPress={onLongPress}>
+      <TouchableOpacity style={styles.container} onPress={onPress}>
         <View style={[{flexDirection: 'row', alignItems: 'center'}]}>
           <Text style={[{color: Colors.darkGrey, fontSize: 25}]}>
             {item.trans_no + '. '}
