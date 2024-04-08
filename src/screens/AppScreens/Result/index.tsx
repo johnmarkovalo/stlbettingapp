@@ -31,6 +31,7 @@ import moment from 'moment';
 import DrawModal from '../../../components/DrawModal.tsx';
 import TypeModal from '../../../components/TypeModal.tsx';
 import Type from '../../../models/Type.ts';
+import Ionic from 'react-native-vector-icons/Ionicons';
 import {
   getResult,
   getWinners,
@@ -49,6 +50,7 @@ import {
 } from 'react-native-vision-camera';
 
 const widthScreen = Dimensions.get('window').width;
+const heightScreen = Dimensions.get('window').height;
 
 const Result = (props: any) => {
   const {navigation} = props;
@@ -57,6 +59,8 @@ const Result = (props: any) => {
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [refresh, setRefresh] = useState(false);
   const [cameraDevice, setCameraDevice] = useState(useCameraDevice('back'));
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState({title: '', message: ''});
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [drawModalVisible, setDrawModalVisible] = useState(false);
@@ -86,8 +90,19 @@ const Result = (props: any) => {
 
   const processQR = async (ticketcode: string) => {
     try {
+      console.log(ticketcode);
+      if (!internetStatusCheck.current.isConnected()) {
+        Alert.alert('No internet connection');
+      }
+      let response = await checkTransactionAPI(ticketcode, token);
+      if (response) {
+        setAlertModalVisible(true);
+        setModalMessage({
+          title: 'Scanned Ticket',
+          message: response.message,
+        });
+      }
       // if (enableQRCam) return;
-      // console.log(ticketcode);
       // //Check if ticketcode exists in transactions
       // getTransactionByTicketCode(ticketcode, transaction => {
       //   if (transaction) {
@@ -290,6 +305,10 @@ const Result = (props: any) => {
     setTypeModalVisible(true);
   };
 
+  const hideAlertModal = () => {
+    setAlertModalVisible(false);
+  };
+
   if (enableQRCam) {
     return (
       <View style={{flex: 1}}>
@@ -316,6 +335,39 @@ const Result = (props: any) => {
   }
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={alertModalVisible}
+        onRequestClose={betModalHide}>
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            {/* Header */}
+            <View style={styles.modalHeaderContainer}>
+              <Text style={styles.modalTitle}>{modalMessage.title}</Text>
+              <TouchableOpacity
+                onPress={hideAlertModal}
+                style={{
+                  padding: 10,
+                  alignSelf: 'flex-end',
+                  position: 'absolute',
+                }}>
+                <Ionic
+                  name="close"
+                  size={30}
+                  style={{
+                    color: '#000',
+                  }}
+                />
+              </TouchableOpacity>
+            </View>
+            {/* Bet List */}
+            <View style={styles.modalBodyContainer}>
+              <Text style={styles.alertText}>{modalMessage.message}</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Modal
         animationType="fade"
         transparent={true}
@@ -558,6 +610,58 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    // marginTop: 22,
+    width: widthScreen,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  modalView: {
+    // margin: 15,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    height: heightScreen * 0.4,
+    width: widthScreen * 0.9,
+  },
+  modalHeaderContainer: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: widthScreen * 0.9,
+    padding: 10,
+    alignSelf: 'center',
+  },
+  modalBodyContainer: {
+    flex: 1,
+    padding: 1,
+  },
+  modalTitle: {
+    alignSelf: 'center',
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.Black,
+  },
+  alertText: {
+    alignSelf: 'center',
+    textAlign: 'center',
+    fontSize: 22,
+    color: Colors.Black,
   },
 });
 

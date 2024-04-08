@@ -66,24 +66,22 @@ const syncResultAPI = async (
   }
 };
 
-const checkTransactionAPI = async (
-  ticketcode: string,
-  token: string,
-  callback: (types: any) => void,
-) => {
-  console.log('checking server db');
-  axios
-    .get(appConfig.apiUrl + 'transactions/scan/' + ticketcode, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    })
-    .then(response => {
-      if (JSON.stringify(response.data) !== '{}') {
-        callback(response.data);
-      } else callback(null);
-    });
+const checkTransactionAPI = async (ticketcode: string, token: string) => {
+  return new Promise((resolve, reject) => {
+    console.log('checking server db');
+    axios
+      .get(appConfig.apiUrl + 'transactions/scan/' + ticketcode, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then(response => {
+        if (JSON.stringify(response.data) !== '{}') {
+          resolve(response.data);
+        } else resolve(null);
+      });
+  });
 };
 
 export {

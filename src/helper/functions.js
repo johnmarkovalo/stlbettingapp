@@ -103,7 +103,8 @@ export const formatTime = (hour, minute) => {
 
 export const getCurrentDraw = draws => {
   const currentTime = moment().format('HH:mm');
-
+  // console.log('currentTime', currentTime);
+  // console.log('draws', draws);
   // Find the draw that matches the current time
   const currentDraw = draws.find(draw => {
     const start = moment(draw.start, 'HH:mm');
@@ -135,13 +136,13 @@ export const sortNumber = number => {
 };
 
 export const convertToTransData = bets => {
-  let transdata = '';
+  let trans_data = '';
   for (let n = 0; n < bets.length; n++) {
-    transdata += bets[n].betNumber;
-    transdata += ' ' + bets[n].targetAmount;
-    transdata += ' ' + bets[n].rambolAmount + ', ';
+    trans_data += bets[n].betNumber;
+    trans_data += ' ' + bets[n].targetAmount;
+    trans_data += ' ' + bets[n].rambolAmount + ', ';
   }
-  return transdata;
+  return trans_data;
 };
 
 export const formatBetTypes = betTypes => {

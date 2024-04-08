@@ -5,10 +5,12 @@
  */
 import {createStackNavigator} from '@react-navigation/stack';
 import React from 'react';
-import {useSelector} from 'react-redux';
+import {useSelector, useDispatch} from 'react-redux';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
 import {NavigationContainer} from '@react-navigation/native';
+import {typesActions} from '../store/actions/types.actions';
+import {getActiveTypes} from '../helper/sqlite';
 
 export default function Navigation() {
   return (
@@ -23,6 +25,14 @@ export default function Navigation() {
 const Stack = createStackNavigator();
 
 function RootNavigator() {
+  const dispatch = useDispatch();
+  const fetchData = async () => {
+    const types = await getActiveTypes();
+    if (types) {
+      dispatch(typesActions.update(types));
+    }
+  };
+  fetchData();
   const authentication = useSelector(state => state.auth.loggedIn);
   console.log('auth', authentication);
   return (

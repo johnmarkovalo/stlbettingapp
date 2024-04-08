@@ -109,13 +109,13 @@ const TransacScreen = (props: any) => {
     recalculateCurrentDraw();
 
     // Set up interval for periodic recalculation (every 60 seconds)
-    const intervalId = setInterval(recalculateCurrentDraw, 60000);
+    const intervalId = setInterval(recalculateCurrentDraw, 30000);
 
     // Clean up interval when the component unmounts
     return () => {
       clearInterval(intervalId);
     };
-  }, [betType]);
+  }, [props.navigation]);
 
   useEffect(() => {
     return () => {

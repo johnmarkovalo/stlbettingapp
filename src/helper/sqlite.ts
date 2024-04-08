@@ -4,6 +4,7 @@ import Type from '../models/Type';
 import Bet from '../models/Bet';
 import Transaction from '../models/Transaction';
 import {checkIfDouble} from './functions';
+import moment from 'moment';
 
 const db = SQLite.openDatabase({name: 'zian.db', location: 'default'});
 const openDatabaseConnection = () => {
@@ -11,49 +12,54 @@ const openDatabaseConnection = () => {
   return db;
 };
 
-const initializeDatabase = () => {
-  db.transaction((tx: any) => {
-    //Create settings table
-    tx.executeSql(
-      'CREATE TABLE IF NOT EXISTS settings' +
-        '(id INTEGER PRIMARY KEY AUTOINCREMENT, active INTEGER DEFAULT 1, bettype TEXT,' +
-        'cnt TEXT, perc TEXT, maxlength INTEGER DEFAULT 3, divisible INTEGER DEFAULT 0,' +
-        'start11 INTEGER, start11m INTEGER, end11 INTEGER, end11m INTEGER, start4 INTEGER, start4m INTEGER,' +
-        'end4 INTEGER, end4m INTEGER, start9 INTEGER, start9m INTEGER, end9 INTEGER, end9m INTEGER,' +
-        'limits INTEGER DEFAULT 10, capping INTEGER DEFAULT 250, wintar INTEGER, winram INTEGER, winram2 INTEGER, bettypeid INTEGER)',
-    );
-    //Create trans table
-    tx.executeSql(
-      'CREATE TABLE IF NOT EXISTS trans' +
-        '(id INTEGER PRIMARY KEY AUTOINCREMENT, trans_no INTEGER, ticketcode TEXT, total INTEGER, trans_data TEXT,' +
-        "bettypeid INTEGER, betdate DATE, bettime INTEGER, status TEXT DEFAULT 'saved', created_at TEXT)",
-    );
-    tx.executeSql('CREATE INDEX index_ticketcode ON trans (ticketcode)');
-    tx.executeSql(
-      'CREATE INDEX trans_composite_index ON trans (betdate, bettime, bettypeid)',
-    );
-    //Create bet table
-    tx.executeSql(
-      'CREATE TABLE IF NOT EXISTS bet' +
-        '(id INTEGER PRIMARY KEY AUTOINCREMENT, transid INTEGER REFERENCES trans(id) ON DELETE CASCADE, tranno INTEGER, betnumber TEXT,' +
-        "betnumberr TEXT, target INTEGER, rambol INTEGER, subtotal INTEGER, status TEXT DEFAULT 'saved', created_at DATE DEFAULT CURRENT_TIMESTAMP)",
-    );
-    //Create result table
-    tx.executeSql(
-      'CREATE TABLE IF NOT EXISTS result' +
-        '(id INTEGER PRIMARY KEY AUTOINCREMENT, bettypeid INTEGER, result TEXT, resultr TEXT, betdate DATE,' +
-        'bettime INTEGER, created_at DATE DEFAULT CURRENT_TIMESTAMP)',
-    );
-    tx.executeSql(
-      'CREATE INDEX result_composite_index ON result (betdate, bettime, bettypeid)',
-    );
-  });
+const initializeDatabase = async () => {
+  return new Promise((resolve, reject) => {
+    db.transaction((tx: any) => {
+      //Create settings table
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS settings' +
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, active INTEGER DEFAULT 1, bettype TEXT,' +
+          'cnt TEXT, perc TEXT, maxlength INTEGER DEFAULT 3, divisible INTEGER DEFAULT 0,' +
+          'start11 INTEGER, start11m INTEGER, end11 INTEGER, end11m INTEGER, start4 INTEGER, start4m INTEGER,' +
+          'end4 INTEGER, end4m INTEGER, start9 INTEGER, start9m INTEGER, end9 INTEGER, end9m INTEGER,' +
+          'limits INTEGER DEFAULT 10, capping INTEGER DEFAULT 250, wintar INTEGER, winram INTEGER, winram2 INTEGER, bettypeid INTEGER)',
+      );
+      //Create trans table
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS trans' +
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, trans_no INTEGER, ticketcode TEXT, total INTEGER, trans_data TEXT,' +
+          "bettypeid INTEGER, betdate DATE, bettime INTEGER, status TEXT DEFAULT 'saved', created_at TEXT)",
+      );
+      tx.executeSql('CREATE INDEX index_ticketcode ON trans (ticketcode)');
+      tx.executeSql(
+        'CREATE INDEX trans_composite_index ON trans (betdate, bettime, bettypeid)',
+      );
+      //Create bet table
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS bet' +
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, transid INTEGER REFERENCES trans(id) ON DELETE CASCADE, tranno INTEGER, betnumber TEXT,' +
+          "betnumberr TEXT, target INTEGER, rambol INTEGER, subtotal INTEGER, status TEXT DEFAULT 'saved', created_at DATE DEFAULT CURRENT_TIMESTAMP)",
+      );
+      //Create result table
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS result' +
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, bettypeid INTEGER, result TEXT, resultr TEXT, betdate DATE,' +
+          'bettime INTEGER, created_at DATE DEFAULT CURRENT_TIMESTAMP)',
+      );
+      tx.executeSql(
+        'CREATE INDEX result_composite_index ON result (betdate, bettime, bettypeid)',
+      );
+    });
 
-  insertInitialData();
+    insertInitialData();
+
+    resolve(true);
+  });
 };
 
 const insertInitialData = () => {
   //Insert initial settings
+  const now = moment().format('YYYY-MM-DD HH:mm:ss');
   db.transaction((tx: any) => {
     tx.executeSql(
       'INSERT INTO settings(bettype, wintar, winram, winram2, maxlength, cnt, perc, bettypeid,' +
@@ -84,8 +90,8 @@ const insertInitialData = () => {
     );
 
     tx.executeSql(
-      'INSERT INTO trans (trans_no, ticketcode, total, trans_data, bettypeid, betdate, bettime ) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [1, '4064–3336–6537–3166', 20, '247 10 10', '2', '2024-04-03', 3],
+      'INSERT INTO trans (trans_no, ticketcode, total, trans_data, bettypeid, betdate, bettime, created_at ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [1, '4064–3336–6537–3166', 20, '247 10 10', '2', '2023-04-03', 3, now],
       () => {
         console.log('Transaction inserted successfully');
       },
@@ -639,12 +645,62 @@ const getLatestTransaction = (
   });
 };
 
+const getLatestTransactionDateTime = () => {
+  //Check if dateTime < latest transaction created_at
+  return new Promise((resolve, reject) => {
+    db.transaction((tx: any) => {
+      tx.executeSql(
+        'SELECT * FROM trans ORDER BY created_at DESC LIMIT 1',
+        [],
+        (tx: any, results: any) => {
+          const rows = results.rows;
+          const transaction = rows.item(0);
+          resolve(transaction.created_at);
+        },
+        (error: any) => {
+          console.error('Error fetching transactions:', error);
+        },
+      );
+    });
+  });
+};
+
+const checkLastDrawTransactionStatus = (draw: number, betTypeId: number) => {
+  let betDate = moment().format('YYYY-MM-DD');
+  if (draw === 1) {
+    draw = 3;
+    betDate = moment().subtract(1, 'd').format('YYYY-MM-DD');
+  } else {
+    draw = draw - 1;
+  }
+  console.log('params', draw, betTypeId, betDate);
+  return new Promise((resolve, reject) => {
+    db.transaction((tx: any) => {
+      tx.executeSql(
+        'SELECT * FROM trans WHERE bettime = ? AND bettypeid = ? AND betdate = ? AND NOT status = "synced" ORDER BY trans_no DESC LIMIT 1',
+        [draw, betTypeId, betDate],
+        (tx: any, results: any) => {
+          const rows = results.rows;
+          const len = rows.length;
+          if (len > 0) {
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        },
+        (error: any) => {
+          console.error('Error fetching transactions:', error);
+        },
+      );
+    });
+  });
+};
+
 export {
   initializeDatabase,
   getActiveTypes,
   getTransactions,
   getTransactionByTicketCode,
-  getLatestTransaction,
   getBetsByTransaction,
   getWinningTransactionBets,
   getWinners,
@@ -652,6 +708,9 @@ export {
   insertTransaction,
   insertTypes,
   insertResult,
+  getLatestTransaction,
+  getLatestTransactionDateTime,
+  checkLastDrawTransactionStatus,
   updateTransactionStatus,
   closeDatabaseConnection,
 };

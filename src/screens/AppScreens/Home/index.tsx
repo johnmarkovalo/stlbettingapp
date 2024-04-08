@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {
+  Alert,
   Dimensions,
   SafeAreaView,
   ScrollView,
@@ -13,8 +14,10 @@ import {useSelector, useDispatch} from 'react-redux';
 import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import {
+  checkLastDrawTransactionStatus,
   closeDatabaseConnection,
   getActiveTypes,
+  getLatestTransactionDateTime,
 } from '../../../helper/sqlite.ts';
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
@@ -25,50 +28,53 @@ const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
   const user = useSelector(state => state.auth.user);
   const types = useSelector(state => state.types.types);
-  const dispatch = useDispatch();
   const {navigation} = props;
-  const [betTypes, setBetTypes] = useState([]);
   const [currentDraw, setCurrentDraw] = useState(null);
+  const [validDateTime, setValidDateTime] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const types = await getActiveTypes();
-      if (types) {
-        setBetTypes(types);
-        dispatch(typesActions.update(types));
-      }
-    };
-    fetchData();
-  }, [types]);
-
-  useEffect(() => {
+  const recalculateCurrentDraw = async () => {
     // Define a function to recalculate the current draw
-    const recalculateCurrentDraw = () => {
-      // Ensure betTypes[0] exists before accessing its draws
-      if (betTypes.length > 0) {
-        const firstTypeDraws = betTypes[0].draws;
-        const currentDraw = getCurrentDraw(firstTypeDraws);
-        setCurrentDraw(currentDraw);
-      }
-    };
-
+    if (types.length > 0) {
+      const firstTypeDraws = types[0].draws;
+      const currentDraw = getCurrentDraw(firstTypeDraws);
+      console.log('currentDraw', currentDraw);
+      setCurrentDraw(currentDraw);
+    }
+    //Check if dateTime is valid
+    const latestTranDate = await getLatestTransactionDateTime();
+    if (latestTranDate) {
+      const validDateTime = moment().isSameOrAfter(latestTranDate);
+      setValidDateTime(validDateTime);
+    }
+  };
+  useEffect(() => {
     // Recalculate current draw initially when the component mounts
     recalculateCurrentDraw();
 
-    // Set up interval for periodic recalculation (every 60 seconds)
-    const intervalId = setInterval(recalculateCurrentDraw, 60000);
+    // Set up interval for periodic recalculation (every 30 seconds)
+    const intervalId = setInterval(recalculateCurrentDraw, 10000);
 
     // Clean up interval when the component unmounts
     return () => {
       clearInterval(intervalId);
     };
-  }, [betTypes, types]);
+  }, [navigation]);
 
-  useEffect(() => {
-    return () => {
-      closeDatabaseConnection();
-    };
-  }, []);
+  const onTypePress = async (type: Type) => {
+    const hasUnsyncedTransactions = await checkLastDrawTransactionStatus(
+      getCurrentDraw(type.draws),
+      type.bettypeid,
+    );
+    console.log('hasUnsyncedTransactions', hasUnsyncedTransactions);
+    if (hasUnsyncedTransactions) {
+      Alert.alert(
+        'Warning',
+        'Please sync your transactions before proceeding.',
+      );
+    } else {
+      navigation.navigate('Transac', {betType: type});
+    }
+  };
 
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
@@ -104,25 +110,34 @@ const Home = (props: any) => {
             </View>
           </View>
         </View>
-        <View style={styles.container}>
-          <ScrollView style={{marginTop: 20}}>
-            {betTypes.map((button, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => {
-                  navigation.navigate('Transac', {betType: button});
-                }}
-                style={
-                  getCurrentDraw(button.draws) === null
-                    ? styles.buttonDisabled
-                    : styles.button
-                }
-                disabled={getCurrentDraw(button.draws) === null}>
-                <Text style={styles.textStyle}>{button.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        {validDateTime && (
+          <View style={styles.container}>
+            <ScrollView style={{marginTop: 20}}>
+              {types.map((button, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => {
+                    onTypePress(button);
+                  }}
+                  style={
+                    getCurrentDraw(button.draws) === null
+                      ? styles.buttonDisabled
+                      : styles.button
+                  }
+                  disabled={getCurrentDraw(button.draws) === null}>
+                  <Text style={styles.textStyle}>{button.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {!validDateTime && (
+          <View style={styles.container}>
+            <Text style={[styles.textStyle, {color: 'red'}]}>
+              Invalid Date Time
+            </Text>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
