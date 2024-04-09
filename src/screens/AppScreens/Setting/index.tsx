@@ -66,7 +66,7 @@ const Setting = (props: any) => {
     const types = await syncBetTypesAPI(token);
     if (types) {
       insertTypes(types);
-      Alert.alert('Success', 'Bet types synced');
+      Alert.alert('Success', 'Settings are synced');
       dispatch(typesActions.update(formatBetTypes(types)));
     }
   };
