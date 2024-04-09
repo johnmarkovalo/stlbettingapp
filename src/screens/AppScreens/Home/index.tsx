@@ -14,9 +14,9 @@ import {useSelector, useDispatch} from 'react-redux';
 import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import {
-  checkLastDrawTransactionStatus,
-  getLatestTransactionDateTime,
-} from '../../../helper/sqlite.ts';
+  checkLastDrawTransactionStatus, deleteLastWeekTransactions,
+  getLatestTransactionDateTime
+} from "../../../helper/sqlite.ts";
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
 import Type from '../../../models/Type.ts';
@@ -43,6 +43,12 @@ const Home = (props: any) => {
     if (latestTranDate) {
       const validDateTime = moment().isSameOrAfter(latestTranDate);
       setValidDateTime(validDateTime);
+    }
+    //Check if time is less than 1:05 AM and greater than 1:00 AM
+    const currentHour = moment().hour();
+    const currentMinute = moment().minute();
+    if (currentHour < 1 && currentMinute < 5) {
+      await deleteLastWeekTransactions();
     }
   };
   useEffect(() => {

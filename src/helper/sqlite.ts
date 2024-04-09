@@ -121,12 +121,23 @@ const insertInitialData = () => {
   });
 };
 
-const deleteRecords = (table: string, where: string) => {
-  db.transaction((tx: any) => {
-    tx.executeSql('DELETE FROM ' + table + ' WHERE ' + where, [], () => {
-      console.log('deleted');
+const deleteLastWeekTransactions = async () => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction((tx: any) => {
+      tx.executeSql(
+        'DELETE FROM trans WHERE betdate < ?',
+        [moment().subtract(7, 'days').format('YYYY-MM-DD')],
+        () => {
+          console.log('Transactions deleted successfully');
+          resolve();
+        },
+        (error: any) => {
+          console.error('Error deleting transactions:', error);
+          reject(error);
+        },
+      );
     });
-  });
+  })
 };
 //Get Functions
 const getActiveTypes = () => {
@@ -712,5 +723,6 @@ export {
   getLatestTransactionDateTime,
   checkLastDrawTransactionStatus,
   updateTransactionStatus,
+  deleteLastWeekTransactions,
   closeDatabaseConnection,
 };
