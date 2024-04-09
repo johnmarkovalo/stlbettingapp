@@ -47,6 +47,7 @@ import {
   useCameraDevice,
   useCodeScanner,
 } from 'react-native-vision-camera';
+import { listPairedDevices, printHits } from "../../../helper/printer";
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
@@ -73,7 +74,7 @@ const Result = (props: any) => {
   const [betTypeId, setBetTypeId] = useState(2);
   const [betType, setBetType] = useState(betTypes[0]);
   //Draw
-  const [draw, setDraw] = useState(getCurrentDraw(betTypes[0].draws ?? 1));
+  const [draw, setDraw] = useState(getCurrentDraw(betTypes[0].draws) ?? 1);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === betTypeId,
@@ -83,7 +84,7 @@ const Result = (props: any) => {
   //Result
   const [result, setResult] = useState({result: 0});
   //Transaction
-  const [totalAmount, setTotalAmount] = useState(0);
+  const [totalAmount, setTotalAmount] = useState({totalTarget: 0,totalRambol: 0});
   const [transactions, setTransactions] = useState([]);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
@@ -93,7 +94,7 @@ const Result = (props: any) => {
       if (!internetStatusCheck.current.isConnected()) {
         Alert.alert('No internet connection');
       }
-      if (!enableQRCam) {
+      setTimeout(async () => {
         let response = await checkTransactionAPI(ticketcode, token);
         if (response) {
           setAlertModalVisible(true);
@@ -102,7 +103,7 @@ const Result = (props: any) => {
             message: response.message,
           });
         }
-      }
+      }, 1000);
       // if (enableQRCam) return;
       // //Check if ticketcode exists in transactions
       // getTransactionByTicketCode(ticketcode, transaction => {
@@ -228,14 +229,16 @@ const Result = (props: any) => {
     const transactions = await getWinners(betType, newResult);
     if (transactions.length > 0) {
       setTransactions(transactions);
-      let total = 0;
+      let totalTarget = 0;
+      let totalRambol = 0;
       transactions.map(item => {
-        total += item.total;
+        totalTarget += item.targetTotal;
+        totalRambol += item.rambolTotal;
       });
-      setTotalAmount(total);
+      setTotalAmount({totalTarget: totalTarget, totalRambol: totalRambol});
     } else {
       setTransactions([]);
-      setTotalAmount(0);
+      setTotalAmount({totalTarget: 0, totalRambol: 0});
     }
   }
 
@@ -411,6 +414,15 @@ const Result = (props: any) => {
       <View style={Styles.mainContainer}>
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'Result'}</Text>
+          <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
+            <Text
+              style={[
+                {fontWeight: 'bold', fontSize: 35, color: Colors.mediumBlue},
+              ]}>
+              {result.result}
+            </Text>
+          </Text>
+          <Text style={Styles.logoText}>         </Text>
         </View>
         <View style={styles.card}>
           <View style={styles.cardContent}>
@@ -444,26 +456,30 @@ const Result = (props: any) => {
         {refresh && <ActivityIndicator />}
         {!refresh && (
           <View style={styles.hitsContainer}>
-            <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
-              Hits:
+            <Text style={[{fontSize: 18, color: Colors.Black, marginRight: 5, alignSelf:'center'}]}>
+              Target:
               <Text
                 style={[
                   {
                     fontWeight: 'bold',
-                    fontSize: 30,
+                    fontSize: 25,
                     color: Colors.primaryColor,
                   },
                 ]}>
-                {' ' + formatNumberWithCommas(totalAmount)}
+                {' ' + formatNumberWithCommas(totalAmount.totalTarget)}
               </Text>
             </Text>
-            <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
-              Result:
+            <Text style={[{fontSize: 18, color: Colors.Black, marginRight: 5, alignSelf:'center'}]}>
+              Rambol:
               <Text
                 style={[
-                  {fontWeight: 'bold', fontSize: 30, color: Colors.mediumBlue},
+                  {
+                    fontWeight: 'bold',
+                    fontSize: 25,
+                    color: Colors.primaryColor,
+                  },
                 ]}>
-                {result.result}
+                {' ' + formatNumberWithCommas(totalAmount.totalRambol)}
               </Text>
             </Text>
           </View>
@@ -498,14 +514,24 @@ const Result = (props: any) => {
             </Text>
           </View>
         )}
-        {/* Scan Ticket */}
-        <TouchableOpacity
-          style={styles.buttonStyle}
-          onPress={() => {
-            setEnableQRCam(true);
-          }}>
-          <Text style={styles.buttonTextStyle}>Scan Ticket</Text>
-        </TouchableOpacity>
+        {/* Scan Ticket and Print */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.buttonStyle}
+            onPress={() => {
+              listPairedDevices();
+              printHits(betDate, draw, typeLabel(), totalAmount);
+            }}>
+            <Text style={styles.buttonTextStyle}>Print</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.buttonStyle}
+            onPress={() => {
+              setEnableQRCam(true);
+            }}>
+            <Text style={styles.buttonTextStyle}>Scan</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -555,10 +581,18 @@ const styles = StyleSheet.create({
   },
 
   container: {
-    flex: 1,
+    flex: 3,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  buttonContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 10,
   },
 
   button: {
@@ -573,7 +607,7 @@ const styles = StyleSheet.create({
   },
 
   buttonStyle: {
-    width: wp(97),
+    width: wp(46),
     marginVertical: 15,
     justifyContent: 'center',
     alignItems: 'center',
@@ -655,7 +689,7 @@ const styles = StyleSheet.create({
   alertText: {
     alignSelf: 'center',
     textAlign: 'center',
-    fontSize: 22,
+    fontSize: 18,
     color: Colors.Black,
   },
 });

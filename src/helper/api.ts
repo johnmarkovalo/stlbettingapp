@@ -42,7 +42,7 @@ const syncResultAPI = async (
   date: string,
 ) => {
   console.log('checking server db');
-
+  console.log('passed params', type, draw, date);
   try {
     const response = await axios.get(
       appConfig.apiUrl + 'results/' + type + '/draws/' + draw,

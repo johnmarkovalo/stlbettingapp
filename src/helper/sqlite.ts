@@ -336,15 +336,30 @@ const getWinners = (betType: any, result: any) => {
   return new Promise((resolve, reject) => {
     db.transaction((tx: any) => {
       tx.executeSql(
+        // 'SELECT trans.ticketcode, trans.id, trans.status, trans.created_at, trans.trans_no, ' +
+        // 'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END ) as targetTotal, ' +
+        // 'sum(CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END) as rambolTotal ' +
+        // 'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
+        // 'WHERE trans.betdate = ? ' +
+        // 'AND trans.bettime = ? ' +
+        // 'AND trans.bettypeid = ? ' +
+        // 'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
+        // 'GROUP BY trans.ticketcode',
         'SELECT trans.ticketcode, trans.id, trans.status, trans.created_at, trans.trans_no, ' +
-          'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END + CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END) as total ' +
-          'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
-          'WHERE trans.betdate = ? ' +
-          'AND trans.bettime = ? ' +
-          'AND trans.bettypeid = ? ' +
-          'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
-          'GROUP BY trans.ticketcode',
+        'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END + CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END ) as total, ' +
+        'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END ) as targetTotal, ' +
+        'sum(CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END ) as rambolTotal ' +
+        'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
+        'WHERE trans.betdate = ? ' +
+        'AND trans.bettime = ? ' +
+        'AND trans.bettypeid = ? ' +
+        'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
+        'GROUP BY trans.ticketcode',
         [
+          result.result,
+          betType.wintar,
+          result.resultr,
+          checkIfDouble(result.result) ? betType.winram2 : betType.winram,
           result.result,
           betType.wintar,
           result.resultr,
@@ -363,6 +378,7 @@ const getWinners = (betType: any, result: any) => {
             const transaction = rows.item(i);
             if (transaction.total > 0) transactions.push(transaction);
           }
+          console.log('transactions', transactions);
           resolve(transactions);
         },
       );

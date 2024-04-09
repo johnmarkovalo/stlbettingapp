@@ -135,26 +135,32 @@ const LoginScreen = props => {
   };
 
   const processQR = async (qr_token: string) => {
-    try {
-      setLoggingIn(true);
-      axios
-        .post(appConfig.apiUrl + 'login', {
-          encodedString: qr_token,
-        })
-        .then((response: any) => {
-          console.log(response.data);
-          if (response?.data?.token) {
-            dispatch(
-              userActions.login(response.data.agent, response.data.token),
-            );
-            setLoggingIn(false);
-          } else {
-            alert('Invalid QR code');
-          }
-        });
-    } catch (e) {
-      alert(e.message);
-    }
+    setLoggingIn(true);
+    console.log('processQR');
+    setTimeout(function(){
+      console.log('timeout');
+      try {
+        console.log('axios');
+        axios
+          .post(appConfig.apiUrl + 'login', {
+            encodedString: qr_token,
+          })
+          .then((response: any) => {
+            console.log(response.data);
+            if (response?.data?.token) {
+              dispatch(
+                userActions.login(response.data.agent, response.data.token),
+              );
+              setLoggingIn(false);
+            } else {
+              setLoggingIn(false);
+              alert('Invalid QR code');
+            }
+          });
+        } catch (e) {
+          alert(e.message);
+        }
+    }, 1000);
   };
 
   const codeScanner = useCodeScanner({

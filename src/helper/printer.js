@@ -5,13 +5,31 @@ import moment from 'moment';
 async function printSales(betDate, betTime, betType, totalAmount) {
   const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
-  const total = 'TOTAL: ' + totalAmount + '.00';
+  const total = 'TOTAL SALES: <b>' + totalAmount + '.00</b>';
   const textToPrint =
     padStringToLength32(infoHeader) +
     padStringToLength32(dateTime) +
     '--------------------------------' +
     '\n' +
     padStringToLength32(total) +
+    '\n\n' +
+    '  ____________________________  ' +
+    "       Teller's Signature       " +
+    '\n\n ';
+  print(textToPrint);
+}
+
+async function printHits(betDate, betTime, betType, totalAmount) {
+  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
+  const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
+  const totalTarget = 'TARGET:' + totalAmount.totalTarget + '.00';
+  const totalRambol = 'RAMBOL:' + totalAmount.totalRambol + '.00';
+  const textToPrint =
+    padStringToLength32(infoHeader) +
+    padStringToLength32(dateTime) +
+    '--------------------------------' +
+    '\n' +
+    justifySpaceBetween2(totalTarget, totalRambol) +
     '\n\n' +
     '  ____________________________  ' +
     "       Teller's Signature       " +
@@ -135,6 +153,20 @@ function justifySpaceBetween(str1, str2, str3) {
   return result;
 }
 
+function justifySpaceBetween2(str1, str2) {
+  // Calculate the length of each string
+  var length1 = str1.length;
+  var length2 = str2.length;
+
+  var spacesBetween1 = 32 - length1 - length2;
+  // Construct the resulting string with spaces added between the input strings
+  var result =
+    '<b>'+str1 +
+    ' '.repeat(spacesBetween1) +
+    str2+'</b>';
+  return result;
+}
+
 function formatNumberWithCommas(value) {
   // Convert the value to a string
   let stringValue = String(value);
@@ -150,4 +182,4 @@ function formatNumberWithCommas(value) {
   return integerPart;
 }
 
-export {printSales, printTransaction, listPairedDevices};
+export {printSales, printTransaction, printHits, listPairedDevices};
