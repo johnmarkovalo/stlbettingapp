@@ -352,7 +352,7 @@ const History = (props: any) => {
             style={styles.buttonStyle}
             onPress={() => {
               listPairedDevices();
-              printSales(betDate, draw, typeLabel(), totalAmount);
+              printSales(betDate, draw, typeLabel(), totalAmount, user);
             }}>
             <Text style={styles.buttonTextStyle}>Print Sales</Text>
           </TouchableOpacity>

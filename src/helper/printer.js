@@ -2,13 +2,14 @@ import ThermalPrinterModule from 'react-native-thermal-printer';
 import {useSelector} from 'react-redux';
 import {checkIfDouble} from '.';
 import moment from 'moment';
-async function printSales(betDate, betTime, betType, totalAmount) {
+async function printSales(betDate, betTime, betType, totalAmount, user) {
   const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const total = 'TOTAL SALES: <b>' + totalAmount + '.00</b>';
   const textToPrint =
     padStringToLength32(infoHeader) +
     padStringToLength32(dateTime) +
+    padStringToLength32(user.agent_name) +
     '--------------------------------' +
     '\n' +
     padStringToLength32(total) +
@@ -19,7 +20,7 @@ async function printSales(betDate, betTime, betType, totalAmount) {
   print(textToPrint);
 }
 
-async function printHits(betDate, betTime, betType, totalAmount) {
+async function printHits(betDate, betTime, betType, totalAmount,user) {
   const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const totalTarget = 'TARGET:' + totalAmount.totalTarget + '.00';
@@ -27,6 +28,7 @@ async function printHits(betDate, betTime, betType, totalAmount) {
   const textToPrint =
     padStringToLength32(infoHeader) +
     padStringToLength32(dateTime) +
+    padStringToLength32(user.agent_name) +
     '--------------------------------' +
     '\n' +
     justifySpaceBetween2(totalTarget, totalRambol) +

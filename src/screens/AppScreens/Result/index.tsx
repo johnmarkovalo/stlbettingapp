@@ -55,6 +55,7 @@ const heightScreen = Dimensions.get('window').height;
 const Result = (props: any) => {
   const {navigation} = props;
   const internetStatusCheck = useRef(checkInternetConnection());
+  const user = useSelector(state => state.auth.user);
   const token = useSelector(state => state.auth.token);
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [refresh, setRefresh] = useState(false);
@@ -520,7 +521,7 @@ const Result = (props: any) => {
             style={styles.buttonStyle}
             onPress={() => {
               listPairedDevices();
-              printHits(betDate, draw, typeLabel(), totalAmount);
+              printHits(betDate, draw, typeLabel(), totalAmount, user);
             }}>
             <Text style={styles.buttonTextStyle}>Print</Text>
           </TouchableOpacity>
