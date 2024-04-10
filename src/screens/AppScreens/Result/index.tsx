@@ -51,21 +51,23 @@ import { listPairedDevices, printHits } from "../../../helper/printer";
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
+import debounce from 'lodash/debounce';
 
 const Result = (props: any) => {
   const {navigation} = props;
   const internetStatusCheck = useRef(checkInternetConnection());
   const user = useSelector(state => state.auth.user);
   const token = useSelector(state => state.auth.token);
+  const [showQRCam, setShowQRCam] = useState(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [refresh, setRefresh] = useState(false);
-  const [cameraDevice, setCameraDevice] = useState(useCameraDevice('back'));
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState({title: '', message: ''});
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [drawModalVisible, setDrawModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
+  const cameraDevice = useCameraDevice('back');
   //Date
   const [betDate, setBetDate] = useState<Date>(moment().toDate());
   const minDate = moment().subtract(1, 'weeks').toDate();
@@ -91,53 +93,15 @@ const Result = (props: any) => {
 
   const processQR = async (ticketcode: string) => {
     try {
-      console.log(ticketcode);
-      if (!internetStatusCheck.current.isConnected()) {
-        Alert.alert('No internet connection');
+      console.log('processQR');
+      let response = await checkTransactionAPI(ticketcode, token);
+      if (response) {
+        setAlertModalVisible(true);
+        setModalMessage({
+          title: 'Scanned Ticket',
+          message: response.message,
+        });
       }
-      setTimeout(async () => {
-        let response = await checkTransactionAPI(ticketcode, token);
-        if (response) {
-          setAlertModalVisible(true);
-          setModalMessage({
-            title: 'Scanned Ticket',
-            message: response.message,
-          });
-        }
-      }, 1000);
-      // if (enableQRCam) return;
-      // //Check if ticketcode exists in transactions
-      // getTransactionByTicketCode(ticketcode, transaction => {
-      //   if (transaction) {
-      //     console.log('valid ticket');
-      //     getWinningTransactionBets(transaction.id, result, bets => {
-      //       console.log(bets);
-      //       if (bets) {
-      //         updateTransactionStatus(transaction.id, 'scanned');
-      //         Alert.alert('Valid Winning ticket');
-      //       } else {
-      //         Alert.alert('Valid ticket, But not a winning ticket');
-      //       }
-      //     });
-      //   } else {
-      //     if (!internetStatusCheck.current.isConnected()) {
-      //       console.error('Error', 'No internet connection');
-      //       return;
-      //     }
-      //     if (internetStatusCheck.current.isSlow()) {
-      //       console.error('Error', 'Slow internet connection');
-      //       return;
-      //     }
-      //     checkTransactionAPI(ticketcode, token, transaction => {
-      //       if (transaction) {
-      //         console.log(transaction);
-      //       } else {
-      //         Alert.alert('invalid Ticket');
-      //         console.log('transaction not found in server db');
-      //       }
-      //     });
-      //   }
-      // });
     } catch (e) {
       console.error(e.message);
     }
@@ -146,12 +110,20 @@ const Result = (props: any) => {
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: codes => {
-      setEnableQRCam(false);
+      if (!internetStatusCheck.current.isConnected()) {
+        Alert.alert('No internet connection');
+      }
       if (codes[0].value.length === 21) {
-        processQR(codes[0].value);
+        setEnableQRCam(false);
+        setTimeout(async () => {
+          setShowQRCam(false);
+        }, 300);
+        debouncedProcessQr(codes[0].value as string);
       } else Alert.alert('Invalid QR code');
     },
   });
+
+  const debouncedProcessQr = debounce(processQR, 200)
 
   const fetchData = async () => {
     setRefresh(true);
@@ -308,15 +280,20 @@ const Result = (props: any) => {
     setAlertModalVisible(false);
   };
 
-  if (enableQRCam) {
+  const hideQRCam = () => {
+    setShowQRCam(false);
+    setEnableQRCam(false);
+  }
+
+  if (showQRCam) {
     return (
       <View style={{flex: 1}}>
-        <Camera
+        {cameraDevice && <Camera
           codeScanner={codeScanner}
           style={Styles.cameraStyle}
           device={cameraDevice}
-          isActive={true}
-        />
+          isActive={enableQRCam}
+        />}
         <View
           style={{
             flex: 1,
@@ -325,7 +302,7 @@ const Result = (props: any) => {
           }}>
           <TouchableOpacity
             style={styles.buttonStyle}
-            onPress={() => setEnableQRCam(false)}>
+            onPress={() => hideQRCam}>
             <Text style={Styles.loginBtnText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -517,18 +494,19 @@ const Result = (props: any) => {
         )}
         {/* Scan Ticket and Print */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
+          {totalAmount.totalTarget > 0 && totalAmount.totalRambol > 0 && <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {
               listPairedDevices();
               printHits(betDate, draw, typeLabel(), totalAmount, user);
             }}>
             <Text style={styles.buttonTextStyle}>Print</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
           <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {
-              setEnableQRCam(true);
+              setShowQRCam(true);
+              setEnableQRCam(true)
             }}>
             <Text style={styles.buttonTextStyle}>Scan</Text>
           </TouchableOpacity>
@@ -590,8 +568,8 @@ const styles = StyleSheet.create({
 
   buttonContainer: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
     marginHorizontal: 10,
   },
@@ -608,8 +586,8 @@ const styles = StyleSheet.create({
   },
 
   buttonStyle: {
-    width: wp(46),
-    marginVertical: 15,
+    width: wp(96),
+    marginVertical: 5,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',

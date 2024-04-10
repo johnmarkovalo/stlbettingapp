@@ -29,15 +29,19 @@ import {
 import axios from 'axios';
 import {appConfig} from '../../config/appConfig';
 import _ from 'lodash';
+import { checkInternetConnection } from "../../helper";
+import debounce from "lodash/debounce";
 
 const LoginScreen = props => {
+  const internetStatusCheck = useRef(checkInternetConnection());
   const [showLogin, setShowLogin] = useState(false);
   const dispatch = useDispatch();
   const [loggingIn, setLoggingIn] = useState(false);
+  const [showQRCam, setShowQRCam] = useState(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [pinCode, onChangePinCode] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [cameraDevice, setCameraDevice] = useState(useCameraDevice('back'));
+  const cameraDevice = useCameraDevice('back');
 
   async function requestCameraPermission() {
     try {
@@ -166,27 +170,41 @@ const LoginScreen = props => {
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: codes => {
+      if (!internetStatusCheck.current.isConnected()) {
+        Alert.alert('No internet connection');
+      }
       setEnableQRCam(false);
       if (codes[0].value[codes[0].value.length - 12] === ':') {
-        //Remove the remainding string start from ':'
+        setEnableQRCam(false);
+        setTimeout(async () => {
+          setShowQRCam(false);
+          console.log('timeout')
+        }, 300);
         codes[0].value = codes[0].value.substring(
           0,
           codes[0].value.length - 12,
         );
-        processQR(codes[0].value);
+        debouncedProcessQr(codes[0].value as string);
       } else Alert.alert('Invalid QR code');
     },
   });
 
-  if (enableQRCam) {
+  const debouncedProcessQr = debounce(processQR, 200)
+
+  const hideQRCam = () => {
+    setShowQRCam(false);
+    setEnableQRCam(false);
+  }
+
+  if (showQRCam) {
     return (
       <View style={{flex: 1}}>
-        <Camera
+        {cameraDevice && <Camera
           codeScanner={codeScanner}
           style={Styles.cameraStyle}
           device={cameraDevice}
-          isActive={true}
-        />
+          isActive={enableQRCam}
+        />}
         <View
           style={{
             flex: 1,
@@ -205,7 +223,7 @@ const LoginScreen = props => {
             style={[Styles.loginBtn, {width: '50%'}]}>
             <TouchableOpacity
               style={Styles.loginBtnInner}
-              onPress={() => setEnableQRCam(false)}>
+              onPress={() => hideQRCam()}>
               <Text style={Styles.loginBtnText}>Back</Text>
             </TouchableOpacity>
           </LinearGradient>
@@ -226,7 +244,10 @@ const LoginScreen = props => {
             </View>
           )}
           <TouchableOpacity
-            onPress={() => setEnableQRCam(true)}
+            onPress={() => {
+              setEnableQRCam(true);
+              setShowQRCam(true);
+            }}
             style={[Styles.containerGroup, Styles.qrContainer]}>
             <FastImage
               style={Styles.qrIcon}
