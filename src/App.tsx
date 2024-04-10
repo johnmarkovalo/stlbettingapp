@@ -42,9 +42,9 @@ function App(): React.JSX.Element {
     checkAndInitializeDatabase();
 
     // Clean up function to close database connection when component unmounts
-    return () => {
-      closeDatabaseConnection();
-    };
+    // return () => {
+    //   closeDatabaseConnection();
+    // };
   }, []);
   const isDarkMode = useColorScheme() === 'dark';
 

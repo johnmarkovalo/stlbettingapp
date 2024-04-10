@@ -3,15 +3,17 @@
  * https://reactnavigation.org/docs/getting-started
  *
  */
-import {createStackNavigator} from '@react-navigation/stack';
-import React from 'react';
-import {useSelector, useDispatch} from 'react-redux';
+import React, { useEffect } from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { BackHandler } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
-import {NavigationContainer} from '@react-navigation/native';
-import {typesActions} from '../store/actions/types.actions';
-import {getActiveTypes} from '../helper/sqlite';
+import { typesActions } from '../store/actions/types.actions';
+import { getActiveTypes } from '../helper/sqlite';
 
+// Define the Navigation component
 export default function Navigation() {
   return (
     <NavigationContainer>
@@ -20,27 +22,52 @@ export default function Navigation() {
   );
 }
 
-// A root stack navigator is often used for displaying modals on top of all other content
-// Read more here: https://reactnavigation.org/docs/modal
+// Create a root stack navigator
 const Stack = createStackNavigator();
 
+// Define the RootNavigator component
 function RootNavigator() {
   const dispatch = useDispatch();
-  const fetchData = async () => {
-    const types = await getActiveTypes();
-    if (types) {
-      dispatch(typesActions.update(types));
-    }
-  };
-  fetchData();
+  const navigation = useNavigation();
   const authentication = useSelector(state => state.auth.loggedIn);
-  console.log('auth', authentication);
+
+  // Fetch data when the component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      const types = await getActiveTypes();
+      if (types) {
+        dispatch(typesActions.update(types));
+      }
+    };
+    fetchData();
+  }, [dispatch]);
+
+  // Handle back button press
+  useEffect(() => {
+    const handleBackPress = () => {
+      if (navigation.isFocused()) {
+        // Prevent app from exiting if it's the last screen
+        return true;
+      }
+      return false;
+    };
+
+    // Add event listener for hardware back button press
+    BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+
+    // Remove event listener when component is unmounted
+    return () => {
+      BackHandler.removeEventListener('hardwareBackPress', handleBackPress);
+    };
+  }, [navigation]);
+
+  // Set up the Stack Navigator
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} >
       {authentication ? (
-        <Stack.Screen name="App" component={AppNavigator} />
+        <Stack.Screen name="App" component={AppNavigator} options={{ gestureEnabled: false }} />
       ) : (
-        <Stack.Screen name="Auth" component={AuthNavigator} />
+        <Stack.Screen name="Auth" component={AuthNavigator} options={{ gestureEnabled: false }} />
       )}
     </Stack.Navigator>
   );
