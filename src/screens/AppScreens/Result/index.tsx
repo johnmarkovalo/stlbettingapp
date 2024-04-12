@@ -144,12 +144,12 @@ const Result = (props: any) => {
           !internetStatusCheck.current.isConnected() ||
           internetStatusCheck.current.isSlow()
         ) {
-          console.error('Error', 'No/Slow internet connection');
+          Alert.alert('Error', 'No/Slow internet connection');
           setResult({result: 0});
           setTransactions([]);
+          setTotalAmount({totalTarget: 0, totalRambol: 0});
           return;
         }
-
         const serverResult = await syncResultAPI(
           token,
           betTypeId,
@@ -164,6 +164,7 @@ const Result = (props: any) => {
         } else {
           setResult({result: 0});
           setTransactions([]);
+          setTotalAmount({totalTarget: 0, totalRambol: 0});
         }
       }
     } catch (error) {
@@ -505,6 +506,13 @@ const Result = (props: any) => {
           <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {
+              if (
+                !internetStatusCheck.current.isConnected() ||
+                internetStatusCheck.current.isSlow()
+              ) {
+                Alert.alert('Error', 'No/Slow internet connection');
+                return;
+              }
               setShowQRCam(true);
               setEnableQRCam(true)
             }}>
