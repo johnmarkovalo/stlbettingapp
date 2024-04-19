@@ -20,7 +20,6 @@ import {
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
 import Type from '../../../models/Type.ts';
-import {typesActions} from '../../../store/actions/types.actions.ts';
 
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {

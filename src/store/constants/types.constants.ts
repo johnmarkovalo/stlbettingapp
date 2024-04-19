@@ -1,3 +1,4 @@
 export const typesConstants = {
   UPDATE: 'TYPES_UPDATE',
+  UPDATE_SELECTED_DRAW: 'TYPES_UPDATE_SELECTED_DRAW',
 };

@@ -40,7 +40,7 @@ import {
   getTransactionByTicketCode,
   getWinningTransactionBets,
 } from '../../../helper/sqlite.ts';
-import {useSelector} from 'react-redux';
+import { useDispatch, useSelector } from "react-redux";
 import {checkTransactionAPI, syncResultAPI} from '../../../helper/api.ts';
 import {
   Camera,
@@ -52,12 +52,14 @@ import { listPairedDevices, printHits, printSales } from "../../../helper/printe
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 import debounce from 'lodash/debounce';
+import { typesActions } from "../../../store/actions";
 
 const Result = (props: any) => {
   const {navigation} = props;
   const internetStatusCheck = useRef(checkInternetConnection());
   const user = useSelector(state => state.auth.user);
   const token = useSelector(state => state.auth.token);
+  const dispatch = useDispatch();
   const [showQRCam, setShowQRCam] = useState(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [refresh, setRefresh] = useState(false);
@@ -77,7 +79,8 @@ const Result = (props: any) => {
   const [betTypeId, setBetTypeId] = useState(2);
   const [betType, setBetType] = useState(betTypes[0]);
   //Draw
-  const [draw, setDraw] = useState(getCurrentDraw(betTypes[0].draws) ?? 1);
+  const selectedDraw = useSelector(state => state.types.selectedDraw);
+  const [draw, setDraw] = useState(selectedDraw);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === betTypeId,
@@ -132,7 +135,7 @@ const Result = (props: any) => {
       setBetType(betTypes.find(item => item.bettypeid === betTypeId));
       const localResult = await getResult(
         moment(betDate).format('YYYY-MM-DD'),
-        draw,
+        selectedDraw,
         betTypeId,
       );
 
@@ -153,7 +156,7 @@ const Result = (props: any) => {
         const serverResult = await syncResultAPI(
           token,
           betTypeId,
-          draw,
+          selectedDraw,
           moment(betDate).format('YYYY-MM-DD'),
         );
 
@@ -185,12 +188,15 @@ const Result = (props: any) => {
 
   useEffect(() => {
     setBetTypeId(betTypes[0].bettypeid);
-    setDraw(getCurrentDraw(betTypes[0].draws) ?? 1);
   }, []);
 
   useEffect(() => {
+    dispatch(typesActions.updateSelectedDraw(draw))
+  }, [draw]);
+
+  useEffect(() => {
     fetchData();
-  }, [betDate, betTypeId, draw]);
+  }, [betDate, betTypeId, selectedDraw]);
 
   useEffect(() => {
     navigation.addListener('focus', () => {
@@ -361,7 +367,7 @@ const Result = (props: any) => {
         transparent={true}
         visible={drawModalVisible}
         onRequestClose={drawModalHide}>
-        <DrawModal hide={drawModalHide} draw={draw} setDraw={setDraw} />
+        <DrawModal setDraw={setDraw} draw={selectedDraw} hide={drawModalHide} />
       </Modal>
       <Modal
         animationType="fade"

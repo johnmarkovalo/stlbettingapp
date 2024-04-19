@@ -40,7 +40,7 @@ import {
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
 import {sendTransactionAPI} from '../../../helper/api.ts';
-import { userActions } from "../../../store/actions";
+import { typesActions, userActions } from "../../../store/actions";
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -62,8 +62,9 @@ const History = (props: any) => {
   const maxDate = moment().toDate();
   //Type
   const [type, setType] = useState(2);
-  //Draw
-  const [draw, setDraw] = useState(getCurrentDraw(betTypes[0].draws) ?? 1);
+ //Draw
+  const selectedDraw = useSelector(state => state.types.selectedDraw);
+  const [draw, setDraw] = useState(selectedDraw);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === type,
@@ -80,7 +81,7 @@ const History = (props: any) => {
     try {
       const transactions = await getTransactions(
         moment(betDate).format('YYYY-MM-DD'),
-        draw,
+        selectedDraw,
         type,
       );
       console.log('History fetchData', transactions);
@@ -149,12 +150,15 @@ const History = (props: any) => {
   }, []);
 
   useEffect(() => {
+    dispatch(typesActions.updateSelectedDraw(draw))
+  }, [draw]);
+
+  useEffect(() => {
     fetchData();
-  }, [betDate, type, draw]);
+  }, [betDate, type, selectedDraw]);
 
   useEffect(() => {
     navigation.addListener('focus', () => {
-      // setDraw(getCurrentDraw(betTypes[0].draws) ?? 1);
       fetchData();
     });
   }, [navigation]);
@@ -273,7 +277,7 @@ const History = (props: any) => {
         transparent={true}
         visible={drawModalVisible}
         onRequestClose={drawModalHide}>
-        <DrawModal hide={drawModalHide} draw={draw} setDraw={setDraw} />
+        <DrawModal setDraw={setDraw} draw={selectedDraw} hide={drawModalHide} />
       </Modal>
       <Modal
         animationType="fade"
@@ -310,7 +314,7 @@ const History = (props: any) => {
               style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>TIME</Text>
               <Text style={styles.cardSubTitle}>
-                {draw === 1 ? '1ST DRAW' : draw === 2 ? '2ND DRAW' : '3RD DRAW'}
+                {selectedDraw === 1 ? '1ST DRAW' : selectedDraw === 2 ? '2ND DRAW' : '3RD DRAW'}
               </Text>
             </TouchableOpacity>
             <View style={styles.verticalLine} />
@@ -360,7 +364,7 @@ const History = (props: any) => {
                   text: 'Yes',
                   onPress: () => {
                     listPairedDevices();
-                    printSales(betDate, draw, typeLabel(), totalAmount, user);
+                    printSales(betDate, selectedDraw, typeLabel(), totalAmount, user);
                   },
                 },
               ]);
