@@ -53,6 +53,7 @@ const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 import debounce from 'lodash/debounce';
 import { typesActions } from "../../../store/actions";
+import MaterialIcon from "react-native-vector-icons/MaterialIcons";
 
 const Result = (props: any) => {
   const {navigation} = props;
@@ -130,7 +131,6 @@ const Result = (props: any) => {
 
   const fetchData = async () => {
     setRefresh(true);
-
     try {
       setBetType(betTypes.find(item => item.bettypeid === betTypeId));
       const localResult = await getResult(
@@ -392,7 +392,21 @@ const Result = (props: any) => {
               {result.result}
             </Text>
           </Text>
-          <Text style={Styles.logoText}>         </Text>
+          {(totalAmount.totalTarget == 0 || totalAmount.totalRambol == 0) &&<Text style={Styles.logoText}>          </Text>}
+          {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && <TouchableOpacity
+            onPress={() => {
+              listPairedDevices();
+              printHits(betDate, draw, typeLabel(), totalAmount, user);
+            }}
+          >
+            <MaterialIcon
+              name="print"
+              size={40}
+              style={{
+                color: '#000',
+              }}
+            />
+          </TouchableOpacity>}
         </View>
         <View style={styles.card}>
           <View style={styles.cardContent}>
@@ -485,41 +499,21 @@ const Result = (props: any) => {
           </View>
         )}
         {/* Scan Ticket and Print */}
-        <View style={styles.buttonContainer}>
-          {totalAmount.totalTarget > 0 && totalAmount.totalRambol > 0 && <TouchableOpacity
-            style={styles.buttonStyle}
-            onPress={() => {
-              Alert.alert('Confirmation', 'Are you sure you want print hits?', [
-                {
-                  text: 'No',
-                },
-                {
-                  text: 'Yes',
-                  onPress: () => {
-                    listPairedDevices();
-                    printHits(betDate, draw, typeLabel(), totalAmount, user);
-                  },
-                },
-              ]);
-            }}>
-            <Text style={styles.buttonTextStyle}>Print</Text>
-          </TouchableOpacity>}
-          <TouchableOpacity
-            style={styles.buttonStyle}
-            onPress={() => {
-              if (
-                !internetStatusCheck.current.isConnected() ||
-                internetStatusCheck.current.isSlow()
-              ) {
-                Alert.alert('Error', 'No/Slow internet connection');
-                return;
-              }
-              setShowQRCam(true);
-              setEnableQRCam(true)
-            }}>
-            <Text style={styles.buttonTextStyle}>Scan</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.buttonStyle}
+          onPress={() => {
+            if (
+              !internetStatusCheck.current.isConnected() ||
+              internetStatusCheck.current.isSlow()
+            ) {
+              Alert.alert('Error', 'No/Slow internet connection');
+              return;
+            }
+            setShowQRCam(true);
+            setEnableQRCam(true)
+          }}>
+          <Text style={styles.buttonTextStyle}>Scan</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

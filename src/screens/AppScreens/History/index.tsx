@@ -13,6 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Styles from './Styles';
 import {
   widthPercentageToDP as wp,
@@ -296,6 +297,20 @@ const History = (props: any) => {
         {/* Header */}
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'History'}</Text>
+          {transactions.length > 0 && <TouchableOpacity
+            onPress={() => {
+              listPairedDevices();
+              printSales(betDate, selectedDraw, typeLabel(), totalAmount, user);
+            }}
+           >
+            <MaterialIcon
+              name="print"
+              size={40}
+              style={{
+                color: '#000',
+              }}
+            />
+          </TouchableOpacity>}
         </View>
         {/* Conditions */}
         <View style={styles.card}>
@@ -352,26 +367,26 @@ const History = (props: any) => {
           />
         )}
         {/* Print Sales */}
-        {transactions.length > 0 && (
-          <TouchableOpacity
-            style={styles.buttonStyle}
-            onPress={() => {
-              Alert.alert('Confirmation', 'Are you sure you want print sales?', [
-                {
-                  text: 'No',
-                },
-                {
-                  text: 'Yes',
-                  onPress: () => {
-                    listPairedDevices();
-                    printSales(betDate, selectedDraw, typeLabel(), totalAmount, user);
-                  },
-                },
-              ]);
-            }}>
-            <Text style={styles.buttonTextStyle}>Print Sales</Text>
-          </TouchableOpacity>
-        )}
+        {/*{transactions.length > 0 && (*/}
+        {/*  <TouchableOpacity*/}
+        {/*    style={styles.buttonStyle}*/}
+        {/*    onPress={() => {*/}
+        {/*      Alert.alert('Confirmation', 'Are you sure you want print sales?', [*/}
+        {/*        {*/}
+        {/*          text: 'No',*/}
+        {/*        },*/}
+        {/*        {*/}
+        {/*          text: 'Yes',*/}
+        {/*          onPress: () => {*/}
+        {/*            listPairedDevices();*/}
+        {/*            printSales(betDate, selectedDraw, typeLabel(), totalAmount, user);*/}
+        {/*          },*/}
+        {/*        },*/}
+        {/*      ]);*/}
+        {/*    }}>*/}
+        {/*    <Text style={styles.buttonTextStyle}>Print Sales</Text>*/}
+        {/*  </TouchableOpacity>*/}
+        {/*)}*/}
       </View>
     </SafeAreaView>
   );

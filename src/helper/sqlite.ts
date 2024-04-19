@@ -90,8 +90,8 @@ const insertInitialData = () => {
     );
 
     tx.executeSql(
-      'INSERT INTO trans (trans_no, ticketcode, total, trans_data, bettypeid, betdate, bettime, created_at ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [1, '4064–3336–6537–3166', 20, '247 10 10', '2', '2023-04-03', 3, now],
+      'INSERT INTO trans (trans_no, ticketcode, total, trans_data, bettypeid, betdate, bettime, created_at, status ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [1, '4064–3336–6537–3166', 20, '247 10 10', '2', '2023-04-03', 3, now, 'synced'],
       () => {
         console.log('Transaction inserted successfully');
       },
