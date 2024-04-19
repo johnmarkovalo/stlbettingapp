@@ -692,20 +692,12 @@ const getLatestTransactionDateTime = () => {
   });
 };
 
-const checkLastDrawTransactionStatus = (draw: number, betTypeId: number) => {
-  let betDate = moment().format('YYYY-MM-DD');
-  if (draw === 1) {
-    draw = 3;
-    betDate = moment().subtract(1, 'd').format('YYYY-MM-DD');
-  } else {
-    draw = draw - 1;
-  }
-  console.log('params', draw, betTypeId, betDate);
+const checkLastDrawTransactionStatus = () => {
   return new Promise((resolve, reject) => {
     db.transaction((tx: any) => {
       tx.executeSql(
-        'SELECT * FROM trans WHERE bettime = ? AND bettypeid = ? AND betdate = ? AND NOT status = "synced" ORDER BY trans_no DESC LIMIT 1',
-        [draw, betTypeId, betDate],
+        'SELECT * FROM trans WHERE NOT status = "synced" ORDER BY trans_no DESC LIMIT 1',
+        [],
         (tx: any, results: any) => {
           const rows = results.rows;
           const len = rows.length;

@@ -65,10 +65,7 @@ const Home = (props: any) => {
   }, [navigation]);
 
   const onTypePress = async (type: Type) => {
-    const hasUnsyncedTransactions = await checkLastDrawTransactionStatus(
-      getCurrentDraw(type.draws),
-      type.bettypeid,
-    );
+    const hasUnsyncedTransactions = await checkLastDrawTransactionStatus();
     console.log('hasUnsyncedTransactions', hasUnsyncedTransactions);
     if (hasUnsyncedTransactions) {
       Alert.alert(
