@@ -62,6 +62,7 @@ async function printTransaction(transaction, betType, bets, user) {
     padStringToLength32(ticket) +
     '</b>' +
     padStringToLength32('Agent: ' + user.agent_series) +
+    padStringToLength32(user.agent_name) +
     '                                ' +
     padStringToLength32('1PHP T WINS ' + betType.wintar) +
     padStringToLength32('1PHP R WINS ' + betType.winram) +
@@ -81,8 +82,8 @@ async function printTransaction(transaction, betType, bets, user) {
     '  ____________________________  ' +
     "    Ticket Holder's Signature   " +
     '                                ' +
-    "\n<qrcode size='47'>" +
-    transaction.ticketcode +
+    "\n<qrcode size='25'>" +
+    ticket +
     '</qrcode>\n ' +
     '\n\n ';
   print(textToPrint);

@@ -39,6 +39,7 @@ import {
 } from '../../../helper/sqlite.ts';
 import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
 import {sendTransactionAPI} from '../../../helper/api.ts';
+import { userActions } from "../../../store/actions";
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
@@ -611,7 +612,18 @@ const TransacScreen = (props: any) => {
                 <TouchableOpacity
                   onLongPress={() => {}}
                   onPress={() => {
-                    createTransaction();
+                    Alert.alert('Confirmation', 'Is this your final bets?', [
+                      {
+                        text: 'No',
+                      },
+                      {
+                        text: 'Yes',
+                        onPress: () => {
+                          // @ts-ignore
+                          createTransaction();
+                        },
+                      },
+                    ]);
                   }}
                   style={[
                     styles.keyButtonWrapper,
