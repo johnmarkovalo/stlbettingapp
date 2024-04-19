@@ -47,7 +47,7 @@ import {
   useCameraDevice,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import { listPairedDevices, printHits } from "../../../helper/printer";
+import { listPairedDevices, printHits, printSales } from "../../../helper/printer";
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
@@ -229,21 +229,6 @@ const Result = (props: any) => {
         onPress={() => {
           betModalShow(item);
         }}
-        onLongPress={() => {
-          // updateTransactionStatus(item.id, 'scanned');
-          // getWinners(
-          //   moment(betDate).format('YYYY-MM-DD'),
-          //   draw,
-          //   betTypeId,
-          //   result,
-          //   transactions => {
-          //     console.log('transactions', transactions);
-          //     if (transactions.length > 0) {
-          //       setTransactions(transactions);
-          //     } else setTransactions([]);
-          //   },
-          // );
-        }}
       />
     );
   };
@@ -303,7 +288,7 @@ const Result = (props: any) => {
           }}>
           <TouchableOpacity
             style={styles.buttonStyle}
-            onPress={() => hideQRCam}>
+            onPress={() => hideQRCam()}>
             <Text style={Styles.loginBtnText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -498,8 +483,18 @@ const Result = (props: any) => {
           {totalAmount.totalTarget > 0 && totalAmount.totalRambol > 0 && <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {
-              listPairedDevices();
-              printHits(betDate, draw, typeLabel(), totalAmount, user);
+              Alert.alert('Confirmation', 'Are you sure you want print hits?', [
+                {
+                  text: 'No',
+                },
+                {
+                  text: 'Yes',
+                  onPress: () => {
+                    listPairedDevices();
+                    printHits(betDate, draw, typeLabel(), totalAmount, user);
+                  },
+                },
+              ]);
             }}>
             <Text style={styles.buttonTextStyle}>Print</Text>
           </TouchableOpacity>}

@@ -40,6 +40,7 @@ import {
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
 import {sendTransactionAPI} from '../../../helper/api.ts';
+import { userActions } from "../../../store/actions";
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -351,8 +352,18 @@ const History = (props: any) => {
           <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {
-              listPairedDevices();
-              printSales(betDate, draw, typeLabel(), totalAmount, user);
+              Alert.alert('Confirmation', 'Are you sure you want print sales?', [
+                {
+                  text: 'No',
+                },
+                {
+                  text: 'Yes',
+                  onPress: () => {
+                    listPairedDevices();
+                    printSales(betDate, draw, typeLabel(), totalAmount, user);
+                  },
+                },
+              ]);
             }}>
             <Text style={styles.buttonTextStyle}>Print Sales</Text>
           </TouchableOpacity>
