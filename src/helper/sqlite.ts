@@ -79,7 +79,7 @@ const insertInitialData = () => {
       'INSERT INTO settings(bettype, wintar, winram, winram2, maxlength, cnt, perc, bettypeid,' +
         'start11, start11m, end11, end11m, start4, start4m, end4, end4m, start9, start9m, end9, end9m) VALUES ' +
         "('S3', '450', '75', '150', '3', '1.5M', '78%', '2'," +
-        "'4', '0', '10', '30', '11', '10', '15', '30', '16', '10', '20', '30')," +
+        "'4', '0', '13', '45', '14', '15', '16', '45', '17', '10', '20', '45')," +
         "('STL SWER3', '450', '75', '150', '3', '1.5M', '78%', '3'," +
         "'4', '0', '10', '30', '11', '10', '15', '30', '16', '10', '20', '30')," +
         "('LOC SWER3', '450', '75', '150', '3', '1.5M', '78%', '4'," +
@@ -378,7 +378,6 @@ const getWinners = (betType: any, result: any) => {
             const transaction = rows.item(i);
             if (transaction.total > 0) transactions.push(transaction);
           }
-          console.log('transactions', transactions);
           resolve(transactions);
         },
       );

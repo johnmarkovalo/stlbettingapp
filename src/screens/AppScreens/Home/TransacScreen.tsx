@@ -337,8 +337,8 @@ const TransacScreen = (props: any) => {
       };
       const transactionId = await insertTransaction(transaction, bets);
       if (transactionId) {
-        listPairedDevices();
-        printTransaction(transaction, betType, bets, user);
+        // listPairedDevices();
+        // printTransaction(transaction, betType, bets, user);
         updateTransactionStatus(transactionId, 'printed');
         if (internetStatusCheck.current.isConnected()) {
           let newTransaction = {

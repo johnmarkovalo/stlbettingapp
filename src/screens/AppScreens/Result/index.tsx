@@ -72,22 +72,20 @@ const Result = (props: any) => {
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const cameraDevice = useCameraDevice('back');
   //Date
-  const [betDate, setBetDate] = useState<Date>(moment().toDate());
-  const minDate = moment().subtract(1, 'weeks').toDate();
-  const maxDate = moment().toDate();
+  let selectedDate = useSelector(state => state.types.selectedDate);
+  let minDate = moment().subtract(1, 'weeks').toDate();
+  let maxDate = moment().toDate();
   //Type
   const betTypes = useSelector(state => state.types.types);
-  const [betTypeId, setBetTypeId] = useState(2);
-  const [betType, setBetType] = useState(betTypes[0]);
-  //Draw
-  const selectedDraw = useSelector(state => state.types.selectedDraw);
-  const [draw, setDraw] = useState(selectedDraw);
+  let selectedType = useSelector(state => state.types.selectedType);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
-      (item: Type) => item.bettypeid === betTypeId,
+      (item: Type) => item.bettypeid === selectedType,
     );
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
+  //Draw
+  let selectedDraw = useSelector(state => state.types.selectedDraw);
   //Result
   const [result, setResult] = useState({result: 0});
   //Transaction
@@ -132,11 +130,10 @@ const Result = (props: any) => {
   const fetchData = async () => {
     setRefresh(true);
     try {
-      setBetType(betTypes.find(item => item.bettypeid === betTypeId));
       const localResult = await getResult(
-        moment(betDate).format('YYYY-MM-DD'),
+        moment(selectedDate).format('YYYY-MM-DD'),
         selectedDraw,
-        betTypeId,
+        selectedType,
       );
 
       if (localResult) {
@@ -155,9 +152,9 @@ const Result = (props: any) => {
         }
         const serverResult = await syncResultAPI(
           token,
-          betTypeId,
+          selectedType,
           selectedDraw,
-          moment(betDate).format('YYYY-MM-DD'),
+          moment(selectedDate).format('YYYY-MM-DD'),
         );
 
         if (serverResult) {
@@ -187,16 +184,8 @@ const Result = (props: any) => {
   };
 
   useEffect(() => {
-    setBetTypeId(betTypes[0].bettypeid);
-  }, []);
-
-  useEffect(() => {
-    dispatch(typesActions.updateSelectedDraw(draw))
-  }, [draw]);
-
-  useEffect(() => {
     fetchData();
-  }, [betDate, betTypeId, selectedDraw]);
+  }, [selectedDate, selectedDraw, selectedDraw]);
 
   useEffect(() => {
     navigation.addListener('focus', () => {
@@ -205,8 +194,10 @@ const Result = (props: any) => {
   }, [navigation]);
 
   async function getNewWinners(newResult) {
+    const betType = betTypes.find(item => item.bettypeid === selectedType)
     if (newResult.result === 0 || betType === null) return;
     const transactions = await getWinners(betType, newResult);
+    console.log('getNewWinners', transactions);
     if (transactions.length > 0) {
       setTransactions(transactions);
       let totalTarget = 0;
@@ -350,10 +341,10 @@ const Result = (props: any) => {
       <DatePicker
         modal
         open={dateModalVisible}
-        date={betDate}
+        date={selectedDate}
         onConfirm={date => {
           setDateModalVisible(false);
-          setBetDate(date);
+          dispatch(typesActions.updateSelectedDate(date));
         }}
         mode="date"
         maximumDate={maxDate}
@@ -367,7 +358,7 @@ const Result = (props: any) => {
         transparent={true}
         visible={drawModalVisible}
         onRequestClose={drawModalHide}>
-        <DrawModal setDraw={setDraw} draw={selectedDraw} hide={drawModalHide} />
+        <DrawModal hide={drawModalHide} />
       </Modal>
       <Modal
         animationType="fade"
@@ -376,9 +367,6 @@ const Result = (props: any) => {
         onRequestClose={typeModalHide}>
         <TypeModal
           hide={typeModalHide}
-          type={betTypeId}
-          types={betTypes}
-          setType={setBetTypeId}
         />
       </Modal>
       <View style={Styles.mainContainer}>
@@ -396,7 +384,7 @@ const Result = (props: any) => {
           {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && <TouchableOpacity
             onPress={() => {
               listPairedDevices();
-              printHits(betDate, draw, typeLabel(), totalAmount, user);
+              printHits(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
             }}
           >
             <MaterialIcon
@@ -415,7 +403,7 @@ const Result = (props: any) => {
               style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>DATE</Text>
               <Text style={styles.cardSubTitle}>
-                {moment(betDate).format('MMM DD, YYYY')}
+                {moment(selectedDate).format('MMM DD, YYYY')}
               </Text>
             </TouchableOpacity>
             <View style={styles.verticalLine} />
@@ -424,7 +412,7 @@ const Result = (props: any) => {
               style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>TIME</Text>
               <Text style={styles.cardSubTitle}>
-                {draw === 1 ? '1ST DRAW' : draw === 2 ? '2ND DRAW' : '3RD DRAW'}
+                {selectedDraw === 1 ? '1ST DRAW' : selectedDraw === 2 ? '2ND DRAW' : '3RD DRAW'}
               </Text>
             </TouchableOpacity>
             <View style={styles.verticalLine} />

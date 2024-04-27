@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useContext} from 'react';
+import { useSelector, useDispatch } from "react-redux";
 import {
   View,
   TouchableOpacity,
@@ -10,11 +11,15 @@ import {
 import Ionic from 'react-native-vector-icons/Ionicons';
 import Colors from '../Styles/Colors';
 import DropDownPicker from 'react-native-dropdown-picker';
+import { typesActions } from "../store/actions";
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 
-const TypeModal = ({setType, type, types, hide}: any) => {
+const TypeModal = ({hide}: any) => {
+  const dispatch = useDispatch();
+  const [value, setValue] = useState(useSelector(state => state.types.selectedType));
+  const types = useSelector(state => state.types.types);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
 
@@ -52,12 +57,15 @@ const TypeModal = ({setType, type, types, hide}: any) => {
         <View style={styles.modalBodyContainer}>
           <DropDownPicker
             open={open}
-            value={type}
+            value={value}
             items={items}
             setOpen={setOpen}
-            setValue={setType}
+            setValue={setValue}
             setItems={setItems}
-            onSelectItem={hideModal}
+            onSelectItem={(item) => {
+              dispatch(typesActions.updateSelectedType(item.value));
+              hideModal();
+            }}
             // disabled={isPending}
             style={{width: widthScreen / 1.5}}
             dropDownContainerStyle={{width: widthScreen / 1.5, zIndex: 1000}}

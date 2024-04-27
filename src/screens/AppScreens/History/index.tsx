@@ -58,20 +58,19 @@ const History = (props: any) => {
   const [drawModalVisible, setDrawModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   //Date
-  const [betDate, setBetDate] = useState<Date>(moment().toDate());
-  const minDate = moment().subtract(1, 'weeks').toDate();
-  const maxDate = moment().toDate();
+  let selectedDate = useSelector(state => state.types.selectedDate);
+  let minDate = moment().subtract(1, 'weeks').toDate();
+  let maxDate = moment().toDate();
   //Type
-  const [type, setType] = useState(2);
- //Draw
-  const selectedDraw = useSelector(state => state.types.selectedDraw);
-  const [draw, setDraw] = useState(selectedDraw);
+  let selectedType = useSelector(state => state.types.selectedType);
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
-      (item: Type) => item.bettypeid === type,
+      (item: Type) => item.bettypeid === selectedType,
     );
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
+ //Draw
+  let selectedDraw = useSelector(state => state.types.selectedDraw);
   //Transaction
   const [totalAmount, setTotalAmount] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -81,9 +80,9 @@ const History = (props: any) => {
     setRefresh(true);
     try {
       const transactions = await getTransactions(
-        moment(betDate).format('YYYY-MM-DD'),
+        moment(selectedDate).format('YYYY-MM-DD'),
         selectedDraw,
-        type,
+        selectedType,
       );
       console.log('History fetchData', transactions);
       setTransactions(transactions);
@@ -147,16 +146,8 @@ const History = (props: any) => {
   };
 
   useEffect(() => {
-    setType(betTypes[0].bettypeid);
-  }, []);
-
-  useEffect(() => {
-    dispatch(typesActions.updateSelectedDraw(draw))
-  }, [draw]);
-
-  useEffect(() => {
     fetchData();
-  }, [betDate, type, selectedDraw]);
+  }, [selectedDate, selectedType, selectedDraw]);
 
   useEffect(() => {
     navigation.addListener('focus', () => {
@@ -261,10 +252,10 @@ const History = (props: any) => {
       <DatePicker
         modal
         open={dateModalVisible}
-        date={betDate}
+        date={selectedDate}
         onConfirm={date => {
           setDateModalVisible(false);
-          setBetDate(date);
+          dispatch(typesActions.updateSelectedDate(date));
         }}
         mode="date"
         maximumDate={maxDate}
@@ -278,7 +269,7 @@ const History = (props: any) => {
         transparent={true}
         visible={drawModalVisible}
         onRequestClose={drawModalHide}>
-        <DrawModal setDraw={setDraw} draw={selectedDraw} hide={drawModalHide} />
+        <DrawModal hide={drawModalHide} />
       </Modal>
       <Modal
         animationType="fade"
@@ -287,9 +278,6 @@ const History = (props: any) => {
         onRequestClose={typeModalHide}>
         <TypeModal
           hide={typeModalHide}
-          type={type}
-          types={betTypes}
-          setType={setType}
         />
       </Modal>
       {/* Main */}
@@ -300,7 +288,7 @@ const History = (props: any) => {
           {transactions.length > 0 && <TouchableOpacity
             onPress={() => {
               listPairedDevices();
-              printSales(betDate, selectedDraw, typeLabel(), totalAmount, user);
+              printSales(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
             }}
            >
             <MaterialIcon
@@ -320,7 +308,7 @@ const History = (props: any) => {
               style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>DATE</Text>
               <Text style={styles.cardSubTitle}>
-                {moment(betDate).format('MMM DD, YYYY')}
+                {moment(selectedDate).format('MMM DD, YYYY')}
               </Text>
             </TouchableOpacity>
             <View style={styles.verticalLine} />
@@ -366,27 +354,6 @@ const History = (props: any) => {
             }
           />
         )}
-        {/* Print Sales */}
-        {/*{transactions.length > 0 && (*/}
-        {/*  <TouchableOpacity*/}
-        {/*    style={styles.buttonStyle}*/}
-        {/*    onPress={() => {*/}
-        {/*      Alert.alert('Confirmation', 'Are you sure you want print sales?', [*/}
-        {/*        {*/}
-        {/*          text: 'No',*/}
-        {/*        },*/}
-        {/*        {*/}
-        {/*          text: 'Yes',*/}
-        {/*          onPress: () => {*/}
-        {/*            listPairedDevices();*/}
-        {/*            printSales(betDate, selectedDraw, typeLabel(), totalAmount, user);*/}
-        {/*          },*/}
-        {/*        },*/}
-        {/*      ]);*/}
-        {/*    }}>*/}
-        {/*    <Text style={styles.buttonTextStyle}>Print Sales</Text>*/}
-        {/*  </TouchableOpacity>*/}
-        {/*)}*/}
       </View>
     </SafeAreaView>
   );
