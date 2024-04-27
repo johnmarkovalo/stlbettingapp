@@ -40,7 +40,7 @@ import {
 } from '../../../helper/sqlite.ts';
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
-import {sendTransactionAPI} from '../../../helper/api.ts';
+import { getTransactionsAPI, sendTransactionAPI } from "../../../helper/api.ts";
 import { typesActions, userActions } from "../../../store/actions";
 
 const widthScreen = Dimensions.get('window').width;
@@ -58,7 +58,7 @@ const History = (props: any) => {
   const [drawModalVisible, setDrawModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   //Date
-  let selectedDate = useSelector(state => state.types.selectedDate);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   let minDate = moment().subtract(1, 'weeks').toDate();
   let maxDate = moment().toDate();
   //Type
@@ -106,33 +106,31 @@ const History = (props: any) => {
         return; // Exit function if no internet connection
       }
 
-      const promises = transactions.map(transaction => {
-        if (transaction.status === 'printed') {
-          return resendTransaction(transaction);
-        } else {
-          return Promise.resolve();
+      const serverTransactions = await getTransactionsAPI(
+        token,
+        moment(selectedDate).format('YYYY-MM-DD'),
+        selectedDraw,
+        selectedType,
+        user.keycode
+      );
+      //Loop this local transactions
+      transactions.forEach(transaction => {
+        if (!serverTransactions.includes(transaction.ticketcode)) {
+          //If the ticketcode does not exist in server transactions, send to server
+          console.log('This transaction does not exist:', transaction);
+          resendTransaction(transaction);
         }
       });
 
-      let pendingPromises = promises.length; // Track promises
-      await Promise.all(
-        promises.map(async promise => {
-          try {
-            await promise;
-          } catch (error) {
-            console.error('Error in a transaction:', error);
-            // Handle specific error for this transaction
-          } finally {
-            pendingPromises--;
-            if (pendingPromises === 0) {
-              setRefresh(false); // Set refresh to false only when all promises are done.
-            }
-          }
-        }),
-      );
     } catch (error) {
       console.error(error);
     } finally {
+      // @ts-ignore
+      setTransactions(prevTransactions =>
+        prevTransactions.map((item: Transaction) => {
+            return {...item, status: 'synced'}; //
+        }),
+      );
       setRefresh(false);
     }
   };
@@ -212,15 +210,6 @@ const History = (props: any) => {
           const response = await sendTransactionAPI(token, newTransaction);
           if (response) {
             updateTransactionStatus(newTransaction.id, 'synced');
-            setTransactions(prevTransactions =>
-              prevTransactions.map((item: Transaction) => {
-                if (item.ticketcode === newTransaction.ticketcode) {
-                  return {...item, status: 'synced'}; // Update only matching item
-                } else {
-                  return item; // Preserve other items
-                }
-              }),
-            );
             return true; // Resolve promise after successful processing
           }
         }
@@ -255,7 +244,7 @@ const History = (props: any) => {
         date={selectedDate}
         onConfirm={date => {
           setDateModalVisible(false);
-          dispatch(typesActions.updateSelectedDate(date));
+          setSelectedDate(date);
         }}
         mode="date"
         maximumDate={maxDate}

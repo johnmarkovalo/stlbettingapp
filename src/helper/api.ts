@@ -17,6 +17,36 @@ const syncBetTypesAPI = async (token: string) => {
   }
 };
 
+const getTransactionsAPI = async (
+  token: string,
+  date: string,
+  draw: number,
+  type: number,
+  keycode?: string,
+) => {
+  console.log('checking server db');
+  try {
+    const response = await axios.get(
+      appConfig.apiUrl + 'transactions/' + keycode + '/betTypes/' + type,
+      {
+        params: {date, draw},
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error(error.message);
+    throw error;
+  } finally {
+    console.log('done checking server db');
+
+  }
+};
+
 const sendTransactionAPI = async (token: string, transaction) => {
   console.log('transaction', {...transaction});
   const response = await axios.post(
@@ -86,6 +116,7 @@ const checkTransactionAPI = async (ticketcode: string, token: string) => {
 
 export {
   syncBetTypesAPI,
+  getTransactionsAPI,
   sendTransactionAPI,
   syncResultAPI,
   checkTransactionAPI,

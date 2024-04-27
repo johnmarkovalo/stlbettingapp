@@ -72,7 +72,7 @@ const Result = (props: any) => {
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const cameraDevice = useCameraDevice('back');
   //Date
-  let selectedDate = useSelector(state => state.types.selectedDate);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   let minDate = moment().subtract(1, 'weeks').toDate();
   let maxDate = moment().toDate();
   //Type
@@ -344,7 +344,7 @@ const Result = (props: any) => {
         date={selectedDate}
         onConfirm={date => {
           setDateModalVisible(false);
-          dispatch(typesActions.updateSelectedDate(date));
+          setSelectedDate(date);
         }}
         mode="date"
         maximumDate={maxDate}
