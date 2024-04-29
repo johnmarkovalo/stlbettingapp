@@ -25,7 +25,7 @@ import {
   formatBetTypes,
   checkInternetConnection,
 } from '../../../helper/functions';
-import {appConfig} from '../../../config/appConfig';
+import { APP_VERSION, appConfig } from "../../../config/appConfig";
 const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
   const internetStatusCheck = useRef(checkInternetConnection());
@@ -109,6 +109,7 @@ const Setting = (props: any) => {
               </View>
             </TouchableOpacity>
           </View>
+          <Text style={styles.cardSubTitle}>Version: {APP_VERSION}</Text>
           <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {

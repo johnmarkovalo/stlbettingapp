@@ -120,6 +120,7 @@ const History = (props: any) => {
           console.log('This transaction does not exist:', transaction);
           resendTransaction(transaction);
         }
+        updateTransactionStatus(transaction.id, 'synced');
       });
 
     } catch (error) {
@@ -209,7 +210,6 @@ const History = (props: any) => {
           };
           const response = await sendTransactionAPI(token, newTransaction);
           if (response) {
-            updateTransactionStatus(newTransaction.id, 'synced');
             return true; // Resolve promise after successful processing
           }
         }
