@@ -109,7 +109,7 @@ const Setting = (props: any) => {
               </View>
             </TouchableOpacity>
           </View>
-          <Text style={styles.cardSubTitle}>Version: {APP_VERSION}</Text>
+          <Text style={styles.cardSubTitle}>{APP_VERSION}</Text>
           <TouchableOpacity
             style={styles.buttonStyle}
             onPress={() => {
