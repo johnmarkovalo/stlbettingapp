@@ -18,14 +18,18 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import {useDispatch, useSelector} from 'react-redux';
-import {userActions, typesActions} from '../../../store/actions';
-import {syncBetTypesAPI} from '../../../helper/api';
+import {
+  userActions,
+  typesActions,
+  soldoutsActions,
+} from '../../../store/actions';
+import {syncBetTypesAPI, getSoldOutsAPI} from '../../../helper/api';
 import {insertTypes} from '../../../helper/sqlite';
 import {
   formatBetTypes,
   checkInternetConnection,
 } from '../../../helper/functions';
-import { APP_VERSION, appConfig } from "../../../config/appConfig";
+import {APP_VERSION, appConfig} from '../../../config/appConfig';
 const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
   const internetStatusCheck = useRef(checkInternetConnection());
@@ -68,6 +72,11 @@ const Setting = (props: any) => {
       insertTypes(types);
       Alert.alert('Success', 'Settings are synced');
       dispatch(typesActions.update(formatBetTypes(types)));
+    }
+
+    const soldouts = await getSoldOutsAPI(token);
+    if (soldouts) {
+      dispatch(soldoutsActions.update(soldouts));
     }
   };
 

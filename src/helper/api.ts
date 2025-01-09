@@ -17,6 +17,45 @@ const syncBetTypesAPI = async (token: string) => {
   }
 };
 
+const getSoldOutsAPI = async (token: string) => {
+  try {
+    console.log('checking server db');
+
+    const response = await axios.get(appConfig.apiUrl + 'soldOuts', {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error(error.message);
+    throw error;
+  }
+};
+
+const checkSoldOutAPI = async (token: string, trans_data: string) => {
+  try {
+    console.log('checking server db');
+
+    const response = await axios.post(
+      appConfig.apiUrl + 'transactions/checkBets',
+      {trans_data},
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    return response.data;
+  } catch (error) {
+    console.error(error.message);
+    throw error;
+  }
+};
+
 const getTransactionsAPI = async (
   token: string,
   date: string,
@@ -43,7 +82,6 @@ const getTransactionsAPI = async (
     throw error;
   } finally {
     console.log('done checking server db');
-
   }
 };
 
@@ -116,6 +154,8 @@ const checkTransactionAPI = async (ticketcode: string, token: string) => {
 
 export {
   syncBetTypesAPI,
+  getSoldOutsAPI,
+  checkSoldOutAPI,
   getTransactionsAPI,
   sendTransactionAPI,
   syncResultAPI,
