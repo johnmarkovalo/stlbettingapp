@@ -118,13 +118,14 @@ const Setting = (props: any) => {
               </View>
             </TouchableOpacity>
           </View>
-          <Text style={styles.cardSubTitle}>{APP_VERSION}</Text>
+          {/* <Text style={styles.cardSubTitle}>{APP_VERSION}</Text> */}
           <TouchableOpacity
             style={styles.buttonStyle}
-            onPress={() => {
+            onLongPress={() => {
               logout();
             }}>
-            <Text style={styles.buttonTextStyle}>Logout</Text>
+            <Text style={styles.cardSubTitle}>{APP_VERSION}</Text>
+            {/* <Text style={styles.buttonTextStyle}>Logout</Text> */}
           </TouchableOpacity>
         </View>
       </View>
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderRadius: 10,
     height: 50,
-    backgroundColor: colors.primaryColor,
+    // backgroundColor: colors.primaryColor,
   },
 
   buttonTextStyle: {
