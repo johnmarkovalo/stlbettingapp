@@ -176,7 +176,8 @@ const TransacScreen = (props: any) => {
         case 'rambolAmount':
           const rambolAmountSoldOut = soldouts.find(
             soldout =>
-              soldout.combination == betNumber.value && soldout.is_target == 0,
+              soldout.combination == sortNumber(betNumber.value) &&
+              soldout.is_target == 0,
           );
           if (rambolAmountSoldOut) {
             Alert.alert(
