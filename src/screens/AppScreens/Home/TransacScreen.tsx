@@ -18,7 +18,7 @@ import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import moment from 'moment';
-import {useSelector} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import BottomDrawer, {
   BottomDrawerMethods,
 } from 'react-native-animated-bottom-drawer';
@@ -38,13 +38,20 @@ import {
   updateTransactionStatus,
 } from '../../../helper/sqlite.ts';
 import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
-import {sendTransactionAPI, checkSoldOutAPI} from '../../../helper/api.ts';
-import {userActions} from '../../../store/actions';
+import {
+  sendTransactionAPI,
+  checkSoldOutAPI,
+  getSoldOutsAPI,
+} from '../../../helper/api.ts';
+import {soldoutsActions, userActions} from '../../../store/actions';
 
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
   const user = useSelector(state => state.auth.user);
   const token = useSelector(state => state.auth.token);
+  const soldouts = useSelector(state => state.soldouts.soldouts);
+  const dispatch = useDispatch();
+
   const internetStatusCheck = useRef(checkInternetConnection());
   const bottomDrawerRef = useRef<BottomDrawerMethods>(null);
   const betType = props.route.params.betType;
@@ -78,7 +85,7 @@ const TransacScreen = (props: any) => {
 
   useEffect(() => {
     0;
-    if (checkCapping()) return;
+    if (validateBet()) return;
     // Check the length after state has been updated
     if (betNumber.value.length === 3 && betNumber.isFocus) {
       changeFocus('targetAmount');
@@ -98,17 +105,39 @@ const TransacScreen = (props: any) => {
 
   useEffect(() => {
     // Define a function to recalculate the current draw
-    const recalculateCurrentDraw = () => {
+    const recalculateCurrentDraw = async () => {
       const currentDraw = getCurrentDraw(betType.draws);
+      console.log('currentDraw trans', currentDraw);
+      if (internetStatusCheck.current.isConnected()) {
+        // Fetch soldouts
+        const soldouts = await getSoldOutsAPI(token);
+        console.log('soldouts', soldouts);
+        if (soldouts) {
+          dispatch(soldoutsActions.update(soldouts));
+        }
+      }
       //Check if currentDraw is not null
       if (currentDraw !== null) setCurrentDraw(currentDraw);
       else props.navigation.goBack();
     };
 
+    // const fetchSoldOuts = async () => {
+    //   if (internetStatusCheck.current.isConnected()) {
+    //     // Fetch soldouts
+    //     const soldouts = await getSoldOutsAPI(token);
+    //     console.log('soldouts', soldouts);
+    //     if (soldouts) {
+    //       dispatch(soldoutsActions.update(soldouts));
+    //     }
+    //   }
+    // };
+
     // Recalculate current draw initially when the component mounts
     recalculateCurrentDraw();
+    // Get Soldouts
+    // fetchSoldOuts();
 
-    // Set up interval for periodic recalculation (every 60 seconds)
+    // Set up interval for periodic recalculation (every 30 seconds)
     const intervalId = setInterval(recalculateCurrentDraw, 30000);
 
     // Clean up interval when the component unmounts
@@ -125,6 +154,49 @@ const TransacScreen = (props: any) => {
       Alert.alert('Amount', 'Amount cannot be greater than ' + betType.capping);
       return true;
     }
+    return false;
+  }
+
+  function checkSoldOut(type) {
+    if (soldouts.length > 0) {
+      switch (type) {
+        case 'targetAmount':
+          const targetAmountSoldOut = soldouts.find(
+            soldout =>
+              soldout.combination == betNumber.value && soldout.is_target == 1,
+          );
+          if (targetAmountSoldOut) {
+            Alert.alert(
+              'Sold Out',
+              'Number ' + targetAmount.value + ' is sold out for target',
+            );
+            return true;
+          }
+          break;
+        case 'rambolAmount':
+          const rambolAmountSoldOut = soldouts.find(
+            soldout =>
+              soldout.combination == betNumber.value && soldout.is_target == 0,
+          );
+          if (rambolAmountSoldOut) {
+            Alert.alert(
+              'Sold Out',
+              'Number ' + rambolAmount.value + ' is sold out for rambol',
+            );
+            return true;
+          }
+          break;
+        default:
+          return false;
+          break;
+      }
+    }
+    return false;
+  }
+
+  function validateBet(type = '') {
+    if (checkCapping() || checkSoldOut(type)) return true;
+
     return false;
   }
 
@@ -157,7 +229,7 @@ const TransacScreen = (props: any) => {
   };
 
   const changeFocus = (type: string) => {
-    if (checkCapping()) return;
+    if (validateBet(type)) return;
     setBetNumber({
       value: betNumber.value,
       isFocus: false,
@@ -240,7 +312,7 @@ const TransacScreen = (props: any) => {
   };
 
   const onNext = () => {
-    if (checkCapping()) return;
+    if (validateBet()) return;
     if (targetAmount.isFocus && !checkIfTriple(betNumber.value)) {
       setTargetAmount(prevState => ({
         ...prevState,
@@ -278,7 +350,7 @@ const TransacScreen = (props: any) => {
   };
 
   const addBet = () => {
-    if (checkCapping()) return;
+    if (validateBet()) return;
     if (betNumber.value && (targetAmount.value || rambolAmount.value)) {
       setBets(prevState => [
         {
