@@ -24,6 +24,7 @@ import Transaction from '../../../models/Transaction.ts';
 import {TransactionItem} from '../../../components/transactionItem.tsx';
 import {
   checkInternetConnection,
+  convertToBets,
   formatNumberWithCommas,
   getCurrentDraw,
 } from '../../../helper';
@@ -37,11 +38,16 @@ import {
   getTransactions,
   updateTransactionStatus,
   getBetsByTransaction,
+  getLatestTransaction,
+  insertTransaction,
 } from '../../../helper/sqlite.ts';
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
-import { getTransactionsAPI, sendTransactionAPI } from "../../../helper/api.ts";
-import { typesActions, userActions } from "../../../store/actions";
+import {
+  getTransactionsAPI,
+  sendTransactionAPI,
+  getTransactionViaTicketCodeAPI,
+} from '../../../helper/api.ts';
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -69,7 +75,7 @@ const History = (props: any) => {
     );
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
- //Draw
+  //Draw
   let selectedDraw = useSelector(state => state.types.selectedDraw);
   //Transaction
   const [totalAmount, setTotalAmount] = useState(0);
@@ -79,8 +85,15 @@ const History = (props: any) => {
   const fetchData = async () => {
     setRefresh(true);
     try {
+      const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
+      console.log(
+        'History fetchData Params',
+        formattedDate,
+        selectedDraw,
+        selectedType,
+      );
       const transactions = await getTransactions(
-        moment(selectedDate).format('YYYY-MM-DD'),
+        formattedDate,
         selectedDraw,
         selectedType,
       );
@@ -103,54 +116,100 @@ const History = (props: any) => {
     try {
       if (!internetStatusCheck.current.isConnected()) {
         Alert.alert('Error', 'No internet connection');
-        return; // Exit function if no internet connection
+        return;
       }
 
+      const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
       const serverTransactions = await getTransactionsAPI(
         token,
-        moment(selectedDate).format('YYYY-MM-DD'),
+        formattedDate,
         selectedDraw,
         selectedType,
-        user.keycode
+        user.keycode,
       );
-      //Loop this local transactions
+
+      // Step 1: Convert server transactions to a Set for quick lookup
+      const serverTransactionSet = new Set(serverTransactions);
+
+      // Step 2: Find and resend local transactions that are not on the server
       transactions.forEach(transaction => {
-        if (!serverTransactions.includes(transaction.ticketcode)) {
-          //If the ticketcode does not exist in server transactions, send to server
-          console.log('This transaction does not exist:', transaction);
-          resendTransaction(transaction);
+        if (!serverTransactionSet.has(transaction.ticketcode)) {
+          console.log(
+            'This transaction does not exist on the server:',
+            transaction,
+          );
+          resendTransaction(transaction); // Send missing local transaction to server
+          updateTransactionStatus(transaction.id, 'synced');
         }
-        updateTransactionStatus(transaction.id, 'synced');
       });
 
+      // Step 3: Find and insert server transactions that are missing locally
+      const localTransactionSet = new Set(transactions.map(t => t.ticketcode));
+
+      serverTransactions.forEach(serverTicketCode => {
+        if (!localTransactionSet.has(serverTicketCode)) {
+          console.log(
+            'Inserting missing transaction from server:',
+            serverTicketCode,
+          );
+          insertTransactionFromServer(serverTicketCode);
+        }
+      });
     } catch (error) {
-      console.error(error);
+      console.error('Error syncing transactions:', error);
     } finally {
-      // @ts-ignore
-      setTransactions(prevTransactions =>
-        prevTransactions.map((item: Transaction) => {
-            return {...item, status: 'synced'}; //
-        }),
-      );
       setRefresh(false);
+    }
+  };
+
+  const insertTransactionFromServer = async (ticketcode: string) => {
+    try {
+      const transaction = await getTransactionViaTicketCodeAPI(
+        token,
+        ticketcode,
+      );
+      console.log('Transaction from server:', transaction);
+      if (transaction) {
+        const bets = convertToBets(transaction.trans_data);
+        //Convert 1.00 to 1
+        transaction.declared_gross = Math.floor(transaction.declared_gross);
+        const newTransaction = {
+          ...transaction,
+          status: 'synced',
+          total: transaction.declared_gross,
+          created_at: moment(transaction.printed_at).format(
+            'YYYY-MM-DD HH:mm:ss',
+          ),
+          bets: bets,
+        };
+        console.log('Transaction from server:', transaction);
+        await insertTransaction(newTransaction, bets);
+      }
+    } catch (error) {
+      console.error('Error inserting transaction from server:', error);
     }
   };
 
   const onRefresh = () => {
     setRefresh(true);
     syncTransactions();
+    fetchData();
     setTimeout(() => {
       setRefresh(false);
     }, 1000); // Refresh indicator will be visible for at least 1 second
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData().then(() => {
+      syncTransactions();
+    });
   }, [selectedDate, selectedType, selectedDraw]);
 
   useEffect(() => {
     navigation.addListener('focus', () => {
-      fetchData();
+      fetchData().then(() => {
+        syncTransactions();
+      });
     });
   }, [navigation]);
 
@@ -265,29 +324,34 @@ const History = (props: any) => {
         transparent={true}
         visible={typeModalVisible}
         onRequestClose={typeModalHide}>
-        <TypeModal
-          hide={typeModalHide}
-        />
+        <TypeModal hide={typeModalHide} />
       </Modal>
       {/* Main */}
       <View style={Styles.mainContainer}>
         {/* Header */}
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'History'}</Text>
-          {transactions.length > 0 && <TouchableOpacity
-            onPress={() => {
-              listPairedDevices();
-              printSales(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
-            }}
-           >
-            <MaterialIcon
-              name="print"
-              size={40}
-              style={{
-                color: '#000',
-              }}
-            />
-          </TouchableOpacity>}
+          {transactions.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                listPairedDevices();
+                printSales(
+                  selectedDate,
+                  selectedDraw,
+                  typeLabel(),
+                  totalAmount,
+                  user,
+                );
+              }}>
+              <MaterialIcon
+                name="print"
+                size={40}
+                style={{
+                  color: '#000',
+                }}
+              />
+            </TouchableOpacity>
+          )}
         </View>
         {/* Conditions */}
         <View style={styles.card}>
@@ -306,7 +370,11 @@ const History = (props: any) => {
               style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>TIME</Text>
               <Text style={styles.cardSubTitle}>
-                {selectedDraw === 1 ? '1ST DRAW' : selectedDraw === 2 ? '2ND DRAW' : '3RD DRAW'}
+                {selectedDraw === 1
+                  ? '1ST DRAW'
+                  : selectedDraw === 2
+                    ? '2ND DRAW'
+                    : '3RD DRAW'}
               </Text>
             </TouchableOpacity>
             <View style={styles.verticalLine} />

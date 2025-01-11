@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
 import NetInfo from '@react-native-community/netinfo';
+import Bet from '../models/Bet';
 
 export const sleep = milliseconds => {
   return new Promise(resolve => {
@@ -127,7 +128,8 @@ export const checkIfDouble = num => {
   const numString = String(num);
 
   for (let i = 0; i < numString.length; i++) {
-    for (let j = i + 1; j < numString.length; j++) { // Inner loop starts from i + 1
+    for (let j = i + 1; j < numString.length; j++) {
+      // Inner loop starts from i + 1
       if (numString[i] === numString[j]) {
         return true;
       }
@@ -150,6 +152,20 @@ export const convertToTransData = bets => {
     trans_data += ' ' + bets[n].rambolAmount + ', ';
   }
   return trans_data;
+};
+
+export const convertToBets = transData => {
+  const bets: Bet[] = [];
+  const transDataArr = transData.split(', ');
+  for (let n = 0; n < transDataArr.length; n++) {
+    const bet = transDataArr[n].split(' ');
+    bets.push({
+      betNumber: bet[0],
+      targetAmount: bet[1],
+      rambolAmount: bet[2],
+    });
+  }
+  return bets;
 };
 
 export const formatBetTypes = betTypes => {

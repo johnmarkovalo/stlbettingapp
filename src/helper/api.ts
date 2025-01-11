@@ -103,6 +103,32 @@ const sendTransactionAPI = async (token: string, transaction) => {
   return response.data;
 };
 
+const getTransactionViaTicketCodeAPI = async (
+  token: string,
+  ticketcode: string,
+) => {
+  console.log('checking server db');
+  try {
+    const response = await axios.get(
+      appConfig.apiUrl + 'transactions/' + ticketcode,
+      {
+        params: {},
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error(error.message);
+    throw error;
+  } finally {
+    console.log('done checking server db');
+  }
+};
+
 const syncResultAPI = async (
   token: string,
   type: number,
@@ -157,6 +183,7 @@ export {
   getSoldOutsAPI,
   checkSoldOutAPI,
   getTransactionsAPI,
+  getTransactionViaTicketCodeAPI,
   sendTransactionAPI,
   syncResultAPI,
   checkTransactionAPI,

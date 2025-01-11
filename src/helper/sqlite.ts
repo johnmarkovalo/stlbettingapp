@@ -227,7 +227,7 @@ const getTransactions = (
   return new Promise((resolve, reject) => {
     db.transaction((tx: any) => {
       tx.executeSql(
-        'SELECT * FROM trans WHERE betdate = ? AND bettime = ? AND bettypeid = ?',
+        'SELECT * FROM trans WHERE betdate = ? AND bettime = ? AND bettypeid = ? ORDER BY trans_no ASC',
         [betdate, bettime, bettypeid],
         (tx: any, results: any) => {
           const rows = results.rows;
@@ -241,6 +241,7 @@ const getTransactions = (
         },
         (error: any) => {
           console.error('Error fetching transactions:', error);
+          reject(error); // Reject the promise on error
         },
       );
     });
@@ -563,47 +564,156 @@ const insertTransaction = (transaction: Transaction, bets: Bet[]) => {
     console.log('created_at', transaction.created_at);
 
     db.transaction((tx: any) => {
+      // Step 1: Check if a transaction with the same ticketcode already exists
       tx.executeSql(
-        'INSERT INTO trans (ticketcode, trans_data, betdate, bettime, bettypeid, trans_no, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          transaction.ticketcode,
-          transaction.trans_data,
-          transaction.betdate,
-          transaction.bettime,
-          transaction.bettypeid,
-          transaction.trans_no,
-          transaction.total,
-          transaction.status,
-          transaction.created_at,
-        ],
+        'SELECT id FROM trans WHERE ticketcode = ?',
+        [transaction.ticketcode],
         (tx: any, results: any) => {
-          const insertedId = results.insertId;
-          resolve(insertedId); // Pass the inserted ID back to the callback
-
-          // Insert bets associated with the transaction
-          bets.forEach((bet: Bet) => {
-            tx.executeSql(
-              'INSERT INTO bet (transid, tranno, betnumber, betnumberr, target, rambol, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [
-                insertedId,
-                bet.tranno,
-                bet.betNumber,
-                bet.betNumberr,
-                bet.targetAmount,
-                bet.rambolAmount,
-                bet.subtotal,
-              ],
-              () => {
-                console.log('Bet inserted successfully');
-              },
-              (error: any) => {
-                console.error('Error inserting bet:', error);
-              },
+          if (results.rows.length > 0) {
+            console.log(
+              'Duplicate transaction detected (same ticketcode):',
+              transaction.ticketcode,
             );
-          });
+            resolve(null); // Resolve with null indicating duplicate transaction by ticketcode
+            return;
+          }
+
+          // Step 2: Check if a transaction with the same trans_data exists, filtered by betdate, bettime, and bettypeid, and created within the last 4 seconds
+          tx.executeSql(
+            `SELECT created_at FROM trans 
+             WHERE trans_data = ? AND betdate = ? AND bettime = ? AND bettypeid = ? 
+             ORDER BY created_at DESC LIMIT 1`,
+            [
+              transaction.trans_data,
+              transaction.betdate,
+              transaction.bettime,
+              transaction.bettypeid,
+            ],
+            (tx: any, results: any) => {
+              if (results.rows.length > 0) {
+                const lastCreatedAt = new Date(
+                  results.rows.item(0).created_at,
+                ).getTime();
+                const currentCreatedAt = new Date(
+                  transaction.created_at,
+                ).getTime();
+                const timeDifference =
+                  (currentCreatedAt - lastCreatedAt) / 1000; // Time difference in seconds
+
+                if (timeDifference <= 4) {
+                  console.log(
+                    'Duplicate transaction detected (within 4 seconds):',
+                    transaction.trans_data,
+                  );
+                  resolve(null); // Resolve with null indicating duplicate transaction by trans_data
+                  return;
+                }
+              }
+
+              // Step 3: Check if trans_no already exists, filtered by betdate, bettime, and bettypeid
+              tx.executeSql(
+                `SELECT trans_no FROM trans 
+                 WHERE trans_no = ? AND betdate = ? AND bettime = ? AND bettypeid = ?`,
+                [
+                  transaction.trans_no,
+                  transaction.betdate,
+                  transaction.bettime,
+                  transaction.bettypeid,
+                ],
+                (tx: any, transResults: any) => {
+                  if (transResults.rows.length > 0) {
+                    // Step 4: If trans_no exists, increment all subsequent trans_no by 1
+                    tx.executeSql(
+                      `UPDATE trans 
+                       SET trans_no = trans_no + 1 
+                       WHERE trans_no >= ? AND betdate = ? AND bettime = ? AND bettypeid = ?`,
+                      [
+                        transaction.trans_no,
+                        transaction.betdate,
+                        transaction.bettime,
+                        transaction.bettypeid,
+                      ],
+                      () => {
+                        console.log(
+                          'Updated trans_no for subsequent transactions',
+                        );
+                      },
+                      (error: any) => {
+                        console.error('Error updating trans_no:', error);
+                        reject(error);
+                      },
+                    );
+                  }
+
+                  // Step 5: Insert the new transaction after updating trans_no
+                  tx.executeSql(
+                    `INSERT INTO trans (ticketcode, trans_data, betdate, bettime, bettypeid, trans_no, total, status, created_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      transaction.ticketcode,
+                      transaction.trans_data,
+                      transaction.betdate,
+                      transaction.bettime,
+                      transaction.bettypeid,
+                      transaction.trans_no,
+                      transaction.total,
+                      transaction.status,
+                      transaction.created_at,
+                    ],
+                    (tx: any, results: any) => {
+                      const insertedId = results.insertId;
+                      resolve(insertedId); // Pass the inserted ID back to the callback
+
+                      // Step 6: Insert bets associated with the transaction
+                      bets.forEach((bet: Bet) => {
+                        tx.executeSql(
+                          `INSERT INTO bet (transid, tranno, betnumber, betnumberr, target, rambol, subtotal) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                          [
+                            insertedId,
+                            bet.tranno,
+                            bet.betNumber,
+                            bet.betNumberr,
+                            bet.targetAmount,
+                            bet.rambolAmount,
+                            bet.subtotal,
+                          ],
+                          () => {
+                            console.log('Bet inserted successfully');
+                          },
+                          (error: any) => {
+                            console.error('Error inserting bet:', error);
+                          },
+                        );
+                      });
+                    },
+                    (error: any) => {
+                      console.error('Error inserting transaction:', error);
+                      reject(error);
+                    },
+                  );
+                },
+                (error: any) => {
+                  console.error('Error checking trans_no:', error);
+                  reject(error);
+                },
+              );
+            },
+            (error: any) => {
+              console.error(
+                'Error checking existing transaction by trans_data:',
+                error,
+              );
+              reject(error);
+            },
+          );
         },
         (error: any) => {
-          console.error('Error inserting transaction:', error);
+          console.error(
+            'Error checking existing transaction by ticketcode:',
+            error,
+          );
+          reject(error);
         },
       );
     });
