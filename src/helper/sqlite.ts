@@ -91,7 +91,17 @@ const insertInitialData = () => {
 
     tx.executeSql(
       'INSERT INTO trans (trans_no, ticketcode, total, trans_data, bettypeid, betdate, bettime, created_at, status ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [1, '4064–3336–6537–3166', 20, '247 10 10', '2', '2023-04-03', 3, now, 'synced'],
+      [
+        1,
+        '4064–3336–6537–3166',
+        20,
+        '247 10 10',
+        '2',
+        '2023-04-03',
+        3,
+        now,
+        'synced',
+      ],
       () => {
         console.log('Transaction inserted successfully');
       },
@@ -137,7 +147,7 @@ const deleteLastWeekTransactions = async () => {
         },
       );
     });
-  })
+  });
 };
 //Get Functions
 const getActiveTypes = () => {
@@ -346,15 +356,15 @@ const getWinners = (betType: any, result: any) => {
         // 'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
         // 'GROUP BY trans.ticketcode',
         'SELECT trans.ticketcode, trans.id, trans.status, trans.created_at, trans.trans_no, ' +
-        'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END + CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END ) as total, ' +
-        'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END ) as targetTotal, ' +
-        'sum(CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END ) as rambolTotal ' +
-        'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
-        'WHERE trans.betdate = ? ' +
-        'AND trans.bettime = ? ' +
-        'AND trans.bettypeid = ? ' +
-        'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
-        'GROUP BY trans.ticketcode',
+          'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END + CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END ) as total, ' +
+          'sum(CASE WHEN bet.betnumber = ? THEN (bet.target * ?) ELSE 0 END ) as targetTotal, ' +
+          'sum(CASE WHEN bet.betnumberr = ? THEN (bet.rambol * ?) ELSE 0 END ) as rambolTotal ' +
+          'FROM bet LEFT OUTER JOIN trans ON bet.transid = trans.id ' +
+          'WHERE trans.betdate = ? ' +
+          'AND trans.bettime = ? ' +
+          'AND trans.bettypeid = ? ' +
+          'AND ((bet.betnumber = ? AND bet.target>0) OR (bet.betnumberr = ? AND bet.rambol>0)) ' +
+          'GROUP BY trans.ticketcode',
         [
           result.result,
           betType.wintar,
@@ -600,24 +610,55 @@ const insertTransaction = (transaction: Transaction, bets: Bet[]) => {
   });
 };
 
-const insertResult = (result: any) => {
+const insertOrUpdateResult = (result: any) => {
   return new Promise((resolve, reject) => {
     db.transaction((tx: any) => {
+      // Step 1: Check if the result already exists
       tx.executeSql(
-        'INSERT INTO result (bettypeid, result, resultr, betdate, bettime) VALUES (?, ?, ?, ?, ?)',
-        [
-          result.bettypeid,
-          result.result,
-          result.resultr,
-          result.betdate,
-          result.bettime,
-        ],
-        (tx: any, results: any) => {
-          const insertedId = results.insertId;
-          resolve(insertedId);
+        'SELECT id FROM result WHERE bettypeid = ? AND betdate = ? AND bettime = ?',
+        [result.bettypeid, result.betdate, result.bettime],
+        (tx: any, selectResults: any) => {
+          if (selectResults.rows.length > 0) {
+            // Step 2: If the result exists, update it
+            const existingId = selectResults.rows.item(0).id;
+            tx.executeSql(
+              'UPDATE result SET result = ?, resultr = ? WHERE id = ?',
+              [result.result, result.resultr, existingId],
+              () => {
+                console.log('Result updated successfully');
+                resolve(existingId);
+              },
+              (error: any) => {
+                console.error('Error updating result:', error);
+                reject(error);
+              },
+            );
+          } else {
+            // Step 3: If the result does not exist, insert a new one
+            tx.executeSql(
+              'INSERT INTO result (bettypeid, result, resultr, betdate, bettime) VALUES (?, ?, ?, ?, ?)',
+              [
+                result.bettypeid,
+                result.result,
+                result.resultr,
+                result.betdate,
+                result.bettime,
+              ],
+              (tx: any, insertResults: any) => {
+                const insertedId = insertResults.insertId;
+                console.log('Result inserted successfully');
+                resolve(insertedId);
+              },
+              (error: any) => {
+                console.error('Error inserting result:', error);
+                reject(error);
+              },
+            );
+          }
         },
         (error: any) => {
-          console.error('Error inserting result:', error);
+          console.error('Error checking existing result:', error);
+          reject(error);
         },
       );
     });
@@ -725,7 +766,7 @@ export {
   getResult,
   insertTransaction,
   insertTypes,
-  insertResult,
+  insertOrUpdateResult,
   getLatestTransaction,
   getLatestTransactionDateTime,
   checkLastDrawTransactionStatus,

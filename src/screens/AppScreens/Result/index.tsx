@@ -36,24 +36,28 @@ import {
   getResult,
   getWinners,
   updateTransactionStatus,
-  insertResult,
+  insertOrUpdateResult,
   getTransactionByTicketCode,
   getWinningTransactionBets,
 } from '../../../helper/sqlite.ts';
-import { useDispatch, useSelector } from "react-redux";
+import {useDispatch, useSelector} from 'react-redux';
 import {checkTransactionAPI, syncResultAPI} from '../../../helper/api.ts';
 import {
   Camera,
   useCameraDevice,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import { listPairedDevices, printHits, printSales } from "../../../helper/printer";
+import {
+  listPairedDevices,
+  printHits,
+  printSales,
+} from '../../../helper/printer';
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 import debounce from 'lodash/debounce';
-import { typesActions } from "../../../store/actions";
-import MaterialIcon from "react-native-vector-icons/MaterialIcons";
+import {typesActions} from '../../../store/actions';
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
 const Result = (props: any) => {
   const {navigation} = props;
@@ -89,7 +93,10 @@ const Result = (props: any) => {
   //Result
   const [result, setResult] = useState({result: 0});
   //Transaction
-  const [totalAmount, setTotalAmount] = useState({totalTarget: 0,totalRambol: 0});
+  const [totalAmount, setTotalAmount] = useState({
+    totalTarget: 0,
+    totalRambol: 0,
+  });
   const [transactions, setTransactions] = useState([]);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
@@ -125,54 +132,69 @@ const Result = (props: any) => {
     },
   });
 
-  const debouncedProcessQr = debounce(processQR, 200)
+  const debouncedProcessQr = debounce(processQR, 200);
 
   const fetchData = async () => {
     setRefresh(true);
+    const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
+
     try {
       const localResult = await getResult(
-        moment(selectedDate).format('YYYY-MM-DD'),
+        formattedDate,
         selectedDraw,
         selectedType,
       );
 
-      if (localResult) {
-        setResult(localResult);
-        await getNewWinners(localResult);
-      } else {
-        if (
-          !internetStatusCheck.current.isConnected() ||
-          internetStatusCheck.current.isSlow()
-        ) {
-          Alert.alert('Error', 'No/Slow internet connection');
-          setResult({result: 0});
-          setTransactions([]);
-          setTotalAmount({totalTarget: 0, totalRambol: 0});
-          return;
-        }
+      if (hasInternet()) {
         const serverResult = await syncResultAPI(
           token,
           selectedType,
           selectedDraw,
-          moment(selectedDate).format('YYYY-MM-DD'),
+          formattedDate,
         );
 
         if (serverResult) {
-          await insertResult(serverResult); // Assuming insertResult returns a Promise
+          await Promise.all([
+            insertOrUpdateResult(serverResult),
+            getNewWinners(serverResult),
+          ]);
           setResult(serverResult);
-          await getNewWinners(serverResult);
         } else {
-          setResult({result: 0});
-          setTransactions([]);
-          setTotalAmount({totalTarget: 0, totalRambol: 0});
+          handleEmptyResult();
         }
+      } else if (localResult) {
+        setResult(localResult);
+        await getNewWinners(localResult);
+      } else {
+        handleNoInternet();
       }
     } catch (error) {
       console.error('Error:', error);
-      // Handle the error appropriately (e.g., display an error message)
+      handleEmptyResult();
     } finally {
       setRefresh(false);
     }
+  };
+
+  // Utility function to check internet status
+  const hasInternet = () => {
+    return (
+      internetStatusCheck.current.isConnected() &&
+      !internetStatusCheck.current.isSlow()
+    );
+  };
+
+  // Handle no internet scenario
+  const handleNoInternet = () => {
+    Alert.alert('Error', 'No/Slow internet connection');
+    handleEmptyResult();
+  };
+
+  // Handle empty or failed result case
+  const handleEmptyResult = () => {
+    setResult({result: 0});
+    setTransactions([]);
+    setTotalAmount({totalTarget: 0, totalRambol: 0});
   };
 
   const onRefresh = () => {
@@ -194,7 +216,7 @@ const Result = (props: any) => {
   }, [navigation]);
 
   async function getNewWinners(newResult) {
-    const betType = betTypes.find(item => item.bettypeid === selectedType)
+    const betType = betTypes.find(item => item.bettypeid === selectedType);
     if (newResult.result === 0 || betType === null) return;
     const transactions = await getWinners(betType, newResult);
     console.log('getNewWinners', transactions);
@@ -266,17 +288,19 @@ const Result = (props: any) => {
   const hideQRCam = () => {
     setShowQRCam(false);
     setEnableQRCam(false);
-  }
+  };
 
   if (showQRCam) {
     return (
       <View style={{flex: 1}}>
-        {cameraDevice && <Camera
-          codeScanner={codeScanner}
-          style={Styles.cameraStyle}
-          device={cameraDevice}
-          isActive={enableQRCam}
-        />}
+        {cameraDevice && (
+          <Camera
+            codeScanner={codeScanner}
+            style={Styles.cameraStyle}
+            device={cameraDevice}
+            isActive={enableQRCam}
+          />
+        )}
         <View
           style={{
             flex: 1,
@@ -365,9 +389,7 @@ const Result = (props: any) => {
         transparent={true}
         visible={typeModalVisible}
         onRequestClose={typeModalHide}>
-        <TypeModal
-          hide={typeModalHide}
-        />
+        <TypeModal hide={typeModalHide} />
       </Modal>
       <View style={Styles.mainContainer}>
         <View style={Styles.headerContainer}>
@@ -380,21 +402,30 @@ const Result = (props: any) => {
               {result.result}
             </Text>
           </Text>
-          {(totalAmount.totalTarget == 0 || totalAmount.totalRambol == 0) &&<Text style={Styles.logoText}>          </Text>}
-          {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && <TouchableOpacity
-            onPress={() => {
-              listPairedDevices();
-              printHits(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
-            }}
-          >
-            <MaterialIcon
-              name="print"
-              size={40}
-              style={{
-                color: '#000',
-              }}
-            />
-          </TouchableOpacity>}
+          {(totalAmount.totalTarget == 0 || totalAmount.totalRambol == 0) && (
+            <Text style={Styles.logoText}> </Text>
+          )}
+          {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && (
+            <TouchableOpacity
+              onPress={() => {
+                listPairedDevices();
+                printHits(
+                  selectedDate,
+                  selectedDraw,
+                  typeLabel(),
+                  totalAmount,
+                  user,
+                );
+              }}>
+              <MaterialIcon
+                name="print"
+                size={40}
+                style={{
+                  color: '#000',
+                }}
+              />
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.card}>
           <View style={styles.cardContent}>
@@ -412,7 +443,11 @@ const Result = (props: any) => {
               style={{width: widthScreen / 3}}>
               <Text style={styles.cardTitle}>TIME</Text>
               <Text style={styles.cardSubTitle}>
-                {selectedDraw === 1 ? '1ST DRAW' : selectedDraw === 2 ? '2ND DRAW' : '3RD DRAW'}
+                {selectedDraw === 1
+                  ? '1ST DRAW'
+                  : selectedDraw === 2
+                    ? '2ND DRAW'
+                    : '3RD DRAW'}
               </Text>
             </TouchableOpacity>
             <View style={styles.verticalLine} />
@@ -428,7 +463,15 @@ const Result = (props: any) => {
         {refresh && <ActivityIndicator />}
         {!refresh && (
           <View style={styles.hitsContainer}>
-            <Text style={[{fontSize: 18, color: Colors.Black, marginRight: 5, alignSelf:'center'}]}>
+            <Text
+              style={[
+                {
+                  fontSize: 18,
+                  color: Colors.Black,
+                  marginRight: 5,
+                  alignSelf: 'center',
+                },
+              ]}>
               Target:
               <Text
                 style={[
@@ -441,7 +484,15 @@ const Result = (props: any) => {
                 {' ' + formatNumberWithCommas(totalAmount.totalTarget)}
               </Text>
             </Text>
-            <Text style={[{fontSize: 18, color: Colors.Black, marginRight: 5, alignSelf:'center'}]}>
+            <Text
+              style={[
+                {
+                  fontSize: 18,
+                  color: Colors.Black,
+                  marginRight: 5,
+                  alignSelf: 'center',
+                },
+              ]}>
               Rambol:
               <Text
                 style={[
@@ -498,7 +549,7 @@ const Result = (props: any) => {
               return;
             }
             setShowQRCam(true);
-            setEnableQRCam(true)
+            setEnableQRCam(true);
           }}>
           <Text style={styles.buttonTextStyle}>Scan</Text>
         </TouchableOpacity>
