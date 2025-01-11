@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Styles from './Styles';
 import Colors from '../../Styles/Colors';
 import Images from '../../Styles/Images';
-import {userActions} from '../../store/actions';
+import {typesActions, userActions} from '../../store/actions';
 import LinearGradient from 'react-native-linear-gradient';
 import {launchImageLibrary} from 'react-native-image-picker';
 import RNQRGenerator from 'rn-qr-generator';
@@ -29,8 +29,10 @@ import {
 import axios from 'axios';
 import {appConfig} from '../../config/appConfig';
 import _ from 'lodash';
-import { checkInternetConnection } from "../../helper";
-import debounce from "lodash/debounce";
+import {checkInternetConnection, formatBetTypes} from '../../helper';
+import debounce from 'lodash/debounce';
+import {syncBetTypesAPI} from '../../helper/api';
+import {insertTypes} from '../../helper/sqlite';
 
 const LoginScreen = props => {
   const internetStatusCheck = useRef(checkInternetConnection());
@@ -78,6 +80,7 @@ const LoginScreen = props => {
           .then((response: any) => {
             console.log(response.data);
             if (response?.data?.token) {
+              syncSettings(response.data.token);
               dispatch(
                 userActions.login(response.data.agent, response.data.token),
               );
@@ -91,6 +94,15 @@ const LoginScreen = props => {
       }
     } else {
       alert('username & password are required');
+    }
+  }
+
+  async function syncSettings(token: string) {
+    const types = await syncBetTypesAPI(token);
+    if (types) {
+      insertTypes(types);
+      Alert.alert('Success', 'Settings are synced');
+      dispatch(typesActions.update(formatBetTypes(types)));
     }
   }
 
@@ -141,7 +153,7 @@ const LoginScreen = props => {
   const processQR = async (qr_token: string) => {
     setLoggingIn(true);
     console.log('processQR');
-    setTimeout(function(){
+    setTimeout(function () {
       console.log('timeout');
       try {
         console.log('axios');
@@ -161,9 +173,9 @@ const LoginScreen = props => {
               alert('Invalid QR code');
             }
           });
-        } catch (e) {
-          alert(e.message);
-        }
+      } catch (e) {
+        alert(e.message);
+      }
     }, 1000);
   };
 
@@ -178,7 +190,7 @@ const LoginScreen = props => {
         setEnableQRCam(false);
         setTimeout(async () => {
           setShowQRCam(false);
-          console.log('timeout')
+          console.log('timeout');
         }, 300);
         codes[0].value = codes[0].value.substring(
           0,
@@ -189,22 +201,24 @@ const LoginScreen = props => {
     },
   });
 
-  const debouncedProcessQr = debounce(processQR, 200)
+  const debouncedProcessQr = debounce(processQR, 200);
 
   const hideQRCam = () => {
     setShowQRCam(false);
     setEnableQRCam(false);
-  }
+  };
 
   if (showQRCam) {
     return (
       <View style={{flex: 1}}>
-        {cameraDevice && <Camera
-          codeScanner={codeScanner}
-          style={Styles.cameraStyle}
-          device={cameraDevice}
-          isActive={enableQRCam}
-        />}
+        {cameraDevice && (
+          <Camera
+            codeScanner={codeScanner}
+            style={Styles.cameraStyle}
+            device={cameraDevice}
+            isActive={enableQRCam}
+          />
+        )}
         <View
           style={{
             flex: 1,
