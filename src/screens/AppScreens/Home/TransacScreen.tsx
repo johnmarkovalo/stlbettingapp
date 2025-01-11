@@ -108,17 +108,17 @@ const TransacScreen = (props: any) => {
     const recalculateCurrentDraw = async () => {
       const currentDraw = getCurrentDraw(betType.draws);
       console.log('currentDraw trans', currentDraw);
+      //Check if currentDraw is not null
+      if (currentDraw !== null) setCurrentDraw(currentDraw);
+      else props.navigation.goBack();
       if (internetStatusCheck.current.isConnected()) {
         // Fetch soldouts
-        const soldouts = await getSoldOutsAPI(token);
+        const soldouts = getSoldOutsAPI(token);
         console.log('soldouts', soldouts);
         if (soldouts) {
           dispatch(soldoutsActions.update(soldouts));
         }
       }
-      //Check if currentDraw is not null
-      if (currentDraw !== null) setCurrentDraw(currentDraw);
-      else props.navigation.goBack();
     };
 
     // const fetchSoldOuts = async () => {
@@ -382,112 +382,59 @@ const TransacScreen = (props: any) => {
     if (bets.length <= 0) {
       Alert.alert('Error', 'Please add at least one bet');
     } else {
-      //Check if there is internet connection
-      if (internetStatusCheck.current.isConnected()) {
-        //Check if one of the bets is sold out
-        const soldOut = await checkSoldOutAPI(token, convertToTransData(bets));
-        console.log(soldOut);
-        if (soldOut.code === 400) {
-          Alert.alert('Sold Out', soldOut.message);
-          return;
+      //Check if there is a current draw
+      if (!currentDraw) {
+        Alert.alert('Error', 'No current draw');
+        props.navigation.goBack();
+        return;
+      }
+      const latestTrans = await getLatestTransaction(
+        betDate,
+        currentDraw,
+        betType.id,
+      );
+      let ticketcode =
+        user.keycode.substring(user.keycode.length - 4) +
+        '-' +
+        currentDraw +
+        betType.id +
+        '-' +
+        moment().format('YYMMDD-HHmmss');
+      let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
+      let trans_data = convertToTransData(bets);
+      let now = moment().format('YYYY-MM-DD HH:mm:ss');
+      const transaction: Transaction = {
+        ticketcode: ticketcode,
+        betdate: betDate,
+        bettime: currentDraw ?? 1,
+        bettypeid: betType.id,
+        trans_no: trans_no,
+        total: totalAmount,
+        trans_data: trans_data,
+        status: 'saved',
+        created_at: now,
+      };
+      const transactionId = await insertTransaction(transaction, bets);
+      if (transactionId) {
+        listPairedDevices();
+        printTransaction(transaction, betType, bets, user);
+        updateTransactionStatus(transactionId, 'printed');
+        if (internetStatusCheck.current.isConnected()) {
+          let newTransaction = {
+            ...transaction,
+            status: 'VALID',
+            gateway: 'Retrofit',
+            keycode: user.keycode,
+            remarks: '',
+            printed_at: now,
+            declared_gross: totalAmount,
+            bets: bets,
+          };
+          await sendTransactionAPI(token, newTransaction);
+          updateTransactionStatus(transactionId, 'synced');
         }
-        const latestTrans = await getLatestTransaction(
-          betDate,
-          currentDraw,
-          betType.id,
-        );
-        let ticketcode =
-          user.keycode.substring(user.keycode.length - 4) +
-          '-' +
-          currentDraw +
-          betType.id +
-          '-' +
-          moment().format('YYMMDD-HHmmss');
-        let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
-        let trans_data = convertToTransData(bets);
-        let now = moment().format('YYYY-MM-DD HH:mm:ss');
-        const transaction: Transaction = {
-          ticketcode: ticketcode,
-          betdate: betDate,
-          bettime: currentDraw ?? 1,
-          bettypeid: betType.id,
-          trans_no: trans_no,
-          total: totalAmount,
-          trans_data: trans_data,
-          status: 'saved',
-          created_at: now,
-        };
-        const transactionId = await insertTransaction(transaction, bets);
-        if (transactionId) {
-          listPairedDevices();
-          printTransaction(transaction, betType, bets, user);
-          updateTransactionStatus(transactionId, 'printed');
-          if (internetStatusCheck.current.isConnected()) {
-            let newTransaction = {
-              ...transaction,
-              status: 'VALID',
-              gateway: 'Retrofit',
-              keycode: user.keycode,
-              remarks: '',
-              printed_at: now,
-              declared_gross: totalAmount,
-              bets: bets,
-            };
-            await sendTransactionAPI(token, newTransaction);
-            updateTransactionStatus(transactionId, 'synced');
-          }
-          setBets([]);
-          setTotalAmount(0);
-        }
-      } else {
-        const latestTrans = await getLatestTransaction(
-          betDate,
-          currentDraw,
-          betType.id,
-        );
-        let ticketcode =
-          user.keycode.substring(user.keycode.length - 4) +
-          '-' +
-          currentDraw +
-          betType.id +
-          '-' +
-          moment().format('YYMMDD-HHmmss');
-        let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
-        let trans_data = convertToTransData(bets);
-        let now = moment().format('YYYY-MM-DD HH:mm:ss');
-        const transaction: Transaction = {
-          ticketcode: ticketcode,
-          betdate: betDate,
-          bettime: currentDraw ?? 1,
-          bettypeid: betType.id,
-          trans_no: trans_no,
-          total: totalAmount,
-          trans_data: trans_data,
-          status: 'saved',
-          created_at: now,
-        };
-        const transactionId = await insertTransaction(transaction, bets);
-        if (transactionId) {
-          listPairedDevices();
-          printTransaction(transaction, betType, bets, user);
-          updateTransactionStatus(transactionId, 'printed');
-          if (internetStatusCheck.current.isConnected()) {
-            let newTransaction = {
-              ...transaction,
-              status: 'VALID',
-              gateway: 'Retrofit',
-              keycode: user.keycode,
-              remarks: '',
-              printed_at: now,
-              declared_gross: totalAmount,
-              bets: bets,
-            };
-            await sendTransactionAPI(token, newTransaction);
-            updateTransactionStatus(transactionId, 'synced');
-          }
-          setBets([]);
-          setTotalAmount(0);
-        }
+        setBets([]);
+        setTotalAmount(0);
       }
     }
   };
