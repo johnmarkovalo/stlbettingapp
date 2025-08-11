@@ -1,4 +1,5 @@
 interface Bet {
+  id?: number;
   transid?: number;
   tranno: number;
   betNumber: string;
@@ -6,6 +7,8 @@ interface Bet {
   targetAmount: number;
   rambolAmount: number;
   subtotal: number;
+  status?: string;
+  created_at?: string;
 }
 
 export default Bet;

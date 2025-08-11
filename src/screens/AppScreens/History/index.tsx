@@ -40,7 +40,7 @@ import {
   getBetsByTransaction,
   getLatestTransaction,
   insertTransaction,
-} from '../../../helper/sqlite.ts';
+} from '../../../database';
 import Type from '../../../models/Type.ts';
 import {listPairedDevices, printSales} from '../../../helper/printer.js';
 import {
@@ -49,14 +49,27 @@ import {
   getTransactionViaTicketCodeAPI,
 } from '../../../helper/api.ts';
 
+// Define types for Redux state
+interface RootState {
+  auth: {
+    user: any;
+    token: string;
+  };
+  types: {
+    types: Type[];
+    selectedType: number;
+    selectedDraw: number;
+  };
+}
+
 const widthScreen = Dimensions.get('window').width;
 
 const History = (props: any) => {
   const {navigation} = props;
   const internetStatusCheck = useRef(checkInternetConnection());
-  const user = useSelector(state => state.auth.user);
-  const token = useSelector(state => state.auth.token);
-  const betTypes = useSelector(state => state.types.types);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
+  const betTypes = useSelector((state: RootState) => state.types.types);
   const [refresh, setRefresh] = useState(false);
   const dispatch = useDispatch();
   const [betModalVisible, setBetModalVisible] = useState(false);
@@ -68,7 +81,9 @@ const History = (props: any) => {
   let minDate = moment().subtract(1, 'weeks').toDate();
   let maxDate = moment().toDate();
   //Type
-  let selectedType = useSelector(state => state.types.selectedType);
+  let selectedType = useSelector(
+    (state: RootState) => state.types.selectedType,
+  );
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === selectedType,
@@ -76,10 +91,12 @@ const History = (props: any) => {
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
   //Draw
-  let selectedDraw = useSelector(state => state.types.selectedDraw);
+  let selectedDraw = useSelector(
+    (state: RootState) => state.types.selectedDraw,
+  );
   //Transaction
   const [totalAmount, setTotalAmount] = useState(0);
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction>();
 
   const fetchData = async () => {
@@ -92,7 +109,7 @@ const History = (props: any) => {
         selectedDraw,
         selectedType,
       );
-      const transactions = await getTransactions(
+      const transactions: any[] = await getTransactions(
         formattedDate,
         selectedDraw,
         selectedType,
@@ -100,7 +117,7 @@ const History = (props: any) => {
       console.log('History fetchData', transactions);
       setTransactions(transactions);
       let total = 0;
-      transactions.map(item => {
+      transactions.forEach((item: any) => {
         total += item.total;
       });
       setTotalAmount(total);
@@ -139,14 +156,16 @@ const History = (props: any) => {
             transaction,
           );
           resendTransaction(transaction); // Send missing local transaction to server
-          updateTransactionStatus(transaction.id, 'synced');
+          if (transaction.id) {
+            updateTransactionStatus(transaction.id, 'synced');
+          }
         }
       });
 
       // Step 3: Find and insert server transactions that are missing locally
       const localTransactionSet = new Set(transactions.map(t => t.ticketcode));
 
-      serverTransactions.forEach(serverTicketCode => {
+      serverTransactions.forEach((serverTicketCode: any) => {
         if (!localTransactionSet.has(serverTicketCode)) {
           console.log(
             'Inserting missing transaction from server:',

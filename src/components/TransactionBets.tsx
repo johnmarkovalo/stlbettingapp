@@ -12,12 +12,21 @@ import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
-import {getBetsByTransaction} from '../helper/sqlite';
+import {getBetsByTransaction} from '../database';
+
+// Define types for component props
+interface TransactionBetsProps {
+  transaction: {
+    id: number;
+    ticketcode: string;
+  };
+  hide: () => void;
+}
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 
-const TransactionBets = ({transaction, hide}: any) => {
+const TransactionBets = ({transaction, hide}: TransactionBetsProps) => {
   const [totalAmount, setTotalAmount] = useState(0);
   const [bets, setBets] = useState<Bet[]>([]);
 
@@ -30,7 +39,7 @@ const TransactionBets = ({transaction, hide}: any) => {
     const fetchData = async () => {
       const bets = await getBetsByTransaction(transaction.id);
       if (bets) {
-        setBets(bets);
+        setBets(bets as Bet[]);
       }
     };
     fetchData();
@@ -38,7 +47,7 @@ const TransactionBets = ({transaction, hide}: any) => {
 
   useEffect(() => {
     let total = 0;
-    bets.map(item => {
+    bets.forEach((item: Bet) => {
       total += item.subtotal;
     });
     setTotalAmount(total);

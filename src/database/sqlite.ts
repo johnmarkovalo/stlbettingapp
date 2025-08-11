@@ -1,9 +1,9 @@
 import SQLite, {ResultSetRowList} from 'react-native-sqlite-storage';
-import {formatTime} from './functions';
+import {formatTime} from '../helper/functions';
 import Type from '../models/Type';
 import Bet from '../models/Bet';
 import Transaction from '../models/Transaction';
-import {checkIfDouble} from './functions';
+import {checkIfDouble} from '../helper/functions';
 import moment from 'moment';
 import {DatabaseService} from './DatabaseService';
 

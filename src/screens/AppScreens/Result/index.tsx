@@ -39,7 +39,7 @@ import {
   insertOrUpdateResult,
   getTransactionByTicketCode,
   getWinningTransactionBets,
-} from '../../../helper/sqlite.ts';
+} from '../../../database';
 import {useDispatch, useSelector} from 'react-redux';
 import {checkTransactionAPI, syncResultAPI} from '../../../helper/api.ts';
 import {
@@ -53,6 +53,19 @@ import {
   printSales,
 } from '../../../helper/printer';
 
+// Define types for Redux state
+interface RootState {
+  auth: {
+    user: any;
+    token: string;
+  };
+  types: {
+    types: Type[];
+    selectedType: number;
+    selectedDraw: number;
+  };
+}
+
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 import debounce from 'lodash/debounce';
@@ -62,8 +75,8 @@ import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 const Result = (props: any) => {
   const {navigation} = props;
   const internetStatusCheck = useRef(checkInternetConnection());
-  const user = useSelector(state => state.auth.user);
-  const token = useSelector(state => state.auth.token);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
   const dispatch = useDispatch();
   const [showQRCam, setShowQRCam] = useState(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
@@ -80,8 +93,10 @@ const Result = (props: any) => {
   let minDate = moment().subtract(1, 'weeks').toDate();
   let maxDate = moment().toDate();
   //Type
-  const betTypes = useSelector(state => state.types.types);
-  let selectedType = useSelector(state => state.types.selectedType);
+  const betTypes = useSelector((state: RootState) => state.types.types);
+  let selectedType = useSelector(
+    (state: RootState) => state.types.selectedType,
+  );
   function typeLabel() {
     const matchingItems: Type[] = betTypes.filter(
       (item: Type) => item.bettypeid === selectedType,
@@ -89,7 +104,9 @@ const Result = (props: any) => {
     return matchingItems.length > 0 ? matchingItems[0].name : null;
   }
   //Draw
-  let selectedDraw = useSelector(state => state.types.selectedDraw);
+  let selectedDraw = useSelector(
+    (state: RootState) => state.types.selectedDraw,
+  );
   //Result
   const [result, setResult] = useState({result: 0});
   //Transaction
@@ -97,7 +114,7 @@ const Result = (props: any) => {
     totalTarget: 0,
     totalRambol: 0,
   });
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const processQR = async (ticketcode: string) => {

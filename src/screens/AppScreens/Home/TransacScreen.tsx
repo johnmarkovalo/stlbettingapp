@@ -36,7 +36,7 @@ import {
   getLatestTransaction,
   insertTransaction,
   updateTransactionStatus,
-} from '../../../helper/sqlite.ts';
+} from '../../../database';
 import {listPairedDevices, printTransaction} from '../../../helper/printer.js';
 import {
   sendTransactionAPI,
@@ -45,18 +45,29 @@ import {
 } from '../../../helper/api.ts';
 import {soldoutsActions, userActions} from '../../../store/actions';
 
+// Define types for Redux state
+interface RootState {
+  auth: {
+    user: any;
+    token: string;
+  };
+  soldouts: {
+    soldouts: any[];
+  };
+}
+
 const widthScreen = Dimensions.get('window').width;
 const TransacScreen = (props: any) => {
-  const user = useSelector(state => state.auth.user);
-  const token = useSelector(state => state.auth.token);
-  const soldouts = useSelector(state => state.soldouts.soldouts);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
+  const soldouts = useSelector((state: RootState) => state.soldouts.soldouts);
   const dispatch = useDispatch();
 
   const internetStatusCheck = useRef(checkInternetConnection());
   const bottomDrawerRef = useRef<BottomDrawerMethods>(null);
   const betType = props.route.params.betType;
   const betDate = moment().format('YYYY-MM-DD');
-  const [currentDraw, setCurrentDraw] = useState(null);
+  const [currentDraw, setCurrentDraw] = useState<any>(null);
   const [totalAmount, setTotalAmount] = useState(0);
   const [betNumber, setBetNumber] = useState({
     value: '',
@@ -84,7 +95,6 @@ const TransacScreen = (props: any) => {
   };
 
   useEffect(() => {
-    0;
     if (validateBet()) return;
     // Check the length after state has been updated
     if (betNumber.value.length === 3 && betNumber.isFocus) {
@@ -99,7 +109,10 @@ const TransacScreen = (props: any) => {
 
   useEffect(() => {
     setTotalAmount(
-      bets.reduce((total, current) => total + parseFloat(current.subtotal), 0),
+      bets.reduce(
+        (total, current) => total + parseFloat(current.subtotal.toString()),
+        0,
+      ),
     );
   }, [bets]);
 
@@ -157,7 +170,7 @@ const TransacScreen = (props: any) => {
     return false;
   }
 
-  function checkSoldOut(type) {
+  function checkSoldOut(type: string) {
     if (soldouts.length > 0) {
       switch (type) {
         case 'targetAmount':
@@ -388,7 +401,7 @@ const TransacScreen = (props: any) => {
         props.navigation.goBack();
         return;
       }
-      const latestTrans = await getLatestTransaction(
+      const latestTrans: any = await getLatestTransaction(
         betDate,
         currentDraw,
         betType.id,
@@ -400,7 +413,8 @@ const TransacScreen = (props: any) => {
         betType.id +
         '-' +
         moment().format('YYMMDD-HHmmss');
-      let trans_no = latestTrans ? latestTrans.trans_no + 1 : 1;
+      let trans_no =
+        latestTrans && latestTrans.trans_no ? latestTrans.trans_no + 1 : 1;
       let trans_data = convertToTransData(bets);
       let now = moment().format('YYYY-MM-DD HH:mm:ss');
       const transaction: Transaction = {
@@ -414,7 +428,10 @@ const TransacScreen = (props: any) => {
         status: 'saved',
         created_at: now,
       };
-      const transactionId = await insertTransaction(transaction, bets);
+      const transactionId: number | null = await insertTransaction(
+        transaction,
+        bets,
+      );
       if (transactionId) {
         listPairedDevices();
         printTransaction(transaction, betType, bets, user);

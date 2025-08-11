@@ -12,12 +12,26 @@ import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
-import {getWinningTransactionBets} from '../helper/sqlite';
+import {getWinningTransactionBets} from '../database';
+
+// Define types for component props
+interface ResultTransactionBetsProps {
+  hide: () => void;
+  result: any;
+  transaction: {
+    id: number;
+    ticketcode: string;
+  };
+}
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
 
-const ResultTransactionBets = ({hide, result, transaction}: any) => {
+const ResultTransactionBets = ({
+  hide,
+  result,
+  transaction,
+}: ResultTransactionBetsProps) => {
   const [totalAmount, setTotalAmount] = useState(0);
   const [bets, setBets] = useState<Bet[]>([]);
 
@@ -27,7 +41,7 @@ const ResultTransactionBets = ({hide, result, transaction}: any) => {
   };
 
   useEffect(() => {
-    getWinningTransactionBets(transaction.id, result, bets => {
+    getWinningTransactionBets(transaction.id, result, (bets: Bet[]) => {
       console.log('bets', bets);
       setBets(bets);
     });
@@ -35,7 +49,7 @@ const ResultTransactionBets = ({hide, result, transaction}: any) => {
 
   useEffect(() => {
     let total = 0;
-    bets.map(item => {
+    bets.forEach((item: Bet) => {
       total += item.subtotal;
     });
     setTotalAmount(total);

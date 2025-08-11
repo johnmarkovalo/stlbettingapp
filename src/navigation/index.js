@@ -3,15 +3,15 @@
  * https://reactnavigation.org/docs/getting-started
  *
  */
-import React, { useEffect } from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
-import { BackHandler } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
+import React, {useEffect} from 'react';
+import {createStackNavigator} from '@react-navigation/stack';
+import {NavigationContainer, useNavigation} from '@react-navigation/native';
+import {BackHandler} from 'react-native';
+import {useSelector, useDispatch} from 'react-redux';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
-import { typesActions } from '../store/actions/types.actions';
-import { getActiveTypes } from '../helper/sqlite';
+import {typesActions} from '../store/actions/types.actions';
+import {getActiveTypes} from '../database';
 
 // Define the Navigation component
 export default function Navigation() {
@@ -63,11 +63,19 @@ function RootNavigator() {
 
   // Set up the Stack Navigator
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} >
+    <Stack.Navigator screenOptions={{headerShown: false}}>
       {authentication ? (
-        <Stack.Screen name="App" component={AppNavigator} options={{ gestureEnabled: false }} />
+        <Stack.Screen
+          name="App"
+          component={AppNavigator}
+          options={{gestureEnabled: false}}
+        />
       ) : (
-        <Stack.Screen name="Auth" component={AuthNavigator} options={{ gestureEnabled: false }} />
+        <Stack.Screen
+          name="Auth"
+          component={AuthNavigator}
+          options={{gestureEnabled: false}}
+        />
       )}
     </Stack.Navigator>
   );

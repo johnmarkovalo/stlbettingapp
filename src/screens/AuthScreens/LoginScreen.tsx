@@ -32,9 +32,13 @@ import _ from 'lodash';
 import {checkInternetConnection, formatBetTypes} from '../../helper';
 import debounce from 'lodash/debounce';
 import {syncBetTypesAPI} from '../../helper/api';
-import {insertTypes} from '../../helper/sqlite';
+import {insertTypes} from '../../database';
 
-const LoginScreen = props => {
+interface LoginScreenProps {
+  navigation: any;
+}
+
+const LoginScreen = (props: LoginScreenProps) => {
   const internetStatusCheck = useRef(checkInternetConnection());
   const [showLogin, setShowLogin] = useState(false);
   const dispatch = useDispatch();
@@ -86,14 +90,14 @@ const LoginScreen = props => {
               );
               setLoggingIn(false);
             } else {
-              alert('Invalid QR code');
+              Alert.alert('Error', 'Invalid QR code');
             }
           });
-      } catch (e) {
-        alert(e.message);
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'An error occurred');
       }
     } else {
-      alert('username & password are required');
+      Alert.alert('Error', 'Username & password are required');
     }
   }
 

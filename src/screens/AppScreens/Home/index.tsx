@@ -14,19 +14,30 @@ import {useSelector, useDispatch} from 'react-redux';
 import Styles from './Styles';
 import Colors from '../../../Styles/Colors.ts';
 import {
-  checkLastDrawTransactionStatus, deleteLastWeekTransactions,
-  getLatestTransactionDateTime
-} from "../../../helper/sqlite.ts";
+  checkLastDrawTransactionStatus,
+  deleteLastWeekTransactions,
+  getLatestTransactionDateTime,
+} from '../../../database';
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
 import Type from '../../../models/Type.ts';
 
+// Define types for Redux state
+interface RootState {
+  auth: {
+    user: any;
+  };
+  types: {
+    types: Type[];
+  };
+}
+
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
-  const user = useSelector(state => state.auth.user);
-  const types = useSelector(state => state.types.types);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const types = useSelector((state: RootState) => state.types.types);
   const {navigation} = props;
-  const [currentDraw, setCurrentDraw] = useState(null);
+  const [currentDraw, setCurrentDraw] = useState<number | null>(null);
   const [validDateTime, setValidDateTime] = useState(true);
 
   const recalculateCurrentDraw = async () => {
@@ -64,6 +75,15 @@ const Home = (props: any) => {
   }, [navigation]);
 
   const onTypePress = async (type: Type) => {
+    // Additional safety check: prevent navigation if betting is closed
+    if (currentDraw === null) {
+      Alert.alert(
+        'Betting Closed',
+        'Betting is currently closed. Please wait for the next draw.',
+      );
+      return;
+    }
+
     const hasUnsyncedTransactions = await checkLastDrawTransactionStatus();
     console.log('hasUnsyncedTransactions', hasUnsyncedTransactions);
     if (hasUnsyncedTransactions) {
@@ -112,22 +132,34 @@ const Home = (props: any) => {
         </View>
         {validDateTime && (
           <View style={styles.container}>
+            {currentDraw === null && (
+              <View style={styles.closedMessage}>
+                <Text style={styles.closedMessageText}>
+                  Betting is currently closed. Please wait for the next draw.
+                </Text>
+              </View>
+            )}
             <ScrollView style={{marginTop: 20}}>
-              {types.map((button, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => {
-                    onTypePress(button);
-                  }}
-                  style={
-                    getCurrentDraw(button.draws) === null
-                      ? styles.buttonDisabled
-                      : styles.button
-                  }
-                  disabled={getCurrentDraw(button.draws) === null}>
-                  <Text style={styles.textStyle}>{button.name}</Text>
-                </TouchableOpacity>
-              ))}
+              {types.map((button, index) => {
+                // Button is disabled when:
+                // 1. Bet is closed (currentDraw === null) - no draws are active
+                // 2. This specific button's draw is not active (getCurrentDraw(button.draws) === null)
+                const isButtonDisabled =
+                  currentDraw === null || getCurrentDraw(button.draws) === null;
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      onTypePress(button);
+                    }}
+                    style={
+                      isButtonDisabled ? styles.buttonDisabled : styles.button
+                    }
+                    disabled={isButtonDisabled}>
+                    <Text style={styles.textStyle}>{button.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         )}
@@ -198,14 +230,15 @@ const styles = StyleSheet.create({
   },
 
   buttonDisabled: {
-    elevation: 8,
-    backgroundColor: 'gray',
+    elevation: 2,
+    backgroundColor: '#cccccc',
     borderRadius: 100,
     padding: 10,
     margin: 10,
     height: 60,
     width: widthScreen * 0.8,
     justifyContent: 'center',
+    opacity: 0.6,
   },
 
   textStyle: {
@@ -214,6 +247,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     alignSelf: 'center',
     textTransform: 'uppercase',
+  },
+
+  closedMessage: {
+    backgroundColor: Colors.mediumRed,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignSelf: 'center',
+    width: widthScreen * 0.8,
+  },
+
+  closedMessageText: {
+    color: '#fff',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 

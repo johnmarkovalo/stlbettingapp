@@ -14,11 +14,13 @@ import {PersistGate} from 'redux-persist/integration/react';
 import {MD3LightTheme as DefaultTheme, PaperProvider} from 'react-native-paper';
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 import Navigation from './navigation';
-import {initializeDatabase, closeDatabaseConnection} from './helper/sqlite';
+import {DatabaseService, clearDatabase} from './database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const theme = {
   ...DefaultTheme,
 };
+
 function App(): React.JSX.Element {
   useEffect(() => {
     const checkAndInitializeDatabase = async () => {
@@ -27,12 +29,35 @@ function App(): React.JSX.Element {
           'isDatabaseInitialized',
         );
         if (!isDatabaseInitialized) {
-          await initializeDatabase();
-          await AsyncStorage.setItem('isDatabaseInitialized', 'true');
-          await AsyncStorage.setItem(
-            'API_URL',
-            'http://zian-api-v1.philippinestl.com/api/v2/',
-          );
+          try {
+            const dbService = DatabaseService.getInstance();
+            await dbService.initializeDatabase();
+            await AsyncStorage.setItem('isDatabaseInitialized', 'true');
+            await AsyncStorage.setItem(
+              'API_URL',
+              'http://zian-api-v1.philippinestl.com/api/v2/',
+            );
+          } catch (dbError) {
+            console.error(
+              'Database initialization failed, clearing and retrying:',
+              dbError,
+            );
+            // Clear the database and try again
+            try {
+              await clearDatabase();
+              const dbService = DatabaseService.getInstance();
+              await dbService.initializeDatabase();
+              await AsyncStorage.setItem('isDatabaseInitialized', 'true');
+              await AsyncStorage.setItem(
+                'API_URL',
+                'http://zian-api-v1.philippinestl.com/api/v2/',
+              );
+            } catch (retryError) {
+              console.error('Database retry failed:', retryError);
+              // Set as initialized to prevent infinite retry loops
+              await AsyncStorage.setItem('isDatabaseInitialized', 'true');
+            }
+          }
         }
       } catch (error) {
         console.error('Error initializing database:', error);
@@ -43,7 +68,8 @@ function App(): React.JSX.Element {
 
     // Clean up function to close database connection when component unmounts
     // return () => {
-    //   closeDatabaseConnection();
+    //   const dbService = DatabaseService.getInstance();
+    //   dbService.closeDatabase();
     // };
   }, []);
   const isDarkMode = useColorScheme() === 'dark';

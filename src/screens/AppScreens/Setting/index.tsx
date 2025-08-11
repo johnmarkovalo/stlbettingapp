@@ -24,20 +24,29 @@ import {
   soldoutsActions,
 } from '../../../store/actions';
 import {syncBetTypesAPI, getSoldOutsAPI} from '../../../helper/api';
-import {insertTypes} from '../../../helper/sqlite';
+import {insertTypes} from '../../../database';
 import {
   formatBetTypes,
   checkInternetConnection,
 } from '../../../helper/functions';
 import {APP_VERSION, appConfig} from '../../../config/appConfig';
+
+// Define types for Redux state
+interface RootState {
+  auth: {
+    user: any;
+    token: string;
+  };
+}
+
 const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
   const internetStatusCheck = useRef(checkInternetConnection());
   const {navigation} = props;
-  const user = useSelector(state => state.auth.user);
-  const token = useSelector(state => state.auth.token);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
   const dispatch = useDispatch();
-  const [agent, setAgent] = useState({});
+  const [agent, setAgent] = useState<any>({});
 
   useEffect(() => {
     setAgent({...user});
