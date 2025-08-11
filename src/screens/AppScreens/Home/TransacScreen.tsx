@@ -24,7 +24,7 @@ import BottomDrawer, {
 } from 'react-native-animated-bottom-drawer';
 import Bet from '../../../models/Bet.ts';
 import Transaction from '../../../models/Transaction.ts';
-import {BetItem} from '../../../components/BetItem.tsx';
+import {BetItem} from '../../../components/BetItem';
 import {
   checkIfTriple,
   checkInternetConnection,

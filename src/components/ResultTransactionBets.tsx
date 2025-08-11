@@ -1,164 +1,118 @@
-import React, {useState, useEffect, useContext} from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Text,
-  FlatList,
-} from 'react-native';
-import Ionic from 'react-native-vector-icons/Ionicons';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import {View, StyleSheet, Text, FlatList} from 'react-native';
 import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
 import {getWinningTransactionBets} from '../database';
+import BaseModal from './shared/BaseModal';
 
 // Define types for component props
 interface ResultTransactionBetsProps {
   hide: () => void;
-  result: any;
+  result: {result: number};
   transaction: {
     id: number;
     ticketcode: string;
   };
 }
 
-const widthScreen = Dimensions.get('window').width;
-const heightScreen = Dimensions.get('window').height;
+const ResultTransactionBets: React.FC<ResultTransactionBetsProps> = React.memo(
+  ({hide, result, transaction}) => {
+    const [totalAmount, setTotalAmount] = useState(0);
+    const [bets, setBets] = useState<Bet[]>([]);
 
-const ResultTransactionBets = ({
-  hide,
-  result,
-  transaction,
-}: ResultTransactionBetsProps) => {
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [bets, setBets] = useState<Bet[]>([]);
+    const renderItem = useCallback(
+      ({item, index}: {item: Bet; index: number}) => (
+        <TransactionBetItem
+          key={item.id || index}
+          item={item}
+          index={index}
+          onPress={() => {}}
+        />
+      ),
+      [],
+    );
 
-  const renderItem = ({item}: {item: Bet}) => {
-    const index = bets.indexOf(item);
-    return <TransactionBetItem item={item} index={index} onPress={() => {}} />;
-  };
+    const fetchWinningBets = useCallback(async () => {
+      try {
+        await getWinningTransactionBets(
+          transaction.id,
+          result,
+          (fetchedBets: Bet[]) => {
+            console.log('Winning bets fetched:', fetchedBets);
+            setBets(fetchedBets);
+          },
+        );
+      } catch (error) {
+        console.error('Error fetching winning bets:', error);
+        setBets([]);
+      }
+    }, [transaction.id, result]);
 
-  useEffect(() => {
-    getWinningTransactionBets(transaction.id, result, (bets: Bet[]) => {
-      console.log('bets', bets);
-      setBets(bets);
-    });
-  }, [transaction]);
+    useEffect(() => {
+      fetchWinningBets();
+    }, [fetchWinningBets]);
 
-  useEffect(() => {
-    let total = 0;
-    bets.forEach((item: Bet) => {
-      total += item.subtotal;
-    });
-    setTotalAmount(total);
-  }, [bets]);
+    useEffect(() => {
+      const total = bets.reduce((sum, item) => sum + item.subtotal, 0);
+      setTotalAmount(total);
+    }, [bets]);
 
-  function hideModal() {
-    hide();
-  }
-
-  return (
-    <View style={styles.centeredView}>
-      <View style={styles.modalView}>
-        {/* Header */}
-        <View style={styles.modalHeaderContainer}>
-          <Text style={styles.modalTitle}>{transaction.ticketcode}</Text>
-          <TouchableOpacity
-            onPress={hide}
-            style={{
-              padding: 10,
-              alignSelf: 'flex-end',
-              position: 'absolute',
-            }}>
-            <Ionic
-              name="close"
-              size={30}
-              style={{
-                color: '#000',
-              }}
-            />
-          </TouchableOpacity>
+    const totalDisplay = useMemo(
+      () => (
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalLabel}>Total:</Text>
+          <Text style={styles.totalAmount}>
+            {formatNumberWithCommas(totalAmount)}
+          </Text>
         </View>
-        {/* Bet List */}
-        <View style={styles.modalBodyContainer}>
-          {/* Total */}
-          <View
-            style={{
-              justifyContent: 'center',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}>
-            <Text style={[{fontSize: 20, color: Colors.Black, marginRight: 5}]}>
-              Total:
-            </Text>
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 30, color: Colors.mediumGreen},
-              ]}>
-              {formatNumberWithCommas(totalAmount)}
-            </Text>
-          </View>
-          <FlatList data={bets} renderItem={renderItem} />
-        </View>
-      </View>
-    </View>
-  );
-};
+      ),
+      [totalAmount],
+    );
+
+    const keyExtractor = useCallback(
+      (item: Bet, index: number) => item.id?.toString() || index.toString(),
+      [],
+    );
+
+    return (
+      <BaseModal title={transaction.ticketcode} onClose={hide} height={0.6}>
+        {totalDisplay}
+        <FlatList
+          data={bets}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+        />
+      </BaseModal>
+    );
+  },
+);
+
+ResultTransactionBets.displayName = 'ResultTransactionBets';
 
 const styles = StyleSheet.create({
-  centeredView: {
-    flex: 1,
+  totalContainer: {
     justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
-    // marginTop: 22,
-    width: widthScreen,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    marginBottom: 20,
   },
-  modalView: {
-    // margin: 15,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 5,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    height: heightScreen * 0.6,
-    width: widthScreen * 0.9,
-  },
-  modalHeaderContainer: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: widthScreen * 0.9,
-    padding: 10,
-    alignSelf: 'center',
-  },
-  modalBodyContainer: {
-    flex: 1,
-    padding: 1,
-  },
-  modalTitle: {
-    alignSelf: 'center',
-    textAlign: 'center',
+  totalLabel: {
     fontSize: 20,
-    fontWeight: 'bold',
     color: Colors.Black,
+    marginRight: 5,
   },
-  totalAmountStyle: {
-    fontSize: 20,
+  totalAmount: {
     fontWeight: 'bold',
-    color: Colors.Black,
-    alignSelf: 'center',
-    textAlign: 'center',
+    fontSize: 30,
+    color: Colors.mediumGreen,
+  },
+  listContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 10,
   },
 });
 

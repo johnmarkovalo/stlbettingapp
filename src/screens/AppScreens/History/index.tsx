@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState, useCallback, useMemo} from 'react';
 import {
   Dimensions,
   FlatList,
@@ -19,20 +19,20 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import Colors from '../../../Styles/Colors.ts';
-import Transaction from '../../../models/Transaction.ts';
-import {TransactionItem} from '../../../components/transactionItem.tsx';
+import Colors from '../../../Styles/Colors';
+import Transaction from '../../../models/Transaction';
+import {TransactionItem} from '../../../components/transactionItem';
 import {
   checkInternetConnection,
   convertToBets,
   formatNumberWithCommas,
   getCurrentDraw,
 } from '../../../helper';
-import TransactionBets from '../../../components/TransactionBets.tsx';
+import TransactionBets from '../../../components/TransactionBets';
 import DatePicker from 'react-native-date-picker';
 import moment from 'moment';
-import DrawModal from '../../../components/DrawModal.tsx';
-import TypeModal from '../../../components/TypeModal.tsx';
+import DrawModal from '../../../components/DrawModal';
+import TypeModal from '../../../components/TypeModal';
 import {useSelector, useDispatch} from 'react-redux';
 import {
   getTransactions,
@@ -41,13 +41,13 @@ import {
   getLatestTransaction,
   insertTransaction,
 } from '../../../database';
-import Type from '../../../models/Type.ts';
-import {listPairedDevices, printSales} from '../../../helper/printer.js';
+import Type from '../../../models/Type';
+import {listPairedDevices, printSales} from '../../../helper/printer';
 import {
   getTransactionsAPI,
   sendTransactionAPI,
   getTransactionViaTicketCodeAPI,
-} from '../../../helper/api.ts';
+} from '../../../helper/api';
 
 // Define types for Redux state
 interface RootState {
@@ -64,71 +64,124 @@ interface RootState {
 
 const widthScreen = Dimensions.get('window').width;
 
-const History = (props: any) => {
-  const {navigation} = props;
-  const internetStatusCheck = useRef(checkInternetConnection());
+const History: React.FC<any> = ({navigation}) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
   const betTypes = useSelector((state: RootState) => state.types.types);
+  const selectedType = useSelector(
+    (state: RootState) => state.types.selectedType,
+  );
+  const selectedDraw = useSelector(
+    (state: RootState) => state.types.selectedDraw,
+  );
+
   const [refresh, setRefresh] = useState(false);
-  const dispatch = useDispatch();
+  const [syncing, setSyncing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [betModalVisible, setBetModalVisible] = useState(false);
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [drawModalVisible, setDrawModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
-  //Date
   const [selectedDate, setSelectedDate] = useState(new Date());
-  let minDate = moment().subtract(1, 'weeks').toDate();
-  let maxDate = moment().toDate();
-  //Type
-  let selectedType = useSelector(
-    (state: RootState) => state.types.selectedType,
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [selectedTransaction, setSelectedTransaction] = useState<
+    Transaction | undefined
+  >(undefined);
+
+  const dispatch = useDispatch();
+  const internetStatusCheck = useRef(checkInternetConnection());
+  const hasInitialSync = useRef(false);
+
+  // Memoized values
+  const minDate = useMemo(() => moment().subtract(1, 'weeks').toDate(), []);
+  const maxDate = useMemo(() => moment().toDate(), []);
+  const formattedDate = useMemo(
+    () => moment(selectedDate).format('YYYY-MM-DD'),
+    [selectedDate],
   );
-  function typeLabel() {
-    const matchingItems: Type[] = betTypes.filter(
+
+  // Memoized functions
+  const typeLabel = useCallback(() => {
+    const matchingItems = betTypes.filter(
       (item: Type) => item.bettypeid === selectedType,
     );
     return matchingItems.length > 0 ? matchingItems[0].name : null;
-  }
-  //Draw
-  let selectedDraw = useSelector(
-    (state: RootState) => state.types.selectedDraw,
+  }, [betTypes, selectedType]);
+
+  const insertTransactionFromServer = useCallback(
+    async (ticketcode: string) => {
+      try {
+        const transaction = await getTransactionViaTicketCodeAPI(
+          token,
+          ticketcode,
+        );
+        console.log('Transaction from server:', transaction);
+        if (transaction) {
+          const bets = convertToBets(transaction.trans_data);
+          //Convert 1.00 to 1
+          transaction.declared_gross = Math.floor(transaction.declared_gross);
+          const newTransaction = {
+            ...transaction,
+            status: 'synced',
+            total: transaction.declared_gross,
+            created_at: moment(transaction.printed_at).format(
+              'YYYY-MM-DD HH:mm:ss',
+            ),
+            bets: bets,
+          };
+          console.log('Transaction from server:', transaction);
+          await insertTransaction(newTransaction, bets);
+        }
+      } catch (error) {
+        console.error('Error inserting transaction from server:', error);
+      }
+    },
+    [token],
   );
-  //Transaction
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction>();
 
-  const fetchData = async () => {
-    setRefresh(true);
-    try {
-      const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
-      console.log(
-        'History fetchData Params',
-        formattedDate,
-        selectedDraw,
-        selectedType,
-      );
-      const transactions: any[] = await getTransactions(
-        formattedDate,
-        selectedDraw,
-        selectedType,
-      );
-      console.log('History fetchData', transactions);
-      setTransactions(transactions);
-      let total = 0;
-      transactions.forEach((item: any) => {
-        total += item.total;
-      });
-      setTotalAmount(total);
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setRefresh(false);
+  const resendTransaction = useCallback(
+    async (transaction: Transaction) => {
+      try {
+        if (internetStatusCheck.current.isConnected()) {
+          if (transaction.id) {
+            const bets = await getBetsByTransaction(transaction.id);
+            if (bets) {
+              let newTransaction = {
+                ...transaction,
+                status: 'VALID',
+                gateway: 'Retrofit',
+                keycode: user.keycode,
+                remarks: '',
+                printed_at: transaction.created_at,
+                declared_gross: totalAmount,
+                bets: bets,
+              };
+              const response = await sendTransactionAPI(token, newTransaction);
+              if (response) {
+                return true;
+              }
+            }
+          }
+        } else {
+          Alert.alert('No internet connection');
+        }
+        return false;
+      } catch (error) {
+        console.error('Error in resendTransaction:', error);
+        return false;
+      }
+    },
+    [user.keycode, totalAmount, token],
+  );
+
+  const syncTransactions = useCallback(async () => {
+    if (syncing) {
+      console.log('Sync already in progress, skipping...');
+      return;
     }
-  };
 
-  const syncTransactions = async () => {
+    setSyncing(true);
     setRefresh(true);
     try {
       if (!internetStatusCheck.current.isConnected()) {
@@ -136,7 +189,6 @@ const History = (props: any) => {
         return;
       }
 
-      const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
       const serverTransactions = await getTransactionsAPI(
         token,
         formattedDate,
@@ -149,159 +201,256 @@ const History = (props: any) => {
       const serverTransactionSet = new Set(serverTransactions);
 
       // Step 2: Find and resend local transactions that are not on the server
-      transactions.forEach(transaction => {
-        if (!serverTransactionSet.has(transaction.ticketcode)) {
-          console.log(
-            'This transaction does not exist on the server:',
-            transaction,
-          );
-          resendTransaction(transaction); // Send missing local transaction to server
-          if (transaction.id) {
-            updateTransactionStatus(transaction.id, 'synced');
+      const currentTransactions = await getTransactions(
+        formattedDate,
+        selectedDraw,
+        selectedType,
+      );
+
+      if (Array.isArray(currentTransactions)) {
+        currentTransactions.forEach(transaction => {
+          if (!serverTransactionSet.has(transaction.ticketcode)) {
+            console.log(
+              'This transaction does not exist on the server:',
+              transaction,
+            );
+            resendTransaction(transaction);
+            if (transaction.id) {
+              updateTransactionStatus(transaction.id, 'synced');
+            }
           }
-        }
-      });
+        });
 
-      // Step 3: Find and insert server transactions that are missing locally
-      const localTransactionSet = new Set(transactions.map(t => t.ticketcode));
+        // Step 3: Find and insert server transactions that are missing locally
+        const localTransactionSet = new Set(
+          currentTransactions.map(t => t.ticketcode),
+        );
 
-      serverTransactions.forEach((serverTicketCode: any) => {
-        if (!localTransactionSet.has(serverTicketCode)) {
-          console.log(
-            'Inserting missing transaction from server:',
-            serverTicketCode,
-          );
-          insertTransactionFromServer(serverTicketCode);
-        }
-      });
+        serverTransactions.forEach((serverTicketCode: any) => {
+          if (!localTransactionSet.has(serverTicketCode)) {
+            console.log(
+              'Inserting missing transaction from server:',
+              serverTicketCode,
+            );
+            insertTransactionFromServer(serverTicketCode);
+          }
+        });
+      }
     } catch (error) {
       console.error('Error syncing transactions:', error);
     } finally {
       setRefresh(false);
+      setSyncing(false);
     }
-  };
+  }, [
+    token,
+    formattedDate,
+    selectedDraw,
+    selectedType,
+    user.keycode,
+    resendTransaction,
+    insertTransactionFromServer,
+    syncing,
+  ]);
 
-  const insertTransactionFromServer = async (ticketcode: string) => {
-    try {
-      const transaction = await getTransactionViaTicketCodeAPI(
-        token,
-        ticketcode,
-      );
-      console.log('Transaction from server:', transaction);
-      if (transaction) {
-        const bets = convertToBets(transaction.trans_data);
-        //Convert 1.00 to 1
-        transaction.declared_gross = Math.floor(transaction.declared_gross);
-        const newTransaction = {
-          ...transaction,
-          status: 'synced',
-          total: transaction.declared_gross,
-          created_at: moment(transaction.printed_at).format(
-            'YYYY-MM-DD HH:mm:ss',
-          ),
-          bets: bets,
-        };
-        console.log('Transaction from server:', transaction);
-        await insertTransaction(newTransaction, bets);
+  // Separate function for initial sync that only runs once
+  const performInitialSync = useCallback(async () => {
+    if (internetStatusCheck.current.isConnected()) {
+      console.log('🔄 Initial load - Syncing with server first...');
+      setSyncing(true);
+      await syncTransactions();
+      setSyncing(false);
+    }
+  }, [syncTransactions]);
+
+  const fetchData = useCallback(
+    async (shouldSync = false) => {
+      if (shouldSync) {
+        setRefresh(true);
       }
-    } catch (error) {
-      console.error('Error inserting transaction from server:', error);
-    }
-  };
 
-  const onRefresh = () => {
+      try {
+        // Validate parameters before making the call
+        if (selectedDraw === undefined || selectedType === undefined) {
+          console.warn('⚠️ History fetchData - Missing parameters:', {
+            draw: selectedDraw,
+            type: selectedType,
+          });
+          setTransactions([]);
+          setTotalAmount(0);
+          setInitialLoading(false);
+          return;
+        }
+
+        console.log('🔄 History fetchData - Params:', {
+          date: formattedDate,
+          draw: selectedDraw,
+          type: selectedType,
+          typeName: typeLabel(),
+          shouldSync,
+        });
+
+        const fetchedTransactions = await getTransactions(
+          formattedDate,
+          selectedDraw,
+          selectedType,
+        );
+
+        console.log('📊 History fetchData - Results:', {
+          count: Array.isArray(fetchedTransactions)
+            ? fetchedTransactions.length
+            : 0,
+          transactions: fetchedTransactions,
+        });
+
+        if (Array.isArray(fetchedTransactions)) {
+          setTransactions(fetchedTransactions);
+          const total = fetchedTransactions.reduce(
+            (sum, item) => sum + (item.total || 0),
+            0,
+          );
+          setTotalAmount(total);
+        } else {
+          setTransactions([]);
+          setTotalAmount(0);
+        }
+
+        setInitialLoading(false);
+      } catch (error) {
+        console.error('❌ History fetchData error:', error);
+        setTransactions([]);
+        setTotalAmount(0);
+        setInitialLoading(false);
+      } finally {
+        if (shouldSync) {
+          setRefresh(false);
+        }
+      }
+    },
+    [formattedDate, selectedDraw, selectedType, typeLabel],
+  );
+
+  const onRefresh = useCallback(async () => {
     setRefresh(true);
-    syncTransactions();
-    fetchData();
-    setTimeout(() => {
-      setRefresh(false);
-    }, 1000); // Refresh indicator will be visible for at least 1 second
-  };
+    try {
+      // Sync with server first, then fetch data
+      await syncTransactions();
+      await fetchData();
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setTimeout(() => {
+        setRefresh(false);
+      }, 1000);
+    }
+  }, [syncTransactions, fetchData]);
 
-  useEffect(() => {
-    fetchData().then(() => {
-      syncTransactions();
-    });
-  }, [selectedDate, selectedType, selectedDraw]);
+  const handleManualSync = useCallback(async () => {
+    if (syncing) {
+      console.log('Sync already in progress...');
+      return;
+    }
 
-  useEffect(() => {
-    navigation.addListener('focus', () => {
-      fetchData().then(() => {
-        syncTransactions();
-      });
-    });
-  }, [navigation]);
+    if (!internetStatusCheck.current.isConnected()) {
+      Alert.alert('Error', 'No internet connection');
+      return;
+    }
 
-  const renderItem = ({item}: {item: Transaction}) => {
-    return (
-      <TransactionItem
-        item={item}
-        onPress={() => {
-          betModalShow(item);
-        }}
-      />
-    );
-  };
+    // Sync with server first, then fetch data
+    await syncTransactions();
+    await fetchData();
+  }, [syncTransactions, fetchData, syncing]);
 
-  //Modals
-  const betModalHide = () => {
-    setBetModalVisible(!betModalVisible);
-  };
+  // Modal handlers
+  const betModalHide = useCallback(() => {
+    setBetModalVisible(false);
+  }, []);
 
-  const betModalShow = (transaction: Transaction) => {
+  const betModalShow = useCallback((transaction: Transaction) => {
     setSelectedTransaction(transaction);
     setBetModalVisible(true);
-  };
+  }, []);
 
-  const drawModalHide = () => {
-    setDrawModalVisible(!drawModalVisible);
-    // setNote({id: null, note: null});
-  };
+  const drawModalHide = useCallback(() => {
+    setDrawModalVisible(false);
+  }, []);
 
-  const drawModalShow = () => {
+  const drawModalShow = useCallback(() => {
     setDrawModalVisible(true);
-  };
+  }, []);
 
-  const typeModalHide = () => {
-    setTypeModalVisible(!typeModalVisible);
-    // setNote({id: null, note: null});
-  };
+  const typeModalHide = useCallback(() => {
+    setTypeModalVisible(false);
+  }, []);
 
-  const typeModalShow = () => {
+  const typeModalShow = useCallback(() => {
     setTypeModalVisible(true);
-  };
+  }, []);
 
-  const resendTransaction = async (transaction: Transaction) => {
-    try {
-      if (internetStatusCheck.current.isConnected()) {
-        const bets = await getBetsByTransaction(transaction.id);
-        if (bets) {
-          let newTransaction = {
-            ...transaction,
-            status: 'VALID',
-            gateway: 'Retrofit',
-            keycode: user.keycode,
-            remarks: '',
-            printed_at: transaction.created_at,
-            declared_gross: totalAmount,
-            bets: bets,
-          };
-          const response = await sendTransactionAPI(token, newTransaction);
-          if (response) {
-            return true; // Resolve promise after successful processing
-          }
-        }
-        // Alert.alert('Printed');
-      } else {
-        Alert.alert('No internet connection');
-      }
-      return false; // Resolve promise indicating no successful processing
-    } catch (error) {
-      console.error('Error in resendTransaction:', error);
-      // Handle error and potentially retry the transaction
-      return false;
+  const dateModalHide = useCallback(() => {
+    setDateModalVisible(false);
+  }, []);
+
+  const dateModalShow = useCallback(() => {
+    setDateModalVisible(true);
+  }, []);
+
+  const handleDateConfirm = useCallback((date: Date) => {
+    setDateModalVisible(false);
+    setSelectedDate(date);
+  }, []);
+
+  const handlePrintSales = useCallback(() => {
+    if (transactions.length > 0) {
+      listPairedDevices();
+      printSales(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
     }
-  };
+  }, [
+    transactions.length,
+    selectedDate,
+    selectedDraw,
+    typeLabel,
+    totalAmount,
+    user,
+  ]);
+
+  // Render functions
+  const renderItem = useCallback(
+    ({item}: {item: Transaction}) => (
+      <TransactionItem
+        key={item.id || item.ticketcode}
+        item={item}
+        onPress={() => betModalShow(item)}
+      />
+    ),
+    [betModalShow],
+  );
+
+  const keyExtractor = useCallback(
+    (item: Transaction) => item.id?.toString() || item.ticketcode,
+    [],
+  );
+
+  // Effects
+  useEffect(() => {
+    const initializeScreen = async () => {
+      if (!hasInitialSync.current) {
+        // First time: sync then fetch
+        await performInitialSync();
+        hasInitialSync.current = true;
+      }
+      await fetchData();
+    };
+
+    initializeScreen();
+  }, [performInitialSync, fetchData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchData();
+    });
+    return unsubscribe;
+  }, [navigation, fetchData]);
 
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
@@ -313,24 +462,28 @@ const History = (props: any) => {
         onRequestClose={betModalHide}>
         <TransactionBets
           hide={betModalHide}
-          transaction={selectedTransaction}
+          transaction={
+            selectedTransaction
+              ? {
+                  id: selectedTransaction.id || 0,
+                  ticketcode: selectedTransaction.ticketcode,
+                }
+              : {id: 0, ticketcode: ''}
+          }
         />
       </Modal>
+
       <DatePicker
         modal
         open={dateModalVisible}
         date={selectedDate}
-        onConfirm={date => {
-          setDateModalVisible(false);
-          setSelectedDate(date);
-        }}
+        onConfirm={handleDateConfirm}
         mode="date"
         maximumDate={maxDate}
         minimumDate={minDate}
-        onCancel={() => {
-          setDateModalVisible(false);
-        }}
+        onCancel={dateModalHide}
       />
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -338,6 +491,7 @@ const History = (props: any) => {
         onRequestClose={drawModalHide}>
         <DrawModal hide={drawModalHide} />
       </Modal>
+
       <Modal
         animationType="fade"
         transparent={true}
@@ -345,48 +499,53 @@ const History = (props: any) => {
         onRequestClose={typeModalHide}>
         <TypeModal hide={typeModalHide} />
       </Modal>
-      {/* Main */}
+
+      {/* Main Content */}
       <View style={Styles.mainContainer}>
         {/* Header */}
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'History'}</Text>
-          {transactions.length > 0 && (
+          <View style={styles.headerButtons}>
             <TouchableOpacity
-              onPress={() => {
-                listPairedDevices();
-                printSales(
-                  selectedDate,
-                  selectedDraw,
-                  typeLabel(),
-                  totalAmount,
-                  user,
-                );
-              }}>
+              onPress={handleManualSync}
+              style={styles.syncButton}
+              disabled={syncing}>
               <MaterialIcon
-                name="print"
-                size={40}
-                style={{
-                  color: '#000',
-                }}
+                name="sync"
+                size={30}
+                style={[styles.syncIcon, syncing && {opacity: 0.5}]}
               />
+              {syncing && (
+                <View style={styles.syncIndicator}>
+                  <ActivityIndicator size="small" color={Colors.primaryColor} />
+                </View>
+              )}
             </TouchableOpacity>
-          )}
+            {transactions.length > 0 && (
+              <TouchableOpacity onPress={handlePrintSales}>
+                <MaterialIcon name="print" size={40} style={styles.printIcon} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-        {/* Conditions */}
+
+        {/* Filter Cards */}
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <TouchableOpacity
-              onPress={() => setDateModalVisible(true)}
-              style={{width: widthScreen / 3}}>
+              onPress={dateModalShow}
+              style={styles.filterButton}>
               <Text style={styles.cardTitle}>DATE</Text>
               <Text style={styles.cardSubTitle}>
                 {moment(selectedDate).format('MMM DD, YYYY')}
               </Text>
             </TouchableOpacity>
+
             <View style={styles.verticalLine} />
+
             <TouchableOpacity
               onPress={drawModalShow}
-              style={{width: widthScreen / 3}}>
+              style={styles.filterButton}>
               <Text style={styles.cardTitle}>TIME</Text>
               <Text style={styles.cardSubTitle}>
                 {selectedDraw === 1
@@ -396,37 +555,62 @@ const History = (props: any) => {
                     : '3RD DRAW'}
               </Text>
             </TouchableOpacity>
+
             <View style={styles.verticalLine} />
+
             <TouchableOpacity
               onPress={typeModalShow}
-              style={{width: widthScreen / 3}}>
+              style={styles.filterButton}>
               <Text style={styles.cardTitle}>Type</Text>
               <Text style={styles.cardSubTitle}>{typeLabel()}</Text>
             </TouchableOpacity>
           </View>
         </View>
-        {/* Total */}
-        {refresh && <ActivityIndicator />}
-        {!refresh && (
-          <View style={[styles.container, {justifyContent: 'center'}]}>
-            <Text style={[{fontSize: 20, color: Colors.Black, marginRight: 5}]}>
-              Total:
+
+        {/* Total Amount */}
+        {initialLoading && (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator style={styles.loader} />
+            <Text style={styles.loaderText}>Initializing and syncing...</Text>
+          </View>
+        )}
+        {refresh && !initialLoading && (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator style={styles.loader} />
+            <Text style={styles.loaderText}>
+              {syncing ? 'Syncing with server...' : 'Loading...'}
             </Text>
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 30, color: Colors.mediumGreen},
-              ]}>
+          </View>
+        )}
+        {!refresh && !initialLoading && (
+          <View style={styles.totalContainer}>
+            <Text style={styles.totalLabel}>Total:</Text>
+            <Text style={styles.totalAmount}>
               {formatNumberWithCommas(totalAmount)}
             </Text>
           </View>
         )}
+
         {/* Transaction List */}
-        {!refresh && (
+        {!initialLoading && (
           <FlatList
             data={transactions}
             renderItem={renderItem}
+            keyExtractor={keyExtractor}
             refreshControl={
-              <RefreshControl refreshing={refresh} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refresh && !syncing}
+                onRefresh={onRefresh}
+                colors={[Colors.primaryColor]}
+                tintColor={Colors.primaryColor}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No transactions found</Text>
+              </View>
             }
           />
         )}
@@ -434,6 +618,10 @@ const History = (props: any) => {
     </SafeAreaView>
   );
 };
+
+History.displayName = 'History';
+
+export default React.memo(History);
 
 const styles = StyleSheet.create({
   card: {
@@ -443,13 +631,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
-
   cardContent: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
-
+  filterButton: {
+    width: widthScreen / 3,
+    alignItems: 'center',
+  },
   cardTitle: {
     fontSize: 16,
     color: Colors.darkGrey,
@@ -457,7 +647,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
-
   cardSubTitle: {
     fontSize: 14,
     color: Colors.primaryColor,
@@ -465,72 +654,76 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
-
   verticalLine: {
-    height: '80%', // Adjust height as needed
+    height: '80%',
     width: 1,
     backgroundColor: 'gray',
   },
-
-  container: {
+  totalContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-  },
-
-  button: {
-    elevation: 8,
-    backgroundColor: Colors.primaryColor,
-    borderRadius: 100,
-    padding: 10,
-    margin: 10,
-    height: 60,
-    width: widthScreen * 0.8,
-    justifyContent: 'center',
-  },
-
-  textStyle: {
-    fontSize: 30,
-    color: '#fff',
-    fontWeight: 'bold',
-    alignSelf: 'center',
-    textTransform: 'uppercase',
-  },
-
-  buttonStyle: {
-    width: wp(97),
-    marginVertical: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: 10,
-    height: 50,
-    backgroundColor: Colors.primaryColor,
+    paddingVertical: 20,
   },
-
-  buttonTextStyle: {
-    fontSize: 30,
-    color: Colors.White,
+  totalLabel: {
+    fontSize: 20,
+    color: Colors.Black,
+    marginRight: 5,
+  },
+  totalAmount: {
     fontWeight: 'bold',
-    alignSelf: 'center',
-    textTransform: 'uppercase',
+    fontSize: 30,
+    color: Colors.mediumGreen,
   },
-
-  //Modal
-  modalContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
+  loader: {
+    marginVertical: 20,
+  },
+  listContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 10,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: Colors.darkGrey,
+    textAlign: 'center',
+  },
+  printIcon: {
+    color: '#000',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  syncButton: {
+    marginRight: 10,
+  },
+  syncIcon: {
+    color: Colors.primaryColor,
+  },
+  loaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loaderText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: Colors.darkGrey,
+  },
+  syncIndicator: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
   },
 });
-
-export default History;

@@ -3,53 +3,63 @@ import {TouchableOpacity, Text, StyleSheet, View} from 'react-native';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Transaction from '../models/Transaction';
 import Colors from '../Styles/Colors';
-import moment from 'moment';
 import {convertDateTime, formatNumberWithCommas} from '../helper';
 
-type TransactionProps = {
+interface TransactionItemProps {
   item: Transaction;
   onPress: () => void;
-};
+}
 
-export const TransactionItem = ({item, onPress}: TransactionProps) => {
-  function checkValid(item) {
-    if (item.status === 'synced' || item.status === 'scanned') {
-      return true;
-    }
-    return false;
-  }
-  return (
-    <View>
-      <TouchableOpacity style={styles.container} onPress={onPress}>
-        <View style={[{flexDirection: 'row', alignItems: 'center'}]}>
-          <Text style={[{color: Colors.darkGrey, fontSize: 25}]}>
-            {item.trans_no + '. '}
-          </Text>
-          <View>
-            {checkValid(item) && (
-              <Text style={styles.numberStyle}>{item.ticketcode}</Text>
-            )}
-            {!checkValid(item) && (
-              <Text style={styles.syncedNumberStyle}>{item.ticketcode}</Text>
-            )}
-            <Text style={styles.subNumberStyle}>
-              {/* {moment(item.created_at, 'hh:mm:ss').format('hh:mm A')} */}
-              {convertDateTime(item.created_at)}
-            </Text>
-          </View>
-        </View>
-        <Text
-          style={[
-            styles.numberStyle,
-            {color: Colors.mediumGreen, fontSize: 20},
-          ]}>
-          {formatNumberWithCommas(item.total)}
+const TransactionItem: React.FC<TransactionItemProps> = React.memo(
+  ({item, onPress}) => {
+    const isValidStatus = (status: string): boolean => {
+      return status === 'synced' || status === 'scanned';
+    };
+
+    const renderTicketCode = () => {
+      const isValid = isValidStatus(item.status);
+      return (
+        <Text style={isValid ? styles.numberStyle : styles.syncedNumberStyle}>
+          {item.ticketcode}
         </Text>
-      </TouchableOpacity>
-      <View style={styles.line} />
-    </View>
-  );
-};
+      );
+    };
+
+    const renderTransactionNumber = () => (
+      <Text style={styles.transactionNumber}>{item.trans_no + '. '}</Text>
+    );
+
+    const renderTransactionInfo = () => (
+      <View style={styles.transactionInfo}>
+        {renderTicketCode()}
+        <Text style={styles.subNumberStyle}>
+          {convertDateTime(item.created_at)}
+        </Text>
+      </View>
+    );
+
+    const renderTotal = () => (
+      <Text style={styles.totalAmount}>
+        {formatNumberWithCommas(item.total)}
+      </Text>
+    );
+
+    return (
+      <View>
+        <TouchableOpacity style={styles.container} onPress={onPress}>
+          <View style={styles.leftContainer}>
+            {renderTransactionNumber()}
+            {renderTransactionInfo()}
+          </View>
+          {renderTotal()}
+        </TouchableOpacity>
+        <View style={styles.line} />
+      </View>
+    );
+  },
+);
+
+TransactionItem.displayName = 'TransactionItem';
 
 const styles = StyleSheet.create({
   container: {
@@ -60,33 +70,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
-  numberContainer: {
+  leftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transactionNumber: {
+    color: Colors.darkGrey,
+    fontSize: 25,
+  },
+  transactionInfo: {
     flexDirection: 'column',
   },
-
   syncedNumberStyle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.mediumRed,
   },
-
   numberStyle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.Black,
   },
-
   subNumberStyle: {
     fontSize: 14,
     fontWeight: 'normal',
     color: Colors.darkGrey,
   },
-
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.mediumGreen,
+  },
   line: {
     alignSelf: 'center',
-    height: 1, // Adjust height as needed
+    height: 1,
     width: '95%',
     backgroundColor: Colors.darkGrey,
   },
 });
+
+export {TransactionItem};

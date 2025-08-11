@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState, useCallback, useMemo} from 'react';
 import {
   Dimensions,
   FlatList,
@@ -18,19 +18,19 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import Colors from '../../../Styles/Colors.ts';
-import {ResultTransactionItem} from '../../../components/ResultTransactionItem.tsx';
+import Colors from '../../../Styles/Colors';
+import {ResultTransactionItem} from '../../../components/ResultTransactionItem';
 import {
   checkInternetConnection,
   formatNumberWithCommas,
   getCurrentDraw,
 } from '../../../helper';
-import ResultTransactionBets from '../../../components/ResultTransactionBets.tsx';
+import ResultTransactionBets from '../../../components/ResultTransactionBets';
 import DatePicker from 'react-native-date-picker';
 import moment from 'moment';
-import DrawModal from '../../../components/DrawModal.tsx';
-import TypeModal from '../../../components/TypeModal.tsx';
-import Type from '../../../models/Type.ts';
+import DrawModal from '../../../components/DrawModal';
+import TypeModal from '../../../components/TypeModal';
+import Type from '../../../models/Type';
 import Ionic from 'react-native-vector-icons/Ionicons';
 import {
   getResult,
@@ -41,7 +41,7 @@ import {
   getWinningTransactionBets,
 } from '../../../database';
 import {useDispatch, useSelector} from 'react-redux';
-import {checkTransactionAPI, syncResultAPI} from '../../../helper/api.ts';
+import {checkTransactionAPI, syncResultAPI} from '../../../helper/api';
 import {
   Camera,
   useCameraDevice,
@@ -52,6 +52,9 @@ import {
   printHits,
   printSales,
 } from '../../../helper/printer';
+import debounce from 'lodash/debounce';
+import {typesActions} from '../../../store/actions';
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
 // Define types for Redux state
 interface RootState {
@@ -68,16 +71,22 @@ interface RootState {
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
-import debounce from 'lodash/debounce';
-import {typesActions} from '../../../store/actions';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
-const Result = (props: any) => {
-  const {navigation} = props;
-  const internetStatusCheck = useRef(checkInternetConnection());
+const Result: React.FC<any> = ({navigation}) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
+  const betTypes = useSelector((state: RootState) => state.types.types);
+  const selectedType = useSelector(
+    (state: RootState) => state.types.selectedType,
+  );
+  const selectedDraw = useSelector(
+    (state: RootState) => state.types.selectedDraw,
+  );
+
   const dispatch = useDispatch();
+  const internetStatusCheck = useRef(checkInternetConnection());
+
+  // State
   const [showQRCam, setShowQRCam] = useState(false);
   const [enableQRCam, setEnableQRCam] = useState(false);
   const [refresh, setRefresh] = useState(false);
@@ -87,80 +96,125 @@ const Result = (props: any) => {
   const [dateModalVisible, setDateModalVisible] = useState(false);
   const [drawModalVisible, setDrawModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
-  const cameraDevice = useCameraDevice('back');
-  //Date
   const [selectedDate, setSelectedDate] = useState(new Date());
-  let minDate = moment().subtract(1, 'weeks').toDate();
-  let maxDate = moment().toDate();
-  //Type
-  const betTypes = useSelector((state: RootState) => state.types.types);
-  let selectedType = useSelector(
-    (state: RootState) => state.types.selectedType,
-  );
-  function typeLabel() {
-    const matchingItems: Type[] = betTypes.filter(
-      (item: Type) => item.bettypeid === selectedType,
-    );
-    return matchingItems.length > 0 ? matchingItems[0].name : null;
-  }
-  //Draw
-  let selectedDraw = useSelector(
-    (state: RootState) => state.types.selectedDraw,
-  );
-  //Result
-  const [result, setResult] = useState({result: 0});
-  //Transaction
+  const [result, setResult] = useState<{result: number}>({result: 0});
   const [totalAmount, setTotalAmount] = useState({
     totalTarget: 0,
     totalRambol: 0,
   });
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<{
+    id: number;
+    ticketcode: string;
+  } | null>(null);
 
-  const processQR = async (ticketcode: string) => {
-    try {
-      console.log('processQR');
-      let response = await checkTransactionAPI(ticketcode, token);
-      if (response) {
-        setAlertModalVisible(true);
-        setModalMessage({
-          title: 'Scanned Ticket',
-          message: response.message,
-        });
+  // Camera
+  const cameraDevice = useCameraDevice('back');
+
+  // Memoized values
+  const minDate = useMemo(() => moment().subtract(1, 'weeks').toDate(), []);
+  const maxDate = useMemo(() => moment().toDate(), []);
+  const formattedDate = useMemo(
+    () => moment(selectedDate).format('YYYY-MM-DD'),
+    [selectedDate],
+  );
+
+  // Memoized functions
+  const typeLabel = useCallback(() => {
+    const matchingItems = betTypes.filter(
+      (item: Type) => item.bettypeid === selectedType,
+    );
+    return matchingItems.length > 0 ? matchingItems[0].name : null;
+  }, [betTypes, selectedType]);
+
+  const hasInternet = useCallback(() => {
+    return (
+      internetStatusCheck.current.isConnected() &&
+      !internetStatusCheck.current.isSlow()
+    );
+  }, []);
+
+  const handleEmptyResult = useCallback(() => {
+    setResult({result: 0});
+    setTransactions([]);
+    setTotalAmount({totalTarget: 0, totalRambol: 0});
+  }, []);
+
+  const handleNoInternet = useCallback(() => {
+    Alert.alert('Error', 'No/Slow internet connection');
+    handleEmptyResult();
+  }, [handleEmptyResult]);
+
+  const processQR = useCallback(
+    async (ticketcode: string) => {
+      try {
+        console.log('processQR');
+        let response = await checkTransactionAPI(ticketcode, token);
+        if (response && typeof response === 'object' && 'message' in response) {
+          setAlertModalVisible(true);
+          setModalMessage({
+            title: 'Scanned Ticket',
+            message: response.message as string,
+          });
+        }
+      } catch (e: any) {
+        console.error(e?.message || 'Unknown error');
       }
-    } catch (e) {
-      console.error(e.message);
-    }
-  };
+    },
+    [token],
+  );
+
+  const debouncedProcessQr = useMemo(
+    () => debounce(processQR, 200),
+    [processQR],
+  );
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr'],
     onCodeScanned: codes => {
       if (!internetStatusCheck.current.isConnected()) {
         Alert.alert('No internet connection');
+        return;
       }
-      if (codes[0].value.length === 21) {
+      if (codes && codes.length > 0 && codes[0]?.value?.length === 21) {
         setEnableQRCam(false);
         setTimeout(async () => {
           setShowQRCam(false);
         }, 300);
         debouncedProcessQr(codes[0].value as string);
-      } else Alert.alert('Invalid QR code');
+      } else {
+        Alert.alert('Invalid QR code');
+      }
     },
   });
 
-  const debouncedProcessQr = debounce(processQR, 200);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setRefresh(true);
-    const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
-
     try {
+      // Validate parameters before making the call
+      if (selectedDraw === undefined || selectedType === undefined) {
+        console.warn('⚠️ Result fetchData - Missing parameters:', {
+          draw: selectedDraw,
+          type: selectedType,
+        });
+        handleEmptyResult();
+        return;
+      }
+
+      console.log('🔄 Result fetchData - Params:', {
+        date: formattedDate,
+        draw: selectedDraw,
+        type: selectedType,
+        typeName: typeLabel(),
+      });
+
       const localResult = await getResult(
         formattedDate,
         selectedDraw,
         selectedType,
       );
+
+      console.log('📊 Result fetchData - Local result:', localResult);
 
       if (hasInternet()) {
         const serverResult = await syncResultAPI(
@@ -170,143 +224,174 @@ const Result = (props: any) => {
           formattedDate,
         );
 
+        console.log('📊 Result fetchData - Server result:', serverResult);
+
         if (serverResult) {
           await Promise.all([
             insertOrUpdateResult(serverResult),
             getNewWinners(serverResult),
           ]);
-          setResult(serverResult);
+          setResult(serverResult as {result: number});
         } else {
           handleEmptyResult();
         }
       } else if (localResult) {
-        setResult(localResult);
-        await getNewWinners(localResult);
+        setResult(localResult as {result: number});
+        await getNewWinners(localResult as {result: number});
       } else {
         handleNoInternet();
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('❌ Result fetchData error:', error);
       handleEmptyResult();
     } finally {
       setRefresh(false);
     }
-  };
+  }, [
+    formattedDate,
+    selectedDraw,
+    selectedType,
+    typeLabel,
+    hasInternet,
+    token,
+    handleEmptyResult,
+    handleNoInternet,
+  ]);
 
-  // Utility function to check internet status
-  const hasInternet = () => {
-    return (
-      internetStatusCheck.current.isConnected() &&
-      !internetStatusCheck.current.isSlow()
-    );
-  };
+  const getNewWinners = useCallback(
+    async (newResult: {result: number}) => {
+      const betType = betTypes.find(item => item.bettypeid === selectedType);
+      if (newResult.result === 0 || betType === null) return;
 
-  // Handle no internet scenario
-  const handleNoInternet = () => {
-    Alert.alert('Error', 'No/Slow internet connection');
-    handleEmptyResult();
-  };
+      const transactions = await getWinners(betType, newResult);
+      console.log('getNewWinners', transactions);
 
-  // Handle empty or failed result case
-  const handleEmptyResult = () => {
-    setResult({result: 0});
-    setTransactions([]);
-    setTotalAmount({totalTarget: 0, totalRambol: 0});
-  };
+      if (
+        transactions &&
+        Array.isArray(transactions) &&
+        transactions.length > 0
+      ) {
+        setTransactions(transactions as any[]);
+        let totalTarget = 0;
+        let totalRambol = 0;
+        (transactions as any[]).forEach((item: any) => {
+          totalTarget += item.targetTotal;
+          totalRambol += item.rambolTotal;
+        });
+        setTotalAmount({totalTarget: totalTarget, totalRambol: totalRambol});
+      } else {
+        setTransactions([]);
+        setTotalAmount({totalTarget: 0, totalRambol: 0});
+      }
+    },
+    [betTypes, selectedType],
+  );
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefresh(true);
     fetchData();
     setTimeout(() => {
       setRefresh(false);
-    }, 1000); // Refresh indicator will be visible for at least 1 second
-  };
+    }, 1000);
+  }, [fetchData]);
 
-  useEffect(() => {
-    fetchData();
-  }, [selectedDate, selectedDraw, selectedDraw]);
+  // Modal handlers
+  const betModalHide = useCallback(() => {
+    setBetModalVisible(false);
+  }, []);
 
-  useEffect(() => {
-    navigation.addListener('focus', () => {
-      fetchData();
-    });
-  }, [navigation]);
-
-  async function getNewWinners(newResult) {
-    const betType = betTypes.find(item => item.bettypeid === selectedType);
-    if (newResult.result === 0 || betType === null) return;
-    const transactions = await getWinners(betType, newResult);
-    console.log('getNewWinners', transactions);
-    if (transactions.length > 0) {
-      setTransactions(transactions);
-      let totalTarget = 0;
-      let totalRambol = 0;
-      transactions.map(item => {
-        totalTarget += item.targetTotal;
-        totalRambol += item.rambolTotal;
-      });
-      setTotalAmount({totalTarget: totalTarget, totalRambol: totalRambol});
-    } else {
-      setTransactions([]);
-      setTotalAmount({totalTarget: 0, totalRambol: 0});
-    }
-  }
-
-  function scanTicket(ticketcode: string) {
-    getTransactionByTicketCode(ticketcode, transaction => {
-      console.log('transaction', transaction);
-    });
-  }
-
-  const renderItem = ({item}: {item: any}) => {
-    return (
-      <ResultTransactionItem
-        item={item}
-        onPress={() => {
-          betModalShow(item);
-        }}
-      />
-    );
-  };
-
-  //Modals
-  const betModalHide = () => {
-    setBetModalVisible(!betModalVisible);
-    // setNote({id: null, note: null});
-  };
-
-  const betModalShow = (transaction: any) => {
+  const betModalShow = useCallback((transaction: any) => {
     setSelectedTransaction(transaction);
     setBetModalVisible(true);
-  };
+  }, []);
 
-  const drawModalHide = () => {
-    setDrawModalVisible(!drawModalVisible);
-    // setNote({id: null, note: null});
-  };
+  const drawModalHide = useCallback(() => {
+    setDrawModalVisible(false);
+  }, []);
 
-  const drawModalShow = () => {
+  const drawModalShow = useCallback(() => {
     setDrawModalVisible(true);
-  };
+  }, []);
 
-  const typeModalHide = () => {
-    setTypeModalVisible(!typeModalVisible);
-    // setNote({id: null, note: null});
-  };
+  const typeModalHide = useCallback(() => {
+    setTypeModalVisible(false);
+  }, []);
 
-  const typeModalShow = () => {
+  const typeModalShow = useCallback(() => {
     setTypeModalVisible(true);
-  };
+  }, []);
 
-  const hideAlertModal = () => {
+  const dateModalHide = useCallback(() => {
+    setDateModalVisible(false);
+  }, []);
+
+  const dateModalShow = useCallback(() => {
+    setDateModalVisible(true);
+  }, []);
+
+  const handleDateConfirm = useCallback((date: Date) => {
+    setDateModalVisible(false);
+    setSelectedDate(date);
+  }, []);
+
+  const hideAlertModal = useCallback(() => {
     setAlertModalVisible(false);
-  };
+  }, []);
 
-  const hideQRCam = () => {
+  const hideQRCam = useCallback(() => {
     setShowQRCam(false);
     setEnableQRCam(false);
-  };
+  }, []);
 
+  const handleScanPress = useCallback(() => {
+    if (!hasInternet()) {
+      Alert.alert('Error', 'No/Slow internet connection');
+      return;
+    }
+    setShowQRCam(true);
+    setEnableQRCam(true);
+  }, [hasInternet]);
+
+  const handlePrintHits = useCallback(() => {
+    if (totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) {
+      listPairedDevices();
+      printHits(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
+    }
+  }, [totalAmount, selectedDate, selectedDraw, typeLabel, user]);
+
+  // Render functions
+  const renderItem = useCallback(
+    ({item}: {item: any}) => (
+      <ResultTransactionItem
+        key={item.id || item.ticketcode}
+        item={item}
+        onPress={() => betModalShow(item)}
+        onLongPress={() => {
+          // Handle long press if needed
+        }}
+      />
+    ),
+    [betModalShow],
+  );
+
+  const keyExtractor = useCallback(
+    (item: any) => item.id?.toString() || item.ticketcode,
+    [],
+  );
+
+  // Effects
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchData();
+    });
+    return unsubscribe;
+  }, [navigation, fetchData]);
+
+  // Camera view
   if (showQRCam) {
     return (
       <View style={{flex: 1}}>
@@ -318,56 +403,41 @@ const Result = (props: any) => {
             isActive={enableQRCam}
           />
         )}
-        <View
-          style={{
-            flex: 1,
-            width: '100%',
-            justifyContent: 'flex-end',
-          }}>
-          <TouchableOpacity
-            style={styles.buttonStyle}
-            onPress={() => hideQRCam()}>
+        <View style={styles.cameraButtonContainer}>
+          <TouchableOpacity style={styles.cameraButton} onPress={hideQRCam}>
             <Text style={Styles.loginBtnText}>Back</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
+
   return (
     <SafeAreaView style={Styles.backgroundWrapper}>
+      {/* Alert Modal */}
       <Modal
         animationType="fade"
         transparent={true}
         visible={alertModalVisible}
-        onRequestClose={betModalHide}>
+        onRequestClose={hideAlertModal}>
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
-            {/* Header */}
             <View style={styles.modalHeaderContainer}>
               <Text style={styles.modalTitle}>{modalMessage.title}</Text>
               <TouchableOpacity
                 onPress={hideAlertModal}
-                style={{
-                  padding: 10,
-                  alignSelf: 'flex-end',
-                  position: 'absolute',
-                }}>
-                <Ionic
-                  name="close"
-                  size={30}
-                  style={{
-                    color: '#000',
-                  }}
-                />
+                style={styles.closeButton}>
+                <Ionic name="close" size={30} style={styles.closeIcon} />
               </TouchableOpacity>
             </View>
-            {/* Bet List */}
             <View style={styles.modalBodyContainer}>
               <Text style={styles.alertText}>{modalMessage.message}</Text>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Bet Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -376,24 +446,23 @@ const Result = (props: any) => {
         <ResultTransactionBets
           hide={betModalHide}
           result={result}
-          transaction={selectedTransaction}
+          transaction={selectedTransaction || {id: 0, ticketcode: ''}}
         />
       </Modal>
+
+      {/* Date Picker */}
       <DatePicker
         modal
         open={dateModalVisible}
         date={selectedDate}
-        onConfirm={date => {
-          setDateModalVisible(false);
-          setSelectedDate(date);
-        }}
+        onConfirm={handleDateConfirm}
         mode="date"
         maximumDate={maxDate}
         minimumDate={minDate}
-        onCancel={() => {
-          setDateModalVisible(false);
-        }}
+        onCancel={dateModalHide}
       />
+
+      {/* Draw Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -401,6 +470,8 @@ const Result = (props: any) => {
         onRequestClose={drawModalHide}>
         <DrawModal hide={drawModalHide} />
       </Modal>
+
+      {/* Type Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -408,56 +479,39 @@ const Result = (props: any) => {
         onRequestClose={typeModalHide}>
         <TypeModal hide={typeModalHide} />
       </Modal>
+
+      {/* Main Content */}
       <View style={Styles.mainContainer}>
+        {/* Header */}
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'Result'}</Text>
-          <Text style={[{fontSize: 25, color: Colors.Black, marginRight: 5}]}>
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 35, color: Colors.mediumBlue},
-              ]}>
-              {result.result}
-            </Text>
+          <Text style={styles.resultDisplay}>
+            <Text style={styles.resultNumber}>{result.result}</Text>
           </Text>
-          {(totalAmount.totalTarget == 0 || totalAmount.totalRambol == 0) && (
-            <Text style={Styles.logoText}> </Text>
-          )}
           {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && (
-            <TouchableOpacity
-              onPress={() => {
-                listPairedDevices();
-                printHits(
-                  selectedDate,
-                  selectedDraw,
-                  typeLabel(),
-                  totalAmount,
-                  user,
-                );
-              }}>
-              <MaterialIcon
-                name="print"
-                size={40}
-                style={{
-                  color: '#000',
-                }}
-              />
+            <TouchableOpacity onPress={handlePrintHits}>
+              <MaterialIcon name="print" size={40} style={styles.printIcon} />
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Filter Cards */}
         <View style={styles.card}>
           <View style={styles.cardContent}>
             <TouchableOpacity
-              onPress={() => setDateModalVisible(true)}
-              style={{width: widthScreen / 3}}>
+              onPress={dateModalShow}
+              style={styles.filterButton}>
               <Text style={styles.cardTitle}>DATE</Text>
               <Text style={styles.cardSubTitle}>
                 {moment(selectedDate).format('MMM DD, YYYY')}
               </Text>
             </TouchableOpacity>
+
             <View style={styles.verticalLine} />
+
             <TouchableOpacity
               onPress={drawModalShow}
-              style={{width: widthScreen / 3}}>
+              style={styles.filterButton}>
               <Text style={styles.cardTitle}>TIME</Text>
               <Text style={styles.cardSubTitle}>
                 {selectedDraw === 1
@@ -467,113 +521,76 @@ const Result = (props: any) => {
                     : '3RD DRAW'}
               </Text>
             </TouchableOpacity>
+
             <View style={styles.verticalLine} />
+
             <TouchableOpacity
               onPress={typeModalShow}
-              style={{width: widthScreen / 3}}>
+              style={styles.filterButton}>
               <Text style={styles.cardTitle}>Type</Text>
               <Text style={styles.cardSubTitle}>{typeLabel()}</Text>
             </TouchableOpacity>
           </View>
         </View>
-        {/* Hits */}
-        {refresh && <ActivityIndicator />}
+
+        {/* Hits Summary */}
+        {refresh && <ActivityIndicator style={styles.loader} />}
         {!refresh && (
           <View style={styles.hitsContainer}>
-            <Text
-              style={[
-                {
-                  fontSize: 18,
-                  color: Colors.Black,
-                  marginRight: 5,
-                  alignSelf: 'center',
-                },
-              ]}>
+            <Text style={styles.hitLabel}>
               Target:
-              <Text
-                style={[
-                  {
-                    fontWeight: 'bold',
-                    fontSize: 25,
-                    color: Colors.primaryColor,
-                  },
-                ]}>
+              <Text style={styles.hitValue}>
                 {' ' + formatNumberWithCommas(totalAmount.totalTarget)}
               </Text>
             </Text>
-            <Text
-              style={[
-                {
-                  fontSize: 18,
-                  color: Colors.Black,
-                  marginRight: 5,
-                  alignSelf: 'center',
-                },
-              ]}>
+            <Text style={styles.hitLabel}>
               Rambol:
-              <Text
-                style={[
-                  {
-                    fontWeight: 'bold',
-                    fontSize: 25,
-                    color: Colors.primaryColor,
-                  },
-                ]}>
+              <Text style={styles.hitValue}>
                 {' ' + formatNumberWithCommas(totalAmount.totalRambol)}
               </Text>
             </Text>
           </View>
         )}
+
         {/* Transaction List */}
         {!refresh && transactions.length > 0 && (
           <FlatList
             data={transactions}
             renderItem={renderItem}
+            keyExtractor={keyExtractor}
             refreshControl={
               <RefreshControl refreshing={refresh} onRefresh={onRefresh} />
             }
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
           />
         )}
-        {!refresh && transactions.length == 0 && result.result !== 0 && (
-          <View style={styles.container}>
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 30, color: Colors.mediumBlue},
-              ]}>
-              No Winners
-            </Text>
+
+        {/* Empty States */}
+        {!refresh && transactions.length === 0 && result.result !== 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No Winners</Text>
           </View>
         )}
+
         {!refresh && result.result === 0 && (
-          <View style={styles.container}>
-            <Text
-              style={[
-                {fontWeight: 'bold', fontSize: 30, color: Colors.mediumBlue},
-              ]}>
-              No Result Yet
-            </Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No Result Yet</Text>
           </View>
         )}
-        {/* Scan Ticket and Print */}
-        <TouchableOpacity
-          style={styles.buttonStyle}
-          onPress={() => {
-            if (
-              !internetStatusCheck.current.isConnected() ||
-              internetStatusCheck.current.isSlow()
-            ) {
-              Alert.alert('Error', 'No/Slow internet connection');
-              return;
-            }
-            setShowQRCam(true);
-            setEnableQRCam(true);
-          }}>
-          <Text style={styles.buttonTextStyle}>Scan</Text>
+
+        {/* Scan Button */}
+        <TouchableOpacity style={styles.scanButton} onPress={handleScanPress}>
+          <Text style={styles.scanButtonText}>Scan</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
+
+Result.displayName = 'Result';
+
+export default React.memo(Result);
 
 const styles = StyleSheet.create({
   card: {
@@ -583,13 +600,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
-
   cardContent: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
-
+  filterButton: {
+    width: widthScreen / 3,
+    alignItems: 'center',
+  },
   cardTitle: {
     fontSize: 16,
     color: Colors.darkGrey,
@@ -597,7 +616,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
-
   cardSubTitle: {
     fontSize: 14,
     color: Colors.primaryColor,
@@ -605,46 +623,50 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
-
   verticalLine: {
-    height: '80%', // Adjust height as needed
+    height: '80%',
     width: 1,
     backgroundColor: 'gray',
   },
-
+  resultDisplay: {
+    fontSize: 25,
+    color: Colors.Black,
+    marginRight: 5,
+  },
+  resultNumber: {
+    fontWeight: 'bold',
+    fontSize: 35,
+    color: Colors.mediumBlue,
+  },
   hitsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
   },
-
-  container: {
+  hitLabel: {
+    fontSize: 18,
+    color: Colors.Black,
+    alignSelf: 'center',
+  },
+  hitValue: {
+    fontWeight: 'bold',
+    fontSize: 25,
+    color: Colors.primaryColor,
+  },
+  emptyContainer: {
     flex: 3,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  buttonContainer: {
-    flex: 1,
-    flexDirection: 'column',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    marginHorizontal: 10,
+  emptyText: {
+    fontWeight: 'bold',
+    fontSize: 30,
+    color: Colors.mediumBlue,
   },
-
-  button: {
-    elevation: 8,
-    backgroundColor: Colors.primaryColor,
-    borderRadius: 100,
-    padding: 10,
-    margin: 10,
-    height: 60,
-    width: widthScreen * 0.8,
-    justifyContent: 'center',
-  },
-
-  buttonStyle: {
+  scanButton: {
     width: wp(96),
     marginVertical: 5,
     justifyContent: 'center',
@@ -654,42 +676,29 @@ const styles = StyleSheet.create({
     height: 50,
     backgroundColor: Colors.primaryColor,
   },
-
-  buttonTextStyle: {
+  scanButtonText: {
     fontSize: 30,
     color: Colors.White,
     fontWeight: 'bold',
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
-
-  //Modal
-  modalContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  loader: {
+    marginVertical: 20,
   },
-
+  listContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 10,
+  },
   centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    // marginTop: 22,
     width: widthScreen,
     backgroundColor: 'rgba(0,0,0,0.7)',
   },
   modalView: {
-    // margin: 15,
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 5,
@@ -712,6 +721,7 @@ const styles = StyleSheet.create({
     width: widthScreen * 0.9,
     padding: 10,
     alignSelf: 'center',
+    position: 'relative',
   },
   modalBodyContainer: {
     flex: 1,
@@ -730,6 +740,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: Colors.Black,
   },
+  closeButton: {
+    padding: 10,
+    alignSelf: 'flex-end',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  closeIcon: {
+    color: '#000',
+  },
+  cameraButtonContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  cameraButton: {
+    width: wp(96),
+    marginVertical: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderRadius: 10,
+    height: 50,
+    backgroundColor: Colors.primaryColor,
+  },
+  printIcon: {
+    color: '#000',
+  },
 });
-
-export default Result;

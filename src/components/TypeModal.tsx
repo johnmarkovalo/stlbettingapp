@@ -1,128 +1,111 @@
-import React, {useState, useEffect, useContext} from 'react';
-import { useSelector, useDispatch } from "react-redux";
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Text,
-  Button,
-} from 'react-native';
-import Ionic from 'react-native-vector-icons/Ionicons';
-import Colors from '../Styles/Colors';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import {useSelector, useDispatch} from 'react-redux';
+import {StyleSheet, Dimensions} from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { typesActions } from "../store/actions";
+import {typesActions} from '../store/actions';
+import BaseModal from './shared/BaseModal';
+import Type from '../models/Type';
 
 const widthScreen = Dimensions.get('window').width;
-const heightScreen = Dimensions.get('window').height;
 
-const TypeModal = ({hide}: any) => {
+interface RootState {
+  types: {
+    selectedType: number;
+    types: Type[];
+  };
+}
+
+interface TypeModalProps {
+  hide: () => void;
+}
+
+const TypeModal: React.FC<TypeModalProps> = React.memo(({hide}) => {
   const dispatch = useDispatch();
-  const [value, setValue] = useState(useSelector(state => state.types.selectedType));
-  const types = useSelector(state => state.types.types);
+  const selectedType = useSelector(
+    (state: RootState) => state.types.selectedType,
+  );
+  const types = useSelector((state: RootState) => state.types.types);
+
+  const [value, setValue] = useState(selectedType);
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<Array<{label: string; value: number}>>([]);
+
+  // Memoize the dropdown items to prevent unnecessary re-renders
+  const dropdownItems = useMemo(
+    () =>
+      types.map((item: Type) => ({
+        label: item.name,
+        value: item.bettypeid,
+      })),
+    [types],
+  );
 
   useEffect(() => {
-    types.map((item: any) => {
-      setItems(old => [...old, {label: item.name, value: item.bettypeid}]);
-    });
-  }, []);
-  function hideModal() {
+    setItems(dropdownItems);
+  }, [dropdownItems]);
+
+  const handleSelectItem = useCallback(
+    (item: any) => {
+      if (item && item.value !== undefined) {
+        dispatch(typesActions.updateSelectedType(item.value));
+        hide();
+      }
+    },
+    [dispatch, hide],
+  );
+
+  const handleClose = useCallback(() => {
     hide();
-  }
+  }, [hide]);
 
   return (
-    <View style={styles.centeredView}>
-      <View style={styles.modalView}>
-        {/* Header */}
-        <View style={styles.modalHeaderContainer}>
-          <Text style={styles.modalTitle}>{'Select Type'}</Text>
-          <TouchableOpacity
-            onPress={hide}
-            style={{
-              padding: 10,
-              alignSelf: 'flex-end',
-              position: 'absolute',
-            }}>
-            <Ionic
-              name="close"
-              size={30}
-              style={{
-                color: '#000',
-              }}
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.modalBodyContainer}>
-          <DropDownPicker
-            open={open}
-            value={value}
-            items={items}
-            setOpen={setOpen}
-            setValue={setValue}
-            setItems={setItems}
-            onSelectItem={(item) => {
-              dispatch(typesActions.updateSelectedType(item.value));
-              hideModal();
-            }}
-            // disabled={isPending}
-            style={{width: widthScreen / 1.5}}
-            dropDownContainerStyle={{width: widthScreen / 1.5, zIndex: 1000}}
-            // autoScroll={true}
-            // scrollViewProps={}
-          />
-        </View>
-      </View>
-    </View>
+    <BaseModal title="Select Type" onClose={handleClose} height={0.2}>
+      <DropDownPicker
+        open={open}
+        value={value}
+        items={items}
+        setOpen={setOpen}
+        setValue={setValue}
+        setItems={setItems}
+        onSelectItem={handleSelectItem}
+        style={styles.dropdown}
+        dropDownContainerStyle={styles.dropdownContainer}
+        listMode="SCROLLVIEW"
+        scrollViewProps={{
+          nestedScrollEnabled: true,
+        }}
+        placeholder="Select a type"
+        placeholderStyle={styles.placeholderStyle}
+        textStyle={styles.textStyle}
+      />
+    </BaseModal>
   );
-};
+});
+
+TypeModal.displayName = 'TypeModal';
 
 const styles = StyleSheet.create({
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  dropdown: {
+    width: widthScreen / 1.5,
     alignSelf: 'center',
-    // marginTop: 22,
-    width: widthScreen,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'transparent',
+    borderColor: '#ccc',
+    borderRadius: 8,
   },
-  modalView: {
-    // margin: 15,
+  dropdownContainer: {
+    width: widthScreen / 1.5,
+    zIndex: 1000,
+    alignSelf: 'center',
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 5,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    height: heightScreen * 0.2,
-    width: widthScreen * 0.9,
+    borderColor: '#ccc',
+    borderRadius: 8,
   },
-  modalHeaderContainer: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: widthScreen * 0.9,
-    padding: 10,
-    alignSelf: 'center',
+  placeholderStyle: {
+    color: '#999',
   },
-  modalBodyContainer: {
-    flex: 1,
-    padding: 1,
-  },
-  modalTitle: {
-    alignSelf: 'center',
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.Black,
+  textStyle: {
+    fontSize: 16,
+    color: '#333',
   },
 });
 
