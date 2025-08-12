@@ -275,6 +275,346 @@ export class DatabaseService {
     });
   }
 
+  // Batch syncing methods
+  public async getUnsyncedTransactionsCount(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getUnsyncedTransactionsCount(betdate, bettime, bettypeid),
+          [betdate, bettime, bettypeid],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const count = results.rows.item(0).count;
+              resolve(count);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error getting unsynced count:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  public async getUnsyncedTransactionsBatch(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+    limit: number,
+    offset: number,
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getUnsyncedTransactionsBatch(
+            betdate,
+            bettime,
+            bettypeid,
+            limit,
+            offset,
+          ),
+          [betdate, bettime, bettypeid, limit, offset],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows;
+              const transactions: any[] = [];
+
+              for (let i = 0; i < rows.length; i++) {
+                transactions.push(rows.item(i));
+              }
+
+              resolve(transactions);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching unsynced transactions batch:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  public async updateTransactionStatusBatch(
+    ticketcodes: string[],
+    status: string,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.updateTransactionStatusBatch(ticketcodes, status),
+          [status, ...ticketcodes],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            resolve();
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error updating transaction status batch:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  // Check for unsynced transactions from previous draws
+  public async getUnsyncedTransactionsFromPreviousDraws(
+    currentDate: string,
+    currentDraw: number,
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getUnsyncedTransactionsFromPreviousDraws(
+            currentDate,
+            currentDraw,
+          ),
+          [currentDate, currentDate, currentDraw],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows;
+              const transactions: any[] = [];
+
+              for (let i = 0; i < rows.length; i++) {
+                transactions.push(rows.item(i));
+              }
+
+              resolve(transactions);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error(
+              'Error fetching unsynced transactions from previous draws:',
+              error,
+            );
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  public async getUnsyncedTransactionsSummary(): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getUnsyncedTransactionsSummary(),
+          [],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows;
+              const transactions: any[] = [];
+
+              for (let i = 0; i < rows.length; i++) {
+                transactions.push(rows.item(i));
+              }
+
+              resolve(transactions);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error(
+              'Error fetching unsynced transactions summary:',
+              error,
+            );
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  // Improved transaction deletion methods
+  public async getOldTransactionsForDeletion(
+    weeksOld: number = 1,
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getOldTransactionsForDeletion(weeksOld),
+          [],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows;
+              const transactions: any[] = [];
+
+              for (let i = 0; i < rows.length; i++) {
+                transactions.push(rows.item(i));
+              }
+
+              resolve(transactions);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error(
+              'Error fetching old transactions for deletion:',
+              error,
+            );
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  public async deleteOldTransactions(weeksOld: number = 1): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.deleteOldTransactions(weeksOld),
+          [],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            resolve(results.rowsAffected || 0);
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error deleting old transactions:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  public async deleteOldBets(weeksOld: number = 1): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.deleteOldBets(weeksOld),
+          [],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            resolve(results.rowsAffected || 0);
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error deleting old bets:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  public async deleteOldResults(weeksOld: number = 1): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.deleteOldResults(weeksOld),
+          [],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            resolve(results.rowsAffected || 0);
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error deleting old results:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  // Comprehensive cleanup method
+  public async cleanupOldData(weeksOld: number = 1): Promise<{
+    transactionsDeleted: number;
+    betsDeleted: number;
+    resultsDeleted: number;
+  }> {
+    try {
+      console.log(
+        `🧹 Starting database cleanup for data older than ${weeksOld} week(s)`,
+      );
+
+      // First, get a preview of what will be deleted
+      const oldTransactions =
+        await this.getOldTransactionsForDeletion(weeksOld);
+      console.log(
+        `📋 Found ${oldTransactions.length} old transactions to delete`,
+      );
+
+      if (oldTransactions.length > 0) {
+        console.log('📋 Sample transactions to be deleted:');
+        oldTransactions.slice(0, 3).forEach((tx: any) => {
+          console.log(
+            `   • ${tx.ticketcode} - ${tx.betdate} (${tx.bettime}) - ${tx.status}`,
+          );
+        });
+      }
+
+      // Delete old data
+      const transactionsDeleted = await this.deleteOldTransactions(weeksOld);
+      const betsDeleted = await this.deleteOldBets(weeksOld);
+      const resultsDeleted = await this.deleteOldResults(weeksOld);
+
+      console.log(
+        `✅ Cleanup completed: ${transactionsDeleted} transactions, ${betsDeleted} bets, ${resultsDeleted} results deleted`,
+      );
+
+      // Optimize database after deletion
+      await this.optimizeDatabase();
+
+      return {
+        transactionsDeleted,
+        betsDeleted,
+        resultsDeleted,
+      };
+    } catch (error) {
+      console.error('❌ Error during database cleanup:', error);
+      throw error;
+    }
+  }
+
+  // Database optimization methods
+  public async optimizeDatabase(): Promise<void> {
+    try {
+      console.log('🔧 Optimizing database...');
+
+      // Analyze database statistics
+      await this.executeMaintenanceQuery(SQLBuilder.analyzeDatabase());
+      console.log('📊 Database analyzed');
+
+      // Reindex for better performance
+      await this.executeMaintenanceQuery(SQLBuilder.reindexDatabase());
+      console.log('🔍 Database reindexed');
+
+      // Vacuum to reclaim space
+      await this.executeMaintenanceQuery(SQLBuilder.vacuumDatabase());
+      console.log('💾 Database vacuumed');
+
+      console.log('✅ Database optimization completed');
+    } catch (error) {
+      console.error('❌ Error optimizing database:', error);
+      throw error;
+    }
+  }
+
+  private async executeMaintenanceQuery(query: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          query,
+          [],
+          () => resolve(),
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error(`Error executing maintenance query: ${query}`, error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
   public async insertTransaction(
     transaction: Transaction,
     bets: Bet[],

@@ -178,4 +178,125 @@ export class SQLBuilder {
             AND ${COLUMNS.TRANS.BETTIME} = ? 
             AND ${COLUMNS.TRANS.BETTYPEID} = ?`;
   }
+
+  // Batch syncing queries
+  static getUnsyncedTransactionsCount(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): string {
+    return `SELECT COUNT(*) as count FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.BETDATE} = ? 
+            AND ${COLUMNS.TRANS.BETTIME} = ? 
+            AND ${COLUMNS.TRANS.BETTYPEID} = ? 
+            AND ${COLUMNS.TRANS.STATUS} != 'synced'`;
+  }
+
+  static getUnsyncedTransactionsBatch(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+    limit: number,
+    offset: number,
+  ): string {
+    return `SELECT * FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.BETDATE} = ? 
+            AND ${COLUMNS.TRANS.BETTIME} = ? 
+            AND ${COLUMNS.TRANS.BETTYPEID} = ? 
+            AND ${COLUMNS.TRANS.STATUS} != 'synced'
+            ORDER BY ${COLUMNS.TRANS.CREATED_AT} ASC
+            LIMIT ? OFFSET ?`;
+  }
+
+  static updateTransactionStatusBatch(
+    ticketcodes: string[],
+    status: string,
+  ): string {
+    const placeholders = ticketcodes.map(() => '?').join(',');
+    return `UPDATE ${TABLES.TRANS} 
+            SET ${COLUMNS.TRANS.STATUS} = ? 
+            WHERE ${COLUMNS.TRANS.TICKETCODE} IN (${placeholders})`;
+  }
+
+  // Check for unsynced transactions from previous draws
+  static getUnsyncedTransactionsFromPreviousDraws(
+    currentDate: string,
+    currentDraw: number,
+  ): string {
+    return `SELECT 
+              ${COLUMNS.TRANS.BETDATE},
+              ${COLUMNS.TRANS.BETTIME},
+              ${COLUMNS.TRANS.BETTYPEID},
+              COUNT(*) as unsynced_count
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.STATUS} != 'synced'
+              AND (
+                ${COLUMNS.TRANS.BETDATE} < ? 
+                OR (${COLUMNS.TRANS.BETDATE} = ? AND ${COLUMNS.TRANS.BETTIME} < ?)
+              )
+            GROUP BY ${COLUMNS.TRANS.BETDATE}, ${COLUMNS.TRANS.BETTIME}, ${COLUMNS.TRANS.BETTYPEID}
+            ORDER BY ${COLUMNS.TRANS.BETDATE} DESC, ${COLUMNS.TRANS.BETTIME} DESC`;
+  }
+
+  static getUnsyncedTransactionsSummary(): string {
+    return `SELECT 
+              ${COLUMNS.TRANS.BETDATE},
+              ${COLUMNS.TRANS.BETTIME},
+              ${COLUMNS.TRANS.BETTYPEID},
+              COUNT(*) as unsynced_count,
+              SUM(${COLUMNS.TRANS.TOTAL}) as total_amount
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.STATUS} != 'synced'
+            GROUP BY ${COLUMNS.TRANS.BETDATE}, ${COLUMNS.TRANS.BETTIME}, ${COLUMNS.TRANS.BETTYPEID}
+            ORDER BY ${COLUMNS.TRANS.BETDATE} DESC, ${COLUMNS.TRANS.BETTIME} DESC`;
+  }
+
+  // Improved transaction deletion queries
+  static getOldTransactionsForDeletion(weeksOld: number = 1): string {
+    return `SELECT 
+              ${COLUMNS.TRANS.ID},
+              ${COLUMNS.TRANS.TICKETCODE},
+              ${COLUMNS.TRANS.BETDATE},
+              ${COLUMNS.TRANS.CREATED_AT},
+              ${COLUMNS.TRANS.STATUS}
+            FROM ${TABLES.TRANS} 
+            WHERE (
+              ${COLUMNS.TRANS.BETDATE} < date('now', '-${weeksOld} weeks')
+              OR ${COLUMNS.TRANS.CREATED_AT} < datetime('now', '-${weeksOld} weeks')
+            )
+            AND ${COLUMNS.TRANS.STATUS} = 'synced'
+            ORDER BY ${COLUMNS.TRANS.CREATED_AT} ASC`;
+  }
+
+  static deleteOldTransactions(weeksOld: number = 1): string {
+    return `DELETE FROM ${TABLES.TRANS} 
+            WHERE (
+              ${COLUMNS.TRANS.BETDATE} < date('now', '-${weeksOld} weeks')
+              OR ${COLUMNS.TRANS.CREATED_AT} < datetime('now', '-${weeksOld} weeks')
+            )
+            AND ${COLUMNS.TRANS.STATUS} = 'synced'`;
+  }
+
+  static deleteOldBets(weeksOld: number = 1): string {
+    return `DELETE FROM ${TABLES.BET} 
+            WHERE ${COLUMNS.BET.CREATED_AT} < date('now', '-${weeksOld} weeks')`;
+  }
+
+  static deleteOldResults(weeksOld: number = 1): string {
+    return `DELETE FROM ${TABLES.RESULT} 
+            WHERE ${COLUMNS.RESULT.CREATED_AT} < date('now', '-${weeksOld} weeks')`;
+  }
+
+  // Database maintenance queries
+  static vacuumDatabase(): string {
+    return 'VACUUM';
+  }
+
+  static analyzeDatabase(): string {
+    return 'ANALYZE';
+  }
+
+  static reindexDatabase(): string {
+    return 'REINDEX';
+  }
 }

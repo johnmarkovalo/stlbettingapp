@@ -40,6 +40,9 @@ import {
   getBetsByTransaction,
   getLatestTransaction,
   insertTransaction,
+  getUnsyncedTransactionsCount,
+  getUnsyncedTransactionsBatch,
+  updateTransactionStatusBatch,
 } from '../../../database';
 import Type from '../../../models/Type';
 import {listPairedDevices, printSales} from '../../../helper/printer';
@@ -88,6 +91,17 @@ const History: React.FC<any> = ({navigation}) => {
   const [selectedTransaction, setSelectedTransaction] = useState<
     Transaction | undefined
   >(undefined);
+
+  // Batch sync progress tracking
+  const [batchSyncProgress, setBatchSyncProgress] = useState({
+    isActive: false,
+    currentBatch: 0,
+    totalBatches: 0,
+    processedCount: 0,
+    totalCount: 0,
+    successCount: 0,
+    failedCount: 0,
+  });
 
   const dispatch = useDispatch();
   // Refs
@@ -212,61 +226,40 @@ const History: React.FC<any> = ({navigation}) => {
 
     setSyncing(true);
     setRefresh(true);
+
     try {
       if (!internetStatusCheck.current.isConnected()) {
         Alert.alert('Error', 'No internet connection');
         return;
       }
 
-      const serverTransactions = await getTransactionsAPI(
-        token,
-        formattedDate,
-        selectedDraw,
-        selectedType,
-        user.keycode,
-      );
-
-      // Step 1: Convert server transactions to a Set for quick lookup
-      const serverTransactionSet = new Set(serverTransactions);
-
-      // Step 2: Find and resend local transactions that are not on the server
-      const currentTransactions = await getTransactions(
+      // Check how many unsynced transactions we have
+      const unsyncedCount = await getUnsyncedTransactionsCount(
         formattedDate,
         selectedDraw,
         selectedType,
       );
 
-      if (Array.isArray(currentTransactions)) {
-        currentTransactions.forEach(transaction => {
-          if (!serverTransactionSet.has(transaction.ticketcode)) {
-            console.log(
-              'This transaction does not exist on the server:',
-              transaction,
-            );
-            resendTransaction(transaction);
-            if (transaction.id) {
-              updateTransactionStatus(transaction.id, 'synced');
-            }
-          }
-        });
+      console.log(`🔄 Sync - Found ${unsyncedCount} unsynced transactions`);
 
-        // Step 3: Find and insert server transactions that are missing locally
-        const localTransactionSet = new Set(
-          currentTransactions.map(t => t.ticketcode),
+      // If we have 50+ unsynced items, use batch processing
+      if (unsyncedCount >= 50) {
+        console.log(
+          '📦 Sync - Using batch processing for large number of transactions',
         );
-
-        serverTransactions.forEach((serverTicketCode: any) => {
-          if (!localTransactionSet.has(serverTicketCode)) {
-            console.log(
-              'Inserting missing transaction from server:',
-              serverTicketCode,
-            );
-            insertTransactionFromServer(serverTicketCode);
-          }
-        });
+        await syncTransactionsBatch(unsyncedCount);
+      } else {
+        console.log(
+          '📤 Sync - Using individual processing for small number of transactions',
+        );
+        await syncTransactionsIndividual();
       }
     } catch (error) {
       console.error('Error syncing transactions:', error);
+      Alert.alert(
+        'Sync Error',
+        'Failed to sync transactions. Please try again.',
+      );
     } finally {
       setRefresh(false);
       setSyncing(false);
@@ -280,6 +273,238 @@ const History: React.FC<any> = ({navigation}) => {
     resendTransaction,
     insertTransactionFromServer,
     syncing,
+  ]);
+
+  // Batch syncing for 50+ unsynced transactions
+  const syncTransactionsBatch = useCallback(
+    async (totalUnsynced: number) => {
+      const BATCH_SIZE = 20; // Process 20 transactions at a time
+      const totalBatches = Math.ceil(totalUnsynced / BATCH_SIZE);
+
+      // Initialize progress tracking
+      setBatchSyncProgress({
+        isActive: true,
+        currentBatch: 0,
+        totalBatches,
+        processedCount: 0,
+        totalCount: totalUnsynced,
+        successCount: 0,
+        failedCount: 0,
+      });
+
+      console.log(
+        `📦 Batch Sync - Processing ${totalUnsynced} transactions in ${totalBatches} batches`,
+      );
+
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const offset = batchIndex * BATCH_SIZE;
+        const currentBatchSize = Math.min(BATCH_SIZE, totalUnsynced - offset);
+
+        // Update progress
+        setBatchSyncProgress(prev => ({
+          ...prev,
+          currentBatch: batchIndex + 1,
+        }));
+
+        console.log(
+          `📦 Batch ${batchIndex + 1}/${totalBatches} - Processing ${currentBatchSize} transactions (offset: ${offset})`,
+        );
+
+        try {
+          // Get batch of unsynced transactions
+          const batchTransactions = await getUnsyncedTransactionsBatch(
+            formattedDate,
+            selectedDraw,
+            selectedType,
+            currentBatchSize,
+            offset,
+          );
+
+          if (batchTransactions.length === 0) {
+            console.log(
+              `📦 Batch ${batchIndex + 1} - No transactions to process`,
+            );
+            continue;
+          }
+
+          // Process batch transactions
+          const batchResults = await Promise.allSettled(
+            batchTransactions.map(async transaction => {
+              try {
+                // Get bets for this transaction
+                const bets = await getBetsByTransaction(transaction.id);
+
+                // Prepare transaction data for server
+                const transactionData = {
+                  ticketcode: transaction.ticketcode,
+                  trans_data: convertToBets(bets),
+                  betdate: transaction.betdate,
+                  bettime: transaction.bettime,
+                  bettypeid: transaction.bettypeid,
+                  total: transaction.total,
+                  status: transaction.status,
+                  created_at: transaction.created_at,
+                };
+
+                // Send to server
+                const serverResponse = await sendTransactionAPI(
+                  token,
+                  transactionData,
+                );
+
+                if (serverResponse && serverResponse.success) {
+                  console.log(
+                    `✅ Batch ${batchIndex + 1} - Transaction ${transaction.ticketcode} synced successfully`,
+                  );
+                  return {success: true, ticketcode: transaction.ticketcode};
+                } else {
+                  console.log(
+                    `❌ Batch ${batchIndex + 1} - Transaction ${transaction.ticketcode} failed to sync`,
+                  );
+                  return {
+                    success: false,
+                    ticketcode: transaction.ticketcode,
+                    error: 'Server response error',
+                  };
+                }
+              } catch (error) {
+                console.error(
+                  `❌ Batch ${batchIndex + 1} - Error processing transaction ${transaction.ticketcode}:`,
+                  error,
+                );
+                return {
+                  success: false,
+                  ticketcode: transaction.ticketcode,
+                  error: (error as any)?.message || 'Unknown error',
+                };
+              }
+            }),
+          );
+
+          // Process batch results
+          const successfulSyncs: string[] = [];
+          const failedSyncs: string[] = [];
+
+          batchResults.forEach(result => {
+            if (result.status === 'fulfilled' && result.value.success) {
+              successfulSyncs.push(result.value.ticketcode);
+            } else if (result.status === 'rejected') {
+              failedSyncs.push('unknown');
+            } else if (result.status === 'fulfilled' && !result.value.success) {
+              failedSyncs.push(result.value.ticketcode);
+            }
+          });
+
+          // Update progress counts
+          setBatchSyncProgress(prev => ({
+            ...prev,
+            processedCount: prev.processedCount + batchTransactions.length,
+            successCount: prev.successCount + successfulSyncs.length,
+            failedCount: prev.failedCount + failedSyncs.length,
+          }));
+
+          // Update status for successful syncs
+          if (successfulSyncs.length > 0) {
+            await updateTransactionStatusBatch(successfulSyncs, 'synced');
+            console.log(
+              `✅ Batch ${batchIndex + 1} - Updated ${successfulSyncs.length} transactions to 'synced'`,
+            );
+          }
+
+          // Log failed syncs for manual review
+          if (failedSyncs.length > 0) {
+            console.log(
+              `⚠️ Batch ${batchIndex + 1} - ${failedSyncs.length} transactions failed to sync:`,
+              failedSyncs,
+            );
+          }
+
+          // Add small delay between batches to avoid overwhelming the server
+          if (batchIndex < totalBatches - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (batchError) {
+          console.error(
+            `❌ Batch ${batchIndex + 1} - Batch processing error:`,
+            batchError,
+          );
+          // Continue with next batch instead of failing completely
+        }
+      }
+
+      // Reset progress tracking
+      setBatchSyncProgress({
+        isActive: false,
+        currentBatch: 0,
+        totalBatches: 0,
+        processedCount: 0,
+        totalCount: 0,
+        successCount: 0,
+        failedCount: 0,
+      });
+
+      console.log('📦 Batch Sync - Completed processing all batches');
+    },
+    [token, formattedDate, selectedDraw, selectedType, resendTransaction],
+  );
+
+  // Individual syncing for <50 unsynced transactions (original logic)
+  const syncTransactionsIndividual = useCallback(async () => {
+    const serverTransactions = await getTransactionsAPI(
+      token,
+      formattedDate,
+      selectedDraw,
+      selectedType,
+      user.keycode,
+    );
+
+    // Step 1: Convert server transactions to a Set for quick lookup
+    const serverTransactionSet = new Set(serverTransactions);
+
+    // Step 2: Find and resend local transactions that are not on the server
+    const currentTransactions = await getTransactions(
+      formattedDate,
+      selectedDraw,
+      selectedType,
+    );
+
+    if (Array.isArray(currentTransactions)) {
+      currentTransactions.forEach(transaction => {
+        if (!serverTransactionSet.has(transaction.ticketcode)) {
+          console.log(
+            'This transaction does not exist on the server:',
+            transaction,
+          );
+          resendTransaction(transaction);
+          if (transaction.id) {
+            updateTransactionStatus(transaction.id, 'synced');
+          }
+        }
+      });
+
+      // Step 3: Find and insert server transactions that are missing locally
+      const localTransactionSet = new Set(
+        currentTransactions.map(t => t.ticketcode),
+      );
+
+      serverTransactions.forEach((serverTicketCode: any) => {
+        if (!localTransactionSet.has(serverTicketCode)) {
+          console.log(
+            'Inserting missing transaction from server:',
+            serverTicketCode,
+          );
+          insertTransactionFromServer(serverTicketCode);
+        }
+      });
+    }
+  }, [
+    token,
+    formattedDate,
+    selectedDraw,
+    selectedType,
+    user.keycode,
+    resendTransaction,
+    insertTransactionFromServer,
   ]);
 
   const fetchData = useCallback(async () => {
@@ -619,6 +844,52 @@ const History: React.FC<any> = ({navigation}) => {
           </View>
         </View>
 
+        {/* Batch Sync Progress Indicator */}
+        {batchSyncProgress.isActive && (
+          <View style={styles.batchSyncContainer}>
+            <View style={styles.batchSyncHeader}>
+              <MaterialIcon name="sync" size={20} color={Colors.primaryColor} />
+              <Text style={styles.batchSyncTitle}>
+                Batch Syncing Transactions
+              </Text>
+            </View>
+
+            <View style={styles.batchSyncProgress}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${(batchSyncProgress.processedCount / batchSyncProgress.totalCount) * 100}%`,
+                    },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.progressStats}>
+                <Text style={styles.progressText}>
+                  Batch {batchSyncProgress.currentBatch} of{' '}
+                  {batchSyncProgress.totalBatches}
+                </Text>
+                <Text style={styles.progressText}>
+                  {batchSyncProgress.processedCount} /{' '}
+                  {batchSyncProgress.totalCount} processed
+                </Text>
+              </View>
+
+              <View style={styles.progressResults}>
+                <Text
+                  style={[styles.progressText, {color: Colors.primaryColor}]}>
+                  ✅ {batchSyncProgress.successCount} successful
+                </Text>
+                <Text style={[styles.progressText, {color: Colors.mediumRed}]}>
+                  ❌ {batchSyncProgress.failedCount} failed
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Total Amount */}
         {initialLoading && (
           <View style={styles.loaderContainer}>
@@ -746,7 +1017,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   printIcon: {
-    color: '#000',
+    color: Colors.primaryColor,
+    width: 40,
   },
   headerButtons: {
     flexDirection: 'row',
@@ -777,5 +1049,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: 40,
+  },
+  batchSyncContainer: {
+    backgroundColor: Colors.lightGrey,
+    padding: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    elevation: 3,
+  },
+  batchSyncHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  batchSyncTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.darkGrey,
+    marginLeft: 10,
+  },
+  batchSyncProgress: {
+    marginBottom: 10,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: Colors.grey,
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.primaryColor,
+    borderRadius: 5,
+  },
+  progressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  progressText: {
+    fontSize: 14,
+    color: Colors.darkGrey,
+  },
+  progressResults: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
 });

@@ -3,8 +3,7 @@ import {View, Image, Text} from 'react-native';
 
 import Images from '../Styles/Images';
 import Colors from '../Styles/Colors';
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
@@ -41,11 +40,11 @@ export const HomeStacks = () => {
 const HistoryStacks = () => {
   return (
     <HistoryStack.Navigator
-      initialRouteName="Team"
+      initialRouteName="History"
       screenOptions={{
         headerShown: false,
       }}>
-      <HistoryStack.Screen name="Team" component={History} />
+      <HistoryStack.Screen name="History" component={History} />
     </HistoryStack.Navigator>
   );
 };

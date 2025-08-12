@@ -112,4 +112,17 @@ export const INDEXES = {
   TICKETCODE: 'index_ticketcode',
   TRANS_COMPOSITE: 'trans_composite_index',
   RESULT_COMPOSITE: 'result_composite_index',
+
+  // New indexes for better performance
+  TRANS_STATUS: 'trans_status_index',
+  TRANS_CREATED_AT: 'trans_created_at_index',
+  TRANS_BETDATE_STATUS: 'trans_betdate_status_index',
+  TRANS_BETTYPEID_STATUS: 'trans_bettypeid_status_index',
+
+  BET_TRANSID: 'bet_transid_index',
+  BET_CREATED_AT: 'bet_created_at_index',
+  BET_STATUS: 'bet_status_index',
+
+  RESULT_CREATED_AT: 'result_created_at_index',
+  RESULT_BETTYPEID: 'result_bettypeid_index',
 } as const;
