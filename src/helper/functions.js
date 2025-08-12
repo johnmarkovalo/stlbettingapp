@@ -103,19 +103,61 @@ export const formatTime = (hour, minute) => {
 };
 
 export const getCurrentDraw = draws => {
-  const currentTime = moment().format('HH:mm');
-  // console.log('currentTime', currentTime);
-  // console.log('draws', draws);
+  const currentTime = moment();
+  const currentTimeStr = currentTime.format('HH:mm');
+
+  console.log('🕐 getCurrentDraw - Current time:', currentTimeStr);
+  console.log('📅 getCurrentDraw - Draws config:', draws);
+
   // Find the draw that matches the current time
-  const currentDraw = draws.find(draw => {
+  const currentDraw = draws.find((draw, index) => {
     const start = moment(draw.start, 'HH:mm');
     const end = moment(draw.end, 'HH:mm');
-    return moment(currentTime, 'HH:mm').isBetween(start, end);
+
+    // Convert current time to moment for comparison
+    const current = moment(currentTimeStr, 'HH:mm');
+
+    console.log(`🎯 Draw ${index + 1}: ${draw.start} - ${draw.end}`);
+    console.log(
+      `   Start: ${start.format('HH:mm')}, End: ${end.format('HH:mm')}`,
+    );
+    console.log(`   Current: ${current.format('HH:mm')}`);
+
+    // Use a more reliable time comparison method
+    // Convert all times to minutes since midnight for accurate comparison
+    const startMinutes = start.hours() * 60 + start.minutes();
+    const endMinutes = end.hours() * 60 + end.minutes();
+    const currentMinutes = current.hours() * 60 + current.minutes();
+
+    console.log(
+      `   Start minutes: ${startMinutes}, End minutes: ${endMinutes}, Current minutes: ${currentMinutes}`,
+    );
+
+    // Check if current time is between start and end (inclusive)
+    let isBetween;
+    if (startMinutes <= endMinutes) {
+      // Normal case: start < end (same day)
+      isBetween =
+        currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    } else {
+      // Edge case: start > end (crosses midnight)
+      isBetween =
+        currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+    }
+
+    console.log(`   Is between: ${isBetween}`);
+
+    return isBetween;
   });
+
   if (!currentDraw) {
+    console.log('❌ No active draw found - betting is closed');
     return null;
   }
-  return draws.indexOf(currentDraw) + 1;
+
+  const drawIndex = draws.indexOf(currentDraw) + 1;
+  console.log(`✅ Active draw found: Draw ${drawIndex}`);
+  return drawIndex;
 };
 
 export const checkIfTriple = num => {
@@ -155,15 +197,30 @@ export const convertToTransData = bets => {
 };
 
 export const convertToBets = transData => {
-  const bets: Bet[] = [];
+  const bets = [];
   const transDataArr = transData.split(', ');
+
   for (let n = 0; n < transDataArr.length; n++) {
-    const bet = transDataArr[n].split(' ');
-    bets.push({
-      betNumber: bet[0],
-      targetAmount: bet[1],
-      rambolAmount: bet[2],
-    });
+    const betData = transDataArr[n].trim();
+
+    // Skip empty entries
+    if (!betData || betData === '') continue;
+
+    const bet = betData.split(' ');
+
+    // Ensure we have all three parts: betNumber, targetAmount, rambolAmount
+    if (bet.length >= 3) {
+      const targetAmount = Number(bet[1]) || 0;
+      const rambolAmount = Number(bet[2]) || 0;
+
+      bets.push({
+        betNumber: bet[0],
+        targetAmount: targetAmount,
+        rambolAmount: rambolAmount,
+        tranno: n + 1, // Add tranno (transaction number)
+        subtotal: targetAmount + rambolAmount, // Calculate subtotal
+      });
+    }
   }
   return bets;
 };

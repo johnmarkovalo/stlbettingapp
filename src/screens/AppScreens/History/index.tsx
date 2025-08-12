@@ -90,8 +90,11 @@ const History: React.FC<any> = ({navigation}) => {
   >(undefined);
 
   const dispatch = useDispatch();
+  // Refs
   const internetStatusCheck = useRef(checkInternetConnection());
   const hasInitialSync = useRef(false);
+  const prevDrawRef = useRef<number | undefined>();
+  const prevTypeRef = useRef<number | undefined>();
 
   // Memoized values
   const minDate = useMemo(() => moment().subtract(1, 'weeks').toDate(), []);
@@ -118,13 +121,30 @@ const History: React.FC<any> = ({navigation}) => {
         );
         console.log('Transaction from server:', transaction);
         if (transaction) {
+          console.log('Raw trans_data:', transaction.trans_data);
           const bets = convertToBets(transaction.trans_data);
-          //Convert 1.00 to 1
-          transaction.declared_gross = Math.floor(transaction.declared_gross);
+          console.log('Converted bets:', bets);
+
+          // Calculate total by summing target and rambol amounts from bets
+          const calculatedTotal = bets.reduce((total, bet) => {
+            // Convert string amounts to numbers, defaulting to 0 if invalid
+            const targetAmount = Number(bet.targetAmount) || 0;
+            const rambolAmount = Number(bet.rambolAmount) || 0;
+            console.log(
+              `Bet ${bet.betNumber}: target=${targetAmount}, rambol=${rambolAmount}, subtotal=${targetAmount + rambolAmount}`,
+            );
+            return total + targetAmount + rambolAmount;
+          }, 0);
+
+          console.log('Final calculated total:', calculatedTotal);
+
+          console.log('Bets from trans_data:', bets);
+          console.log('Calculated total:', calculatedTotal);
+
           const newTransaction = {
             ...transaction,
             status: 'synced',
-            total: transaction.declared_gross,
+            total: calculatedTotal, // Use calculated total instead of declared_gross
             created_at: moment(transaction.printed_at).format(
               'YYYY-MM-DD HH:mm:ss',
             ),
@@ -146,7 +166,16 @@ const History: React.FC<any> = ({navigation}) => {
         if (internetStatusCheck.current.isConnected()) {
           if (transaction.id) {
             const bets = await getBetsByTransaction(transaction.id);
-            if (bets) {
+            // Ensure bets is an array and calculate total safely
+            let total = 0;
+            if (Array.isArray(bets)) {
+              total = bets.reduce((sum, bet: any) => {
+                const targetAmount = Number(bet.targetAmount) || 0;
+                const rambolAmount = Number(bet.rambolAmount) || 0;
+                return sum + targetAmount + rambolAmount;
+              }, 0);
+            }
+            if (Array.isArray(bets)) {
               let newTransaction = {
                 ...transaction,
                 status: 'VALID',
@@ -154,7 +183,7 @@ const History: React.FC<any> = ({navigation}) => {
                 keycode: user.keycode,
                 remarks: '',
                 printed_at: transaction.created_at,
-                declared_gross: totalAmount,
+                declared_gross: total,
                 bets: bets,
               };
               const response = await sendTransactionAPI(token, newTransaction);
@@ -253,88 +282,77 @@ const History: React.FC<any> = ({navigation}) => {
     syncing,
   ]);
 
-  // Separate function for initial sync that only runs once
-  const performInitialSync = useCallback(async () => {
-    if (internetStatusCheck.current.isConnected()) {
-      console.log('🔄 Initial load - Syncing with server first...');
-      setSyncing(true);
-      await syncTransactions();
-      setSyncing(false);
-    }
-  }, [syncTransactions]);
+  const fetchData = useCallback(async () => {
+    setRefresh(true);
 
-  const fetchData = useCallback(
-    async (shouldSync = false) => {
-      if (shouldSync) {
-        setRefresh(true);
-      }
-
-      try {
-        // Validate parameters before making the call
-        if (selectedDraw === undefined || selectedType === undefined) {
-          console.warn('⚠️ History fetchData - Missing parameters:', {
-            draw: selectedDraw,
-            type: selectedType,
-          });
-          setTransactions([]);
-          setTotalAmount(0);
-          setInitialLoading(false);
-          return;
-        }
-
-        console.log('🔄 History fetchData - Params:', {
-          date: formattedDate,
+    try {
+      // Validate parameters before making the call
+      if (selectedDraw === undefined || selectedType === undefined) {
+        console.warn('⚠️ History fetchData - Missing parameters:', {
           draw: selectedDraw,
           type: selectedType,
-          typeName: typeLabel(),
-          shouldSync,
         });
-
-        const fetchedTransactions = await getTransactions(
-          formattedDate,
-          selectedDraw,
-          selectedType,
-        );
-
-        console.log('📊 History fetchData - Results:', {
-          count: Array.isArray(fetchedTransactions)
-            ? fetchedTransactions.length
-            : 0,
-          transactions: fetchedTransactions,
-        });
-
-        if (Array.isArray(fetchedTransactions)) {
-          setTransactions(fetchedTransactions);
-          const total = fetchedTransactions.reduce(
-            (sum, item) => sum + (item.total || 0),
-            0,
-          );
-          setTotalAmount(total);
-        } else {
-          setTransactions([]);
-          setTotalAmount(0);
-        }
-
-        setInitialLoading(false);
-      } catch (error) {
-        console.error('❌ History fetchData error:', error);
         setTransactions([]);
         setTotalAmount(0);
         setInitialLoading(false);
-      } finally {
-        if (shouldSync) {
-          setRefresh(false);
-        }
+        return;
       }
-    },
-    [formattedDate, selectedDraw, selectedType, typeLabel],
-  );
+
+      console.log('🔄 History fetchData - Params:', {
+        date: formattedDate,
+        draw: selectedDraw,
+        type: selectedType,
+        typeName: typeLabel(),
+      });
+
+      // Always sync with server first
+      if (internetStatusCheck.current.isConnected()) {
+        console.log('🔄 History fetchData - Syncing with server first...');
+        setSyncing(true);
+        await syncTransactions();
+        setSyncing(false);
+      }
+
+      const fetchedTransactions = await getTransactions(
+        formattedDate,
+        selectedDraw,
+        selectedType,
+      );
+
+      console.log('📊 History fetchData - Results:', {
+        count: Array.isArray(fetchedTransactions)
+          ? fetchedTransactions.length
+          : 0,
+        transactions: fetchedTransactions,
+      });
+
+      if (Array.isArray(fetchedTransactions)) {
+        setTransactions(fetchedTransactions);
+        const total = fetchedTransactions.reduce(
+          (sum, item) => sum + (item.total || 0),
+          0,
+        );
+        setTotalAmount(total);
+      } else {
+        setTransactions([]);
+        setTotalAmount(0);
+      }
+
+      setInitialLoading(false);
+    } catch (error) {
+      console.error('❌ History fetchData error:', error);
+      setTransactions([]);
+      setTotalAmount(0);
+      setInitialLoading(false);
+    } finally {
+      setRefresh(false);
+    }
+  }, [formattedDate, selectedDraw, selectedType, typeLabel, syncTransactions]);
 
   const onRefresh = useCallback(async () => {
     setRefresh(true);
     try {
       // Sync with server first, then fetch data
-      await syncTransactions();
       await fetchData();
     } catch (error) {
       console.error('Error during refresh:', error);
@@ -343,7 +361,7 @@ const History: React.FC<any> = ({navigation}) => {
         setRefresh(false);
       }, 1000);
     }
-  }, [syncTransactions, fetchData]);
+  }, [fetchData]);
 
   const handleManualSync = useCallback(async () => {
     if (syncing) {
@@ -356,10 +374,9 @@ const History: React.FC<any> = ({navigation}) => {
       return;
     }
 
-    // Sync with server first, then fetch data
-    await syncTransactions();
+    // fetchData now includes sync, so just call it
     await fetchData();
-  }, [syncTransactions, fetchData, syncing]);
+  }, [fetchData, syncing]);
 
   // Modal handlers
   const betModalHide = useCallback(() => {
@@ -436,14 +453,49 @@ const History: React.FC<any> = ({navigation}) => {
     const initializeScreen = async () => {
       if (!hasInitialSync.current) {
         // First time: sync then fetch
-        await performInitialSync();
+        await fetchData();
         hasInitialSync.current = true;
       }
-      await fetchData();
     };
 
     initializeScreen();
-  }, [performInitialSync, fetchData]);
+  }, [fetchData]);
+
+  // Watch for changes in selectedDraw and selectedType
+  useEffect(() => {
+    if (hasInitialSync.current) {
+      // Only fetch if values actually changed
+      const drawChanged = prevDrawRef.current !== selectedDraw;
+      const typeChanged = prevTypeRef.current !== selectedType;
+
+      if (drawChanged || typeChanged) {
+        console.log('🔄 History - Draw or Type changed, fetching new data...');
+        console.log(
+          'Previous draw:',
+          prevDrawRef.current,
+          'New draw:',
+          selectedDraw,
+        );
+        console.log(
+          'Previous type:',
+          prevTypeRef.current,
+          'New type:',
+          selectedType,
+        );
+
+        // Update refs
+        prevDrawRef.current = selectedDraw;
+        prevTypeRef.current = selectedType;
+
+        // Fetch new data
+        fetchData();
+      }
+    } else {
+      // First time, just store the values
+      prevDrawRef.current = selectedDraw;
+      prevTypeRef.current = selectedType;
+    }
+  }, [selectedDraw, selectedType]); // No fetchData dependency to avoid infinite loop
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
