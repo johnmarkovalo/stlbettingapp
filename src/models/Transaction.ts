@@ -12,6 +12,7 @@ interface Transaction {
   total: number;
   status: string;
   created_at?: string;
+  printed_at?: string;
   bets?: Bet[];
 }
 

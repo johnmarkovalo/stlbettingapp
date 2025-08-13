@@ -65,6 +65,21 @@ interface RootState {
   };
 }
 
+// API response interface for server transactions
+interface ServerTransaction {
+  id?: number;
+  ticketcode: string;
+  trans_data: string;
+  betdate: string;
+  bettime: number;
+  bettypeid: number;
+  printed_at: string;
+  trans_no?: number;
+  total?: number;
+  status?: string;
+  [key: string]: any; // Allow additional properties
+}
+
 const widthScreen = Dimensions.get('window').width;
 
 const History: React.FC<any> = ({navigation}) => {
@@ -109,6 +124,8 @@ const History: React.FC<any> = ({navigation}) => {
   const hasInitialSync = useRef(false);
   const prevDrawRef = useRef<number | undefined>();
   const prevTypeRef = useRef<number | undefined>();
+  const lastFetchTime = useRef<number | undefined>();
+  const lastFetchCallTime = useRef<number | undefined>();
 
   // Memoized values
   const minDate = useMemo(() => moment().subtract(1, 'weeks').toDate(), []);
@@ -129,10 +146,10 @@ const History: React.FC<any> = ({navigation}) => {
   const insertTransactionFromServer = useCallback(
     async (ticketcode: string) => {
       try {
-        const transaction = await getTransactionViaTicketCodeAPI(
+        const transaction = (await getTransactionViaTicketCodeAPI(
           token,
           ticketcode,
-        );
+        )) as unknown as ServerTransaction;
         console.log('Transaction from server:', transaction);
         if (transaction) {
           console.log('Raw trans_data:', transaction.trans_data);
@@ -140,7 +157,7 @@ const History: React.FC<any> = ({navigation}) => {
           console.log('Converted bets:', bets);
 
           // Calculate total by summing target and rambol amounts from bets
-          const calculatedTotal = bets.reduce((total, bet) => {
+          const calculatedTotal = bets.reduce((total: number, bet: any) => {
             // Convert string amounts to numbers, defaulting to 0 if invalid
             const targetAmount = Number(bet.targetAmount) || 0;
             const rambolAmount = Number(bet.rambolAmount) || 0;
@@ -163,6 +180,8 @@ const History: React.FC<any> = ({navigation}) => {
               'YYYY-MM-DD HH:mm:ss',
             ),
             bets: bets,
+            trans_data: transaction.trans_data, // Ensure trans_data is included
+            trans_no: transaction.trans_no || 1, // Ensure trans_no is included
           };
           console.log('Transaction from server:', transaction);
           await insertTransaction(newTransaction, bets);
@@ -508,6 +527,14 @@ const History: React.FC<any> = ({navigation}) => {
   ]);
 
   const fetchData = useCallback(async () => {
+    // Debounce rapid successive calls
+    const now = Date.now();
+    if (lastFetchCallTime.current && now - lastFetchCallTime.current < 1000) {
+      console.log('🔄 History fetchData - Debounced rapid call');
+      return;
+    }
+    lastFetchCallTime.current = now;
+
     setRefresh(true);
 
     try {
@@ -684,7 +711,7 @@ const History: React.FC<any> = ({navigation}) => {
     };
 
     initializeScreen();
-  }, [fetchData]);
+  }, []); // Remove fetchData dependency to prevent infinite loops
 
   // Watch for changes in selectedDraw and selectedType
   useEffect(() => {
@@ -720,11 +747,26 @@ const History: React.FC<any> = ({navigation}) => {
       prevDrawRef.current = selectedDraw;
       prevTypeRef.current = selectedType;
     }
-  }, [selectedDraw, selectedType]); // No fetchData dependency to avoid infinite loop
+  }, [selectedDraw, selectedType, fetchData]); // Add fetchData dependency
 
+  // Navigation focus effect - only fetch if data is stale
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchData();
+      // Only fetch if we haven't fetched recently or if parameters changed
+      const timeSinceLastFetch = Date.now() - (lastFetchTime.current || 0);
+      const shouldFetch = timeSinceLastFetch > 30000; // 30 seconds threshold
+
+      if (shouldFetch) {
+        console.log(
+          '🔄 History - Screen focused, fetching data (stale data)...',
+        );
+        fetchData();
+        lastFetchTime.current = Date.now();
+      } else {
+        console.log(
+          '🔄 History - Screen focused, data is fresh, skipping fetch',
+        );
+      }
     });
     return unsubscribe;
   }, [navigation, fetchData]);

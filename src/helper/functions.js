@@ -198,7 +198,10 @@ export const convertToTransData = bets => {
 
 export const convertToBets = transData => {
   const bets = [];
-  const transDataArr = transData.split(', ');
+
+  // Clean the trans_data string - remove trailing comma and extra spaces
+  const cleanTransData = transData.replace(/,\s*$/, '').trim();
+  const transDataArr = cleanTransData.split(', ');
 
   for (let n = 0; n < transDataArr.length; n++) {
     const betData = transDataArr[n].trim();
@@ -206,20 +209,28 @@ export const convertToBets = transData => {
     // Skip empty entries
     if (!betData || betData === '') continue;
 
-    const bet = betData.split(' ');
+    // Split by one or more spaces to handle multiple spaces
+    const bet = betData.split(/\s+/);
 
     // Ensure we have all three parts: betNumber, targetAmount, rambolAmount
     if (bet.length >= 3) {
-      const targetAmount = Number(bet[1]) || 0;
-      const rambolAmount = Number(bet[2]) || 0;
+      const betNumber = bet[0];
+      const targetAmountRaw = bet[1];
+      const rambolAmountRaw = bet[2];
+
+      // More robust number parsing
+      const targetAmount = parseInt(targetAmountRaw, 10) || 0;
+      const rambolAmount = parseInt(rambolAmountRaw, 10) || 0;
 
       bets.push({
-        betNumber: bet[0],
+        betNumber: betNumber,
         targetAmount: targetAmount,
         rambolAmount: rambolAmount,
         tranno: n + 1, // Add tranno (transaction number)
         subtotal: targetAmount + rambolAmount, // Calculate subtotal
       });
+    } else {
+      console.warn(`⚠️ Bet ${n + 1} has insufficient parts:`, bet);
     }
   }
   return bets;
