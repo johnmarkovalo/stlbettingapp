@@ -236,6 +236,23 @@ export const convertToBets = transData => {
   return bets;
 };
 
+// Convert bet objects back to trans_data string format
+export const convertBetsToTransData = bets => {
+  if (!Array.isArray(bets) || bets.length === 0) {
+    return '';
+  }
+
+  return bets
+    .map(bet => {
+      const betNumber = bet.betNumber || '';
+      const targetAmount = bet.targetAmount || 0;
+      const rambolAmount = bet.rambolAmount || 0;
+
+      return `${betNumber} ${targetAmount} ${rambolAmount}`;
+    })
+    .join(', ');
+};
+
 export const formatBetTypes = betTypes => {
   return betTypes.map(betType => {
     const {
