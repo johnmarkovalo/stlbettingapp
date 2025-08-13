@@ -1460,14 +1460,14 @@ const History: React.FC<any> = ({navigation}) => {
         {!initialLoading && (
           <>
             {/* Debug info */}
-            {__DEV__ && (
+            {/* {__DEV__ && (
               <View style={{padding: 10, backgroundColor: '#f0f0f0'}}>
                 <Text style={{fontSize: 12, color: '#666'}}>
                   Debug: Transactions count: {transactions.length}, Total:{' '}
                   {totalAmount}
                 </Text>
               </View>
-            )}
+            )} */}
             <FlatList
               key={`transactions-${transactions.length}-${Date.now()}`} // Force re-render when transactions change
               data={transactions}
