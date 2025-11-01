@@ -37,7 +37,7 @@ import {
   insertTransaction,
   updateTransactionStatus,
 } from '../../../database';
-import {listPairedDevices, printTransaction} from '../../../helper/printer';
+import {printTransaction} from '../../../helper/printer';
 import {sendTransactionAPI, getSoldOutsAPI} from '../../../helper/api';
 import {soldoutsActions} from '../../../store/actions';
 
@@ -433,7 +433,6 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
         if (transactionId && typeof transactionId === 'number') {
           // Print transaction
-          listPairedDevices();
           printTransaction(transaction, betType, bets, user);
           updateTransactionStatus(transactionId, 'printed');
 

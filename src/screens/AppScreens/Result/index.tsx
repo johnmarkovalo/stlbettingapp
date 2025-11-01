@@ -48,7 +48,6 @@ import {
   useCodeScanner,
 } from 'react-native-vision-camera';
 import {
-  listPairedDevices,
   printHits,
   printSales,
 } from '../../../helper/printer';
@@ -354,7 +353,6 @@ const Result: React.FC<any> = ({navigation}) => {
 
   const handlePrintHits = useCallback(() => {
     if (totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) {
-      listPairedDevices();
       printHits(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
     }
   }, [totalAmount, selectedDate, selectedDraw, typeLabel, user]);

@@ -1,10 +1,29 @@
 import ThermalPrinterModule from 'react-native-thermal-printer';
-import {useSelector} from 'react-redux';
+import {store} from '../store/store';
 import {checkIfDouble} from '.';
 import moment from 'moment';
 
 // Global print queue to prevent multiple simultaneous print jobs
 let isPrinting = false;
+
+// Helper function to get printer MAC address from Redux state
+function getPrinterMacAddress() {
+  try {
+    const state = store.getState();
+    const macAddress = state.printer?.printerMacAddress;
+    if (!macAddress) {
+      throw new Error(
+        'No printer configured. Please select a printer in Printer Setup.',
+      );
+    }
+    return macAddress;
+  } catch (error) {
+    console.error('Error getting printer MAC address:', error);
+    throw new Error(
+      'Printer not configured. Please select a printer in Printer Setup.',
+    );
+  }
+}
 async function printSales(betDate, betTime, betType, totalAmount, user) {
   const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
@@ -20,7 +39,7 @@ async function printSales(betDate, betTime, betType, totalAmount, user) {
     '  ____________________________  ' +
     "       Teller's Signature       " +
     '\n\n ';
-  print(textToPrint);
+  await print(textToPrint);
 }
 
 async function printHits(betDate, betTime, betType, totalAmount, user) {
@@ -39,7 +58,7 @@ async function printHits(betDate, betTime, betType, totalAmount, user) {
     '  ____________________________  ' +
     "       Teller's Signature       " +
     '\n\n ';
-  print(textToPrint);
+  await print(textToPrint);
 }
 
 async function printTransaction(transaction, betType, bets, user) {
@@ -89,16 +108,20 @@ async function printTransaction(transaction, betType, bets, user) {
     ticket +
     '</qrcode>\n ' +
     '\n\n ';
-  print(textToPrint);
+  await print(textToPrint);
 }
 
-async function print(text, retryCount = 0) {
-  const maxRetries = 2;
+// Strip HTML tags to prevent massive expansion by the printer library
+// Thermal printers don't render HTML anyway, so we just need plain text
+function stripHTMLTags(text) {
+  // Remove all HTML tags including <b>, </b>, <qrcode>, </qrcode>, etc.
+  return text.replace(/<[^>]*>/g, '');
+}
 
-  // Check if another print job is in progress
+async function print(text) {
+  // Prevent concurrent print jobs
   if (isPrinting) {
     console.log('Print job already in progress, waiting...');
-    // Wait for current job to complete
     while (isPrinting) {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
@@ -107,134 +130,348 @@ async function print(text, retryCount = 0) {
   isPrinting = true;
 
   try {
-    // Check printer connection before attempting to print
-    const isConnected = await checkPrinterConnection();
-    if (!isConnected) {
-      throw new Error('Printer not connected or not found');
-    }
-
-    // Reset printer connection to ensure clean state
-    await resetPrinterConnection();
+    // Get printer MAC address from Redux
+    const macAddress = getPrinterMacAddress();
 
     ThermalPrinterModule.defaultConfig = {
-      ...ThermalPrinterModule.defaultConfig,
       timeout: 30000,
-      macAddress: '00:11:22:33:44:55',
+      macAddress: macAddress,
     };
 
-    // Split text into chunks to avoid buffer overflow
-    const textSize = estimateTextSize(text);
-    let maxChunkSize = 1500; // Leave some buffer space (printer buffer is 2048)
+    // Strip HTML tags first - they cause massive expansion (20-30x) and thermal printers can't render them anyway
+    const textWithoutHTML = stripHTMLTags(text);
+    const cleanText = textWithoutHTML.trim();
+    const textSize = estimateTextSize(cleanText);
 
-    // If text is extremely large, use smaller chunk size
-    if (textSize > 10000) {
-      console.warn('Large text detected, using smaller chunk size');
-      maxChunkSize = 1000;
+    // Now that HTML tags are stripped, we can use reasonable chunk sizes
+    // Use 1800 bytes max to stay under the 2048-byte buffer limit
+    const maxChunkSize = 1800;
+
+    // If text is small enough, send directly
+    if (textSize < maxChunkSize) {
+      try {
+        await ThermalPrinterModule.printBluetooth({
+          payload: cleanText,
+          macAddress: macAddress,
+        });
+        console.log('Print completed successfully');
+
+        // Wait for printer buffer to drain
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return;
+      } catch (singleSendError) {
+        console.warn(
+          'Single send failed, falling back to chunking:',
+          singleSendError.message,
+        );
+        // Fall through to chunking
+      }
     }
 
-    const chunks = splitTextIntoChunks(text, maxChunkSize);
+    // Split into chunks for larger texts
+    const chunks = splitIntoChunksSafe(cleanText, maxChunkSize);
+    console.log(`Printing ${chunks.length} chunks (${textSize} bytes)`);
 
-    console.log(
-      `Printing ${chunks.length} chunks of data (${textSize} bytes total, attempt ${retryCount + 1})`,
-    );
-
+    // Send chunks sequentially with delays to allow buffer to drain naturally
     for (let i = 0; i < chunks.length; i++) {
-      console.log(`Printing chunk ${i + 1}/${chunks.length}`);
+      let retries = 0;
+      const maxRetries = 3;
+      let success = false;
 
-      let chunkRetryCount = 0;
-      let chunkSuccess = false;
-
-      while (chunkRetryCount < 3 && !chunkSuccess) {
+      while (retries < maxRetries && !success) {
         try {
           await ThermalPrinterModule.printBluetooth({
             payload: chunks[i],
-            macAddress: '00:11:22:33:44:55',
+            macAddress: macAddress,
           });
-          chunkSuccess = true;
-        } catch (chunkError) {
-          chunkRetryCount++;
-          console.warn(
-            `Chunk ${i + 1} failed, retry ${chunkRetryCount}/3:`,
-            chunkError.message,
-          );
+          success = true;
 
-          // Check if it's a buffer overflow error
+          // Delay between chunks to allow printer buffer to process and drain
+          if (i < chunks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        } catch (chunkError) {
+          retries++;
+
+          // If device not found, stop immediately
+          if (
+            chunkError.message.includes('Bluetooth Device Not Found') ||
+            chunkError.message.includes('Device Not Found') ||
+            chunkError.message.includes('not found')
+          ) {
+            throw new Error(
+              'Printer not connected. Please check printer connection in Printer Setup.',
+            );
+          }
+
+          // Buffer overflow - split the chunk smaller
           if (
             chunkError.message.includes('src.length') &&
             chunkError.message.includes('dst.length')
           ) {
-            console.error('Buffer overflow detected, reducing chunk size');
-            // Try with a much smaller chunk
-            const smallerChunk = chunks[i].substring(0, 500);
-            try {
-              await ThermalPrinterModule.printBluetooth({
-                payload: smallerChunk,
-                macAddress: '00:11:22:33:44:55',
-              });
-              chunkSuccess = true;
-              console.log(`Chunk ${i + 1} printed with reduced size`);
-            } catch (smallerError) {
-              console.error('Even smaller chunk failed:', smallerError.message);
-            }
-          }
+            console.warn(
+              `Buffer overflow on chunk ${i + 1}/${chunks.length}, splitting smaller`,
+            );
 
-          if (!chunkSuccess && chunkRetryCount < 3) {
-            // Wait before retrying
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } else if (!chunkSuccess) {
+            // Split this chunk into smaller pieces
+            const smallerChunks = splitIntoChunksSafe(
+              chunks[i],
+              maxChunkSize / 2,
+            );
+            for (const smallChunk of smallerChunks) {
+              try {
+                await ThermalPrinterModule.printBluetooth({
+                  payload: smallChunk,
+                  macAddress: macAddress,
+                });
+                await new Promise(resolve => setTimeout(resolve, 200));
+              } catch (smallChunkError) {
+                console.warn('Small chunk failed:', smallChunkError.message);
+                await new Promise(resolve => setTimeout(resolve, 200));
+              }
+            }
+            success = true;
+          } else if (retries >= maxRetries) {
+            // Other errors after retries
             throw chunkError;
+          } else {
+            // Retry with delay
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
         }
       }
-
-      // Add a small delay between chunks to allow printer to process
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
     }
 
-    // Clear printer buffer after successful printing
-    await clearPrinterBuffer();
+    console.log('Print completed successfully');
 
-    // Add a delay to ensure printer is ready for next job
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    console.log('Done printing');
+    // Wait longer for printer buffer to naturally drain completely
+    // This ensures the next print won't have buffer accumulation issues
+    await new Promise(resolve => setTimeout(resolve, 800));
   } catch (error) {
     console.error('Error printing:', error);
 
-    // Retry the entire print job if we haven't exceeded max retries
-    if (retryCount < maxRetries) {
-      console.log(`Retrying print job (${retryCount + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return print(text, retryCount + 1);
-    } else {
-      console.error('Print job failed after all retries');
-      throw error;
-    }
+    // Wait a bit even on error to let buffer drain
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    throw error;
   } finally {
-    // Always release the print lock
     isPrinting = false;
   }
 }
 
-function splitTextIntoChunks(text, maxChunkSize) {
+// Split text into safe chunks that won't exceed buffer size
+// Accounts for HTML tag expansion (20-30x) by using very small chunk sizes
+function splitIntoChunksSafe(text, maxChunkSizeBytes) {
   const chunks = [];
-  let currentChunk = '';
 
-  // Split by lines to avoid breaking in the middle of a line
+  // For very small max size (accounting for HTML expansion), split character by character
+  // or in small groups
+  if (maxChunkSizeBytes <= 200) {
+    let currentChunk = '';
+    let currentChunkSize = 0;
+
+    // Split character by character, grouping up to maxChunkSizeBytes
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      // Estimate char size - assume HTML tags might expand it
+      const charSize = estimateTextSize(char);
+
+      // If adding this char would exceed limit, save current chunk
+      if (
+        currentChunkSize + charSize > maxChunkSizeBytes &&
+        currentChunk.length > 0
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = char;
+        currentChunkSize = charSize;
+      } else {
+        currentChunk += char;
+        currentChunkSize += charSize;
+      }
+    }
+
+    // Add last chunk
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks.length > 0 ? chunks : [text];
+  }
+
+  // For larger chunks, split by lines first
   const lines = text.split('\n');
+  let currentChunk = '';
+  let currentChunkSize = 0;
 
   for (const line of lines) {
-    // If adding this line would exceed the chunk size, start a new chunk
+    const lineWithNewline = line + '\n';
+    const lineSize = estimateTextSize(lineWithNewline);
+
+    // If single line exceeds max size, split it character by character
+    if (lineSize > maxChunkSizeBytes) {
+      // Save current chunk first
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = '';
+        currentChunkSize = 0;
+      }
+      // Split the long line character by character
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const charSize = estimateTextSize(char);
+        if (
+          currentChunkSize + charSize > maxChunkSizeBytes &&
+          currentChunk.length > 0
+        ) {
+          chunks.push(currentChunk);
+          currentChunk = char;
+          currentChunkSize = charSize;
+        } else {
+          currentChunk += char;
+          currentChunkSize += charSize;
+        }
+      }
+      // Add newline
+      if (currentChunk.length > 0) {
+        currentChunk += '\n';
+        currentChunkSize += 1;
+      }
+      continue;
+    }
+
+    // Check if adding this line would exceed chunk size
     if (
-      currentChunk.length + line.length + 1 > maxChunkSize &&
+      currentChunkSize + lineSize > maxChunkSizeBytes &&
       currentChunk.length > 0
     ) {
       chunks.push(currentChunk);
-      currentChunk = line;
+      currentChunk = lineWithNewline;
+      currentChunkSize = lineSize;
     } else {
-      currentChunk += (currentChunk.length > 0 ? '\n' : '') + line;
+      currentChunk += lineWithNewline;
+      currentChunkSize += lineSize;
+    }
+  }
+
+  // Add last chunk
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks.length > 0 ? chunks : [text];
+}
+
+// Split text into very small chunks - HTML tags expand massively
+// Split into 5-character chunks to account for 20-30x expansion
+function splitTextRespectingHTMLTags(text) {
+  const chunks = [];
+  const maxChunkSize = 5; // Very small: 5 characters per chunk
+
+  let i = 0;
+  while (i < text.length) {
+    // Take only 5 characters at a time to stay well under buffer limits
+    const chunk = text.substring(i, Math.min(i + maxChunkSize, text.length));
+    if (chunk.length > 0) {
+      chunks.push(chunk);
+    }
+    i += maxChunkSize;
+  }
+
+  return chunks.length > 0 ? chunks : [text];
+}
+
+function splitTextIntoChunks(text, maxChunkSize) {
+  const chunks = [];
+
+  // Use byte size for accurate chunking
+  const textByteSize = estimateTextSize(text);
+
+  // Always split if text is larger than chunk size (no single chunk optimization)
+  if (textByteSize <= maxChunkSize && text.length <= maxChunkSize) {
+    return [text];
+  }
+
+  // For very small chunks (emergency splitting), split character by character
+  if (maxChunkSize <= 50) {
+    let currentChunk = '';
+    let currentChunkSize = 0;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const charByteSize = estimateTextSize(char);
+
+      if (
+        currentChunkSize + charByteSize > maxChunkSize &&
+        currentChunk.length > 0
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = char;
+        currentChunkSize = charByteSize;
+      } else {
+        currentChunk += char;
+        currentChunkSize += charByteSize;
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks.length > 0 ? chunks : [text];
+  }
+
+  // For larger chunks, try to split by lines first
+  const lines = text.split('\n');
+  let currentChunk = '';
+  let currentChunkSize = 0;
+
+  for (const line of lines) {
+    const lineWithNewline = line + '\n';
+    const lineByteSize = estimateTextSize(lineWithNewline);
+
+    // If a single line is too large, split it character by character
+    if (lineByteSize > maxChunkSize) {
+      // Save current chunk first
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk);
+        currentChunk = '';
+        currentChunkSize = 0;
+      }
+      // Split the long line character by character
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const charByteSize = estimateTextSize(char);
+        if (
+          currentChunkSize + charByteSize > maxChunkSize &&
+          currentChunk.length > 0
+        ) {
+          chunks.push(currentChunk + '\n');
+          currentChunk = char;
+          currentChunkSize = charByteSize;
+        } else {
+          currentChunk += char;
+          currentChunkSize += charByteSize;
+        }
+      }
+      // Add newline if we have a chunk
+      if (currentChunk.length > 0) {
+        currentChunk += '\n';
+        currentChunkSize += 1;
+      }
+      continue;
+    }
+
+    // If adding this line would exceed the chunk size, save current chunk and start new one
+    if (
+      currentChunkSize + lineByteSize > maxChunkSize &&
+      currentChunk.length > 0
+    ) {
+      chunks.push(currentChunk);
+      currentChunk = lineWithNewline;
+      currentChunkSize = lineByteSize;
+    } else {
+      currentChunk += lineWithNewline;
+      currentChunkSize += lineByteSize;
     }
   }
 
@@ -243,13 +480,30 @@ function splitTextIntoChunks(text, maxChunkSize) {
     chunks.push(currentChunk);
   }
 
-  return chunks;
+  return chunks.length > 0 ? chunks : [text];
 }
 
 function estimateTextSize(text) {
   // Rough estimation of text size in bytes (UTF-8)
   // Most characters are 1 byte, but some special characters might be more
-  return Buffer.byteLength(text, 'utf8');
+  // In React Native, we approximate by string length
+  // For more accurate estimation, we count characters that might be multi-byte
+  let byteSize = 0;
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i);
+    // ASCII characters (0-127) are 1 byte
+    // Characters above 127 can be 2-4 bytes in UTF-8
+    if (charCode < 128) {
+      byteSize += 1;
+    } else if (charCode < 2048) {
+      byteSize += 2;
+    } else if (charCode < 65536) {
+      byteSize += 3;
+    } else {
+      byteSize += 4;
+    }
+  }
+  return byteSize;
 }
 
 async function listPairedDevices() {
@@ -264,66 +518,96 @@ async function listPairedDevices() {
 }
 
 async function checkPrinterConnection() {
-  try {
-    const devices = await listPairedDevices();
-    const targetDevice = devices.find(
-      device => device.macAddress === '00:11:22:33:44:55',
-    );
-
-    if (targetDevice) {
-      console.log('Printer connection available:', targetDevice.deviceName);
-      return true;
-    } else {
-      console.warn('Target printer not found in paired devices');
-      return false;
-    }
-  } catch (error) {
-    console.error('Error checking printer connection:', error);
-    return false;
-  }
+  // Since "Default Printer" is configured, skip device listing
+  // The thermal printer library will handle the connection when printing
+  // If printer is not available, the print call itself will fail with appropriate error
+  return true;
 }
 
 async function clearPrinterBuffer() {
   try {
-    console.log('Clearing printer buffer...');
+    // Get MAC address - if not configured, skip silently (non-critical operation)
+    let macAddress;
+    try {
+      macAddress = getPrinterMacAddress();
+    } catch (error) {
+      // No printer configured - skip silently as this is non-critical
+      return;
+    }
 
-    // Send ESC/POS commands to clear buffer and reset printer
+    // Send ESC/POS commands to clear printer buffer and reset state
+    // This helps prevent state accumulation between prints
+    // Only send initialization commands, no line feeds to avoid wasting paper
     const clearCommands = [
-      '\x1B\x40', // ESC @ - Initialize printer
+      '\x1B\x40', // ESC @ - Initialize printer (clears buffer)
       '\x1B\x61\x00', // ESC a 0 - Left alignment
-      '\x0A', // Line feed
-      '\x0A', // Line feed
-      '\x0A', // Line feed
     ].join('');
 
     await ThermalPrinterModule.printBluetooth({
       payload: clearCommands,
-      macAddress: '00:11:22:33:44:55',
+      macAddress: macAddress,
     });
 
-    // Wait a bit for the printer to process the clear commands
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    console.log('Printer buffer cleared');
+    // Wait for printer to process the clear commands
+    await new Promise(resolve => setTimeout(resolve, 150));
   } catch (error) {
+    // If device not found, skip silently - this is expected if printer is disconnected
+    if (
+      error.message &&
+      (error.message.includes('not found') ||
+        error.message.includes('Not Found'))
+    ) {
+      return; // Skip silently
+    }
     console.warn('Error clearing printer buffer:', error.message);
     // Don't throw error here as it's not critical
   }
 }
 
 async function resetPrinterConnection() {
+  // Reset printer connection state to clear any cached/buffered data
+  // This prevents state accumulation from previous prints
   try {
-    console.log('Resetting printer connection...');
+    // Get MAC address - if not configured, skip silently (non-critical operation)
+    let macAddress;
+    try {
+      macAddress = getPrinterMacAddress();
+    } catch (error) {
+      // No printer configured - skip silently as this is non-critical
+      return;
+    }
 
-    // Clear buffer first
-    await clearPrinterBuffer();
+    // Send ESC/POS reset command to clear printer state
+    const resetCommands = '\x1B\x40'; // ESC @ - Initialize/Reset printer
 
-    // Wait a bit longer to ensure printer is ready
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    console.log('Printer connection reset');
+    try {
+      await ThermalPrinterModule.printBluetooth({
+        payload: resetCommands,
+        macAddress: macAddress,
+      });
+      // Wait for printer to process reset
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch (resetError) {
+      // If reset fails due to device not found, skip it silently
+      // This is normal if printer is not connected - the actual print will handle it
+      if (
+        resetError.message &&
+        (resetError.message.includes('not found') ||
+          resetError.message.includes('Not Found'))
+      ) {
+        // Device not available - skip reset, actual print will handle the error
+        return;
+      }
+      // For other errors, log but continue
+      console.warn(
+        'Printer reset command failed (may be non-critical):',
+        resetError.message,
+      );
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   } catch (error) {
-    console.warn('Error resetting printer connection:', error.message);
+    console.warn('Error in resetPrinterConnection:', error.message);
+    // Non-critical, continue anyway
   }
 }
 
@@ -394,10 +678,41 @@ function formatNumberWithCommas(value) {
   return integerPart;
 }
 
+async function printTest() {
+  const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
+  const textToPrint =
+    '--------------------------------' +
+    '\n' +
+    '       SMALL TOWN LOTTERY       ' +
+    '\n' +
+    '              ZIAN              ' +
+    '\n' +
+    '--------------------------------' +
+    '\n' +
+    '         TEST PRINT PAGE        ' +
+    '\n' +
+    padStringToLength32('Date: ' + dateTime) +
+    '\n' +
+    '--------------------------------' +
+    '\n' +
+    'This is a test print to verify' +
+    '\n' +
+    'that your printer is working' +
+    '\n' +
+    'correctly.' +
+    '\n' +
+    'Printer: Default Printer' +
+    '\n' +
+    '--------------------------------' +
+    '\n\n';
+  await print(textToPrint);
+}
+
 export {
   printSales,
   printTransaction,
   printHits,
+  printTest,
   listPairedDevices,
   checkPrinterConnection,
   clearPrinterBuffer,

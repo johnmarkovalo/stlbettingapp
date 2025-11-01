@@ -13,6 +13,7 @@ import Home from '../screens/AppScreens/Home';
 import History from '../screens/AppScreens/History';
 import Result from '../screens/AppScreens/Result';
 import Setting from '../screens/AppScreens/Setting';
+import PrinterSetup from '../screens/AppScreens/Setting/PrinterSetup';
 
 const navigationRef = React.createRef();
 
@@ -68,6 +69,7 @@ const SettingStacks = () => {
         headerShown: false,
       }}>
       <SettingStack.Screen name="Setting" component={Setting} />
+      <SettingStack.Screen name="PrinterSetup" component={PrinterSetup} />
     </SettingStack.Navigator>
   );
 };

@@ -46,7 +46,7 @@ import {
   getTransactionByTicketCode,
 } from '../../../database';
 import Type from '../../../models/Type';
-import {listPairedDevices, printSales} from '../../../helper/printer';
+import {printSales} from '../../../helper/printer';
 import {
   getTransactionsAPI,
   sendTransactionAPI,
@@ -1171,7 +1171,6 @@ const History: React.FC<any> = ({navigation}) => {
 
   const handlePrintSales = useCallback(() => {
     if (transactions.length > 0) {
-      listPairedDevices();
       printSales(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
     }
   }, [
