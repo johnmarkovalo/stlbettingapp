@@ -1,31 +1,37 @@
-import ThermalPrinterModule from 'react-native-thermal-printer';
-import {store} from '../store/store';
-import {checkIfDouble} from '.';
+// POS SDK (Nyx) for built-in printer
+let NyxPrinterModule, PrintAlign, PrinterStatus;
+try {
+  const nyxModule = require('../native/nyx-printer');
+  NyxPrinterModule = nyxModule.default || nyxModule;
+  PrintAlign = nyxModule.PrintAlign;
+  PrinterStatus = nyxModule.PrinterStatus;
+} catch (error) {
+  console.warn('Nyx printer module not available:', error?.message || error);
+  NyxPrinterModule = null;
+}
 import moment from 'moment';
 
 // Global print queue to prevent multiple simultaneous print jobs
 let isPrinting = false;
 
-// Helper function to get printer MAC address from Redux state
-function getPrinterMacAddress() {
-  try {
-    const state = store.getState();
-    const macAddress = state.printer?.printerMacAddress;
-    if (!macAddress) {
-      throw new Error(
-        'No printer configured. Please select a printer in Printer Setup.',
-      );
-    }
-    return macAddress;
-  } catch (error) {
-    console.error('Error getting printer MAC address:', error);
+// Check if Nyx printer is available
+async function checkNyxPrinter() {
+  if (!NyxPrinterModule || !PrintAlign || !PrinterStatus) {
     throw new Error(
-      'Printer not configured. Please select a printer in Printer Setup.',
+      'Nyx printer not available. Please ensure the printer service is installed on the device.',
     );
   }
+
+  const status = await NyxPrinterModule.getPrinterStatus();
+  if (status !== PrinterStatus.SDK_OK) {
+    throw new Error(`Printer status error: ${PrinterStatus.msg(status)}`);
+  }
 }
+
 async function printSales(betDate, betTime, betType, totalAmount, user) {
-  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
+  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${
+    betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'
+  } Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const total = 'TOTAL SALES: <b>' + totalAmount + '.00</b>';
   const textToPrint =
@@ -43,7 +49,9 @@ async function printSales(betDate, betTime, betType, totalAmount, user) {
 }
 
 async function printHits(betDate, betTime, betType, totalAmount, user) {
-  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
+  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${
+    betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'
+  } Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const totalTarget = 'TARGET:' + totalAmount.totalTarget + '.00';
   const totalRambol = 'RAMBOL:' + totalAmount.totalRambol + '.00';
@@ -62,7 +70,9 @@ async function printHits(betDate, betTime, betType, totalAmount, user) {
 }
 
 async function printTransaction(transaction, betType, bets, user) {
-  const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'} Draw | ${betType.name.replace(/\s/g, '')}`;
+  const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${
+    transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'
+  } Draw | ${betType.name.replace(/\s/g, '')}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const ticket = `${transaction.ticketcode}`;
   const total = `TOTAL: <b>${transaction.total}.00</b>`;
@@ -72,8 +82,9 @@ async function printTransaction(transaction, betType, bets, user) {
     let rambol = bet.rambolAmount.toString() + ' R';
     betString += justifySpaceBetween(bet.betNumber, target, rambol);
   });
-  const textToPrint =
-    // '<img>http://philippinestl.com/downloads/zianLogo.png</img>\n' +
+
+  // Print transaction text first (without QR code)
+  const transactionText =
     '--------------------------------' +
     '       SMALL TOWN LOTTERY       ' +
     '              ZIAN              ' +
@@ -104,20 +115,46 @@ async function printTransaction(transaction, betType, bets, user) {
     '  ____________________________  ' +
     "    Ticket Holder's Signature   " +
     '                                ' +
-    "\n<qrcode size='20'>" +
-    ticket +
-    '</qrcode>\n ' +
-    '\n\n ';
-  await print(textToPrint);
+    '\n\n';
+
+  // Print transaction text first
+  await print(transactionText);
+
+  // Wait a bit for the printer to finish processing the text before printing QR code
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Then print QR code
+  await printQRCode(ticket);
 }
 
-// Strip HTML tags to prevent massive expansion by the printer library
-// Thermal printers don't render HTML anyway, so we just need plain text
-function stripHTMLTags(text) {
-  // Remove all HTML tags including <b>, </b>, <qrcode>, </qrcode>, etc.
-  return text.replace(/<[^>]*>/g, '');
+// Helper function to print QR code using Nyx printer
+async function printQRCode(ticket) {
+  if (!NyxPrinterModule || !PrintAlign || !PrinterStatus) {
+    console.warn('Nyx printer not available for QR code printing');
+    return;
+  }
+
+  try {
+    const status = await NyxPrinterModule.getPrinterStatus();
+    if (status === PrinterStatus.SDK_OK) {
+      await NyxPrinterModule.printQrCode(
+        String(ticket),
+        300,
+        300,
+        PrintAlign.CENTER,
+      );
+      await NyxPrinterModule.printText('\n', {});
+      await NyxPrinterModule.printEndAutoOut();
+      console.log('QR code printed via Nyx printer');
+    } else {
+      console.warn(`Nyx printer status error: ${PrinterStatus.msg(status)}`);
+    }
+  } catch (e) {
+    console.warn('QR code print failed:', e?.message || e);
+  }
 }
 
+// Parse and print text with HTML formatting support
 async function print(text) {
   // Prevent concurrent print jobs
   if (isPrinting) {
@@ -130,485 +167,149 @@ async function print(text) {
   isPrinting = true;
 
   try {
-    // Get printer MAC address from Redux
-    const macAddress = getPrinterMacAddress();
+    // Check printer availability
+    await checkNyxPrinter();
 
-    ThermalPrinterModule.defaultConfig = {
-      timeout: 30000,
-      macAddress: macAddress,
-    };
+    // Process text line by line
+    const lines = text.split('\n');
 
-    // Strip HTML tags first - they cause massive expansion (20-30x) and thermal printers can't render them anyway
-    const textWithoutHTML = stripHTMLTags(text);
-    const cleanText = textWithoutHTML.trim();
-    const textSize = estimateTextSize(cleanText);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
 
-    // Now that HTML tags are stripped, we can use reasonable chunk sizes
-    // Use 1800 bytes max to stay under the 2048-byte buffer limit
-    const maxChunkSize = 1800;
-
-    // If text is small enough, send directly
-    if (textSize < maxChunkSize) {
-      try {
-        await ThermalPrinterModule.printBluetooth({
-          payload: cleanText,
-          macAddress: macAddress,
-        });
-        console.log('Print completed successfully');
-
-        // Wait for printer buffer to drain
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return;
-      } catch (singleSendError) {
-        console.warn(
-          'Single send failed, falling back to chunking:',
-          singleSendError.message,
-        );
-        // Fall through to chunking
+      // Handle empty lines
+      if (line.trim().length === 0) {
+        await NyxPrinterModule.printText('\n', {});
+        continue;
       }
+
+      // Process line with HTML tags
+      await processLine(line);
     }
 
-    // Split into chunks for larger texts
-    const chunks = splitIntoChunksSafe(cleanText, maxChunkSize);
-    console.log(`Printing ${chunks.length} chunks (${textSize} bytes)`);
-
-    // Send chunks sequentially with delays to allow buffer to drain naturally
-    for (let i = 0; i < chunks.length; i++) {
-      let retries = 0;
-      const maxRetries = 3;
-      let success = false;
-
-      while (retries < maxRetries && !success) {
-        try {
-          await ThermalPrinterModule.printBluetooth({
-            payload: chunks[i],
-            macAddress: macAddress,
-          });
-          success = true;
-
-          // Delay between chunks to allow printer buffer to process and drain
-          if (i < chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
-        } catch (chunkError) {
-          retries++;
-
-          // If device not found, stop immediately
-          if (
-            chunkError.message.includes('Bluetooth Device Not Found') ||
-            chunkError.message.includes('Device Not Found') ||
-            chunkError.message.includes('not found')
-          ) {
-            throw new Error(
-              'Printer not connected. Please check printer connection in Printer Setup.',
-            );
-          }
-
-          // Buffer overflow - split the chunk smaller
-          if (
-            chunkError.message.includes('src.length') &&
-            chunkError.message.includes('dst.length')
-          ) {
-            console.warn(
-              `Buffer overflow on chunk ${i + 1}/${chunks.length}, splitting smaller`,
-            );
-
-            // Split this chunk into smaller pieces
-            const smallerChunks = splitIntoChunksSafe(
-              chunks[i],
-              maxChunkSize / 2,
-            );
-            for (const smallChunk of smallerChunks) {
-              try {
-                await ThermalPrinterModule.printBluetooth({
-                  payload: smallChunk,
-                  macAddress: macAddress,
-                });
-                await new Promise(resolve => setTimeout(resolve, 200));
-              } catch (smallChunkError) {
-                console.warn('Small chunk failed:', smallChunkError.message);
-                await new Promise(resolve => setTimeout(resolve, 200));
-              }
-            }
-            success = true;
-          } else if (retries >= maxRetries) {
-            // Other errors after retries
-            throw chunkError;
-          } else {
-            // Retry with delay
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
-        }
-      }
-    }
-
+    // Feed paper and cut
+    await NyxPrinterModule.printEndAutoOut();
     console.log('Print completed successfully');
-
-    // Wait longer for printer buffer to naturally drain completely
-    // This ensures the next print won't have buffer accumulation issues
-    await new Promise(resolve => setTimeout(resolve, 800));
   } catch (error) {
     console.error('Error printing:', error);
-
-    // Wait a bit even on error to let buffer drain
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     throw error;
   } finally {
     isPrinting = false;
   }
 }
 
-// Split text into safe chunks that won't exceed buffer size
-// Accounts for HTML tag expansion (20-30x) by using very small chunk sizes
-function splitIntoChunksSafe(text, maxChunkSizeBytes) {
-  const chunks = [];
-
-  // For very small max size (accounting for HTML expansion), split character by character
-  // or in small groups
-  if (maxChunkSizeBytes <= 200) {
-    let currentChunk = '';
-    let currentChunkSize = 0;
-
-    // Split character by character, grouping up to maxChunkSizeBytes
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      // Estimate char size - assume HTML tags might expand it
-      const charSize = estimateTextSize(char);
-
-      // If adding this char would exceed limit, save current chunk
-      if (
-        currentChunkSize + charSize > maxChunkSizeBytes &&
-        currentChunk.length > 0
-      ) {
-        chunks.push(currentChunk);
-        currentChunk = char;
-        currentChunkSize = charSize;
-      } else {
-        currentChunk += char;
-        currentChunkSize += charSize;
-      }
-    }
-
-    // Add last chunk
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
-    }
-
-    return chunks.length > 0 ? chunks : [text];
-  }
-
-  // For larger chunks, split by lines first
-  const lines = text.split('\n');
-  let currentChunk = '';
-  let currentChunkSize = 0;
-
-  for (const line of lines) {
-    const lineWithNewline = line + '\n';
-    const lineSize = estimateTextSize(lineWithNewline);
-
-    // If single line exceeds max size, split it character by character
-    if (lineSize > maxChunkSizeBytes) {
-      // Save current chunk first
-      if (currentChunk.length > 0) {
-        chunks.push(currentChunk);
-        currentChunk = '';
-        currentChunkSize = 0;
-      }
-      // Split the long line character by character
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const charSize = estimateTextSize(char);
-        if (
-          currentChunkSize + charSize > maxChunkSizeBytes &&
-          currentChunk.length > 0
-        ) {
-          chunks.push(currentChunk);
-          currentChunk = char;
-          currentChunkSize = charSize;
-        } else {
-          currentChunk += char;
-          currentChunkSize += charSize;
-        }
-      }
-      // Add newline
-      if (currentChunk.length > 0) {
-        currentChunk += '\n';
-        currentChunkSize += 1;
-      }
-      continue;
-    }
-
-    // Check if adding this line would exceed chunk size
-    if (
-      currentChunkSize + lineSize > maxChunkSizeBytes &&
-      currentChunk.length > 0
-    ) {
-      chunks.push(currentChunk);
-      currentChunk = lineWithNewline;
-      currentChunkSize = lineSize;
-    } else {
-      currentChunk += lineWithNewline;
-      currentChunkSize += lineSize;
-    }
-  }
-
-  // Add last chunk
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks.length > 0 ? chunks : [text];
-}
-
-// Split text into very small chunks - HTML tags expand massively
-// Split into 5-character chunks to account for 20-30x expansion
-function splitTextRespectingHTMLTags(text) {
-  const chunks = [];
-  const maxChunkSize = 5; // Very small: 5 characters per chunk
-
-  let i = 0;
-  while (i < text.length) {
-    // Take only 5 characters at a time to stay well under buffer limits
-    const chunk = text.substring(i, Math.min(i + maxChunkSize, text.length));
-    if (chunk.length > 0) {
-      chunks.push(chunk);
-    }
-    i += maxChunkSize;
-  }
-
-  return chunks.length > 0 ? chunks : [text];
-}
-
-function splitTextIntoChunks(text, maxChunkSize) {
-  const chunks = [];
-
-  // Use byte size for accurate chunking
-  const textByteSize = estimateTextSize(text);
-
-  // Always split if text is larger than chunk size (no single chunk optimization)
-  if (textByteSize <= maxChunkSize && text.length <= maxChunkSize) {
-    return [text];
-  }
-
-  // For very small chunks (emergency splitting), split character by character
-  if (maxChunkSize <= 50) {
-    let currentChunk = '';
-    let currentChunkSize = 0;
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const charByteSize = estimateTextSize(char);
-
-      if (
-        currentChunkSize + charByteSize > maxChunkSize &&
-        currentChunk.length > 0
-      ) {
-        chunks.push(currentChunk);
-        currentChunk = char;
-        currentChunkSize = charByteSize;
-      } else {
-        currentChunk += char;
-        currentChunkSize += charByteSize;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
-    }
-
-    return chunks.length > 0 ? chunks : [text];
-  }
-
-  // For larger chunks, try to split by lines first
-  const lines = text.split('\n');
-  let currentChunk = '';
-  let currentChunkSize = 0;
-
-  for (const line of lines) {
-    const lineWithNewline = line + '\n';
-    const lineByteSize = estimateTextSize(lineWithNewline);
-
-    // If a single line is too large, split it character by character
-    if (lineByteSize > maxChunkSize) {
-      // Save current chunk first
-      if (currentChunk.length > 0) {
-        chunks.push(currentChunk);
-        currentChunk = '';
-        currentChunkSize = 0;
-      }
-      // Split the long line character by character
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const charByteSize = estimateTextSize(char);
-        if (
-          currentChunkSize + charByteSize > maxChunkSize &&
-          currentChunk.length > 0
-        ) {
-          chunks.push(currentChunk + '\n');
-          currentChunk = char;
-          currentChunkSize = charByteSize;
-        } else {
-          currentChunk += char;
-          currentChunkSize += charByteSize;
-        }
-      }
-      // Add newline if we have a chunk
-      if (currentChunk.length > 0) {
-        currentChunk += '\n';
-        currentChunkSize += 1;
-      }
-      continue;
-    }
-
-    // If adding this line would exceed the chunk size, save current chunk and start new one
-    if (
-      currentChunkSize + lineByteSize > maxChunkSize &&
-      currentChunk.length > 0
-    ) {
-      chunks.push(currentChunk);
-      currentChunk = lineWithNewline;
-      currentChunkSize = lineByteSize;
-    } else {
-      currentChunk += lineWithNewline;
-      currentChunkSize += lineByteSize;
-    }
-  }
-
-  // Add the last chunk if it has content
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks.length > 0 ? chunks : [text];
-}
-
-function estimateTextSize(text) {
-  // Rough estimation of text size in bytes (UTF-8)
-  // Most characters are 1 byte, but some special characters might be more
-  // In React Native, we approximate by string length
-  // For more accurate estimation, we count characters that might be multi-byte
-  let byteSize = 0;
-  for (let i = 0; i < text.length; i++) {
-    const charCode = text.charCodeAt(i);
-    // ASCII characters (0-127) are 1 byte
-    // Characters above 127 can be 2-4 bytes in UTF-8
-    if (charCode < 128) {
-      byteSize += 1;
-    } else if (charCode < 2048) {
-      byteSize += 2;
-    } else if (charCode < 65536) {
-      byteSize += 3;
-    } else {
-      byteSize += 4;
-    }
-  }
-  return byteSize;
-}
-
-async function listPairedDevices() {
-  try {
-    const pairedDevices = await ThermalPrinterModule.getBluetoothDeviceList();
-    console.log('Paired Bluetooth Devices:', pairedDevices);
-    return pairedDevices;
-  } catch (error) {
-    console.error('Error listing devices:', error);
-    return [];
-  }
-}
-
-async function checkPrinterConnection() {
-  // Since "Default Printer" is configured, skip device listing
-  // The thermal printer library will handle the connection when printing
-  // If printer is not available, the print call itself will fail with appropriate error
-  return true;
-}
-
-async function clearPrinterBuffer() {
-  try {
-    // Get MAC address - if not configured, skip silently (non-critical operation)
-    let macAddress;
-    try {
-      macAddress = getPrinterMacAddress();
-    } catch (error) {
-      // No printer configured - skip silently as this is non-critical
-      return;
-    }
-
-    // Send ESC/POS commands to clear printer buffer and reset state
-    // This helps prevent state accumulation between prints
-    // Only send initialization commands, no line feeds to avoid wasting paper
-    const clearCommands = [
-      '\x1B\x40', // ESC @ - Initialize printer (clears buffer)
-      '\x1B\x61\x00', // ESC a 0 - Left alignment
-    ].join('');
-
-    await ThermalPrinterModule.printBluetooth({
-      payload: clearCommands,
-      macAddress: macAddress,
+// Process a single line, handling HTML tags and formatting
+async function processLine(line) {
+  // Extract bold text segments
+  const boldRegex = /<b>(.*?)<\/b>/g;
+  const boldMatches = [];
+  let match;
+  while ((match = boldRegex.exec(line)) !== null) {
+    boldMatches.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      text: match[1],
     });
+  }
 
-    // Wait for printer to process the clear commands
-    await new Promise(resolve => setTimeout(resolve, 150));
-  } catch (error) {
-    // If device not found, skip silently - this is expected if printer is disconnected
-    if (
-      error.message &&
-      (error.message.includes('not found') ||
-        error.message.includes('Not Found'))
-    ) {
-      return; // Skip silently
+  if (boldMatches.length > 0) {
+    // Handle lines with bold text - preserve spacing
+    let currentIndex = 0;
+    let hasContent = false;
+
+    for (const boldMatch of boldMatches) {
+      // Print text before bold (preserve spacing)
+      if (boldMatch.start > currentIndex) {
+        const beforeText = line.substring(currentIndex, boldMatch.start);
+        if (beforeText.trim().length > 0 || hasContent) {
+          // Only print if there's actual content or we've already started printing
+          await printFormattedLine(beforeText, line);
+          hasContent = true;
+        }
+      }
+
+      // Print bold text with larger size
+      await NyxPrinterModule.printText(boldMatch.text, {
+        textSize: 28,
+        align: getTextAlign(line),
+      });
+      hasContent = true;
+
+      currentIndex = boldMatch.end;
     }
-    console.warn('Error clearing printer buffer:', error.message);
-    // Don't throw error here as it's not critical
+
+    // Print remaining text after last bold
+    if (currentIndex < line.length) {
+      const afterText = line.substring(currentIndex);
+      if (afterText.trim().length > 0 || hasContent) {
+        await printFormattedLine(afterText, line);
+      }
+    }
+
+    // Newline after the line
+    await NyxPrinterModule.printText('\n', {});
+  } else {
+    // Regular line without bold - preserve original spacing for alignment
+    await printFormattedLine(line, line);
   }
 }
 
-async function resetPrinterConnection() {
-  // Reset printer connection state to clear any cached/buffered data
-  // This prevents state accumulation from previous prints
-  try {
-    // Get MAC address - if not configured, skip silently (non-critical operation)
-    let macAddress;
-    try {
-      macAddress = getPrinterMacAddress();
-    } catch (error) {
-      // No printer configured - skip silently as this is non-critical
-      return;
-    }
-
-    // Send ESC/POS reset command to clear printer state
-    const resetCommands = '\x1B\x40'; // ESC @ - Initialize/Reset printer
-
-    try {
-      await ThermalPrinterModule.printBluetooth({
-        payload: resetCommands,
-        macAddress: macAddress,
-      });
-      // Wait for printer to process reset
-      await new Promise(resolve => setTimeout(resolve, 200));
-    } catch (resetError) {
-      // If reset fails due to device not found, skip it silently
-      // This is normal if printer is not connected - the actual print will handle it
-      if (
-        resetError.message &&
-        (resetError.message.includes('not found') ||
-          resetError.message.includes('Not Found'))
-      ) {
-        // Device not available - skip reset, actual print will handle the error
-        return;
-      }
-      // For other errors, log but continue
-      console.warn(
-        'Printer reset command failed (may be non-critical):',
-        resetError.message,
-      );
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  } catch (error) {
-    console.warn('Error in resetPrinterConnection:', error.message);
-    // Non-critical, continue anyway
+// Print a formatted line with proper alignment
+async function printFormattedLine(text, originalLine) {
+  const trimmed = text.trim();
+  if (trimmed.length === 0 && text.length === 0) {
+    await NyxPrinterModule.printText('\n', {});
+    return;
   }
+
+  const align = getTextAlign(originalLine);
+
+  // Remove HTML tags from text before printing
+  const cleanText = trimmed.replace(/<[^>]*>/g, '');
+
+  if (cleanText.length === 0) {
+    await NyxPrinterModule.printText('\n', {});
+    return;
+  }
+
+  // For centered text (lines with padding), use printText2 with width constraint
+  if (align === PrintAlign.CENTER) {
+    // Use a reasonable width for 32-character lines (approximately 384px for 32 chars at 12px each)
+    await NyxPrinterModule.printText2(
+      cleanText,
+      {textSize: 24},
+      384,
+      PrintAlign.CENTER,
+    );
+  } else {
+    // For left or right aligned, use regular printText
+    await NyxPrinterModule.printText(cleanText, {
+      textSize: 24,
+      align: align,
+    });
+  }
+}
+
+// Determine text alignment based on padding
+function getTextAlign(line) {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return PrintAlign.LEFT;
+
+  // Check padding on both sides
+  const leadingSpaces = line.length - line.trimStart().length;
+  const trailingSpaces = line.length - line.trimEnd().length;
+
+  // If line has significant padding on both sides (centered), use center
+  if (leadingSpaces >= 5 && trailingSpaces >= 5) {
+    return PrintAlign.CENTER;
+  }
+
+  // If has more leading spaces than trailing, it's likely right-aligned
+  if (leadingSpaces > trailingSpaces && leadingSpaces > 10) {
+    return PrintAlign.RIGHT;
+  }
+
+  // Default to left alignment
+  return PrintAlign.LEFT;
 }
 
 function padStringToLength32(inputString) {
@@ -621,7 +322,7 @@ function padStringToLength32(inputString) {
   // Check if the string is already longer than 32 characters
   if (spacesToAdd <= 0) {
     // If so, return the input string as it is
-    return inputString;
+    return inputString + '\n';
   }
 
   // Add spaces at the start and end of the string
@@ -630,7 +331,7 @@ function padStringToLength32(inputString) {
     inputString +
     ' '.repeat(Math.ceil(spacesToAdd / 2));
 
-  return paddedString;
+  return paddedString + '\n';
 }
 
 function justifySpaceBetween(str1, str2, str3) {
@@ -649,7 +350,7 @@ function justifySpaceBetween(str1, str2, str3) {
     ' '.repeat(spacesBetween2) +
     str3;
 
-  return result;
+  return result + '\n';
 }
 
 function justifySpaceBetween2(str1, str2) {
@@ -660,22 +361,7 @@ function justifySpaceBetween2(str1, str2) {
   var spacesBetween1 = 32 - length1 - length2;
   // Construct the resulting string with spaces added between the input strings
   var result = '<b>' + str1 + ' '.repeat(spacesBetween1) + str2 + '</b>';
-  return result;
-}
-
-function formatNumberWithCommas(value) {
-  // Convert the value to a string
-  let stringValue = String(value);
-
-  // Split the string into parts before and after the decimal point (if any)
-  let parts = stringValue.split('.');
-  let integerPart = parts[0];
-
-  // Add commas to the integer part every three digits from the right
-  integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-  // Return only the integer part without the decimal part
-  return integerPart;
+  return result + '\n';
 }
 
 async function printTest() {
@@ -692,7 +378,6 @@ async function printTest() {
     '         TEST PRINT PAGE        ' +
     '\n' +
     padStringToLength32('Date: ' + dateTime) +
-    '\n' +
     '--------------------------------' +
     '\n' +
     'This is a test print to verify' +
@@ -701,11 +386,39 @@ async function printTest() {
     '\n' +
     'correctly.' +
     '\n' +
-    'Printer: Default Printer' +
+    'Printer: Nyx Built-in Printer' +
     '\n' +
     '--------------------------------' +
     '\n\n';
   await print(textToPrint);
+}
+
+// Placeholder functions for compatibility (no longer needed but kept for API compatibility)
+async function listPairedDevices() {
+  // Nyx printer is built-in, no Bluetooth pairing needed
+  return [];
+}
+
+async function checkPrinterConnection() {
+  // Nyx printer connection is automatic
+  try {
+    await checkNyxPrinter();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function clearPrinterBuffer() {
+  // Nyx printer handles buffer automatically
+  // No action needed for built-in printer
+  return;
+}
+
+async function resetPrinterConnection() {
+  // Nyx printer connection is automatic
+  // No action needed for built-in printer
+  return;
 }
 
 export {

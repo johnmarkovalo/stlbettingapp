@@ -77,6 +77,11 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.bettingapp"
+    
+    buildFeatures {
+        aidl true
+    }
+    
     defaultConfig {
         applicationId "com.bettingapp"
         minSdkVersion rootProject.ext.minSdkVersion
