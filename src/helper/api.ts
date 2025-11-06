@@ -293,6 +293,48 @@ class ApiClient {
       throw error;
     }
   }
+
+  /**
+   * Bulk fetch transactions by ticketcodes
+   * @param token - Auth token
+   * @param ticketcodes - Array of ticketcode strings
+   * @returns Array of transaction objects
+   */
+  async getTransactionsBulk(
+    token: string,
+    ticketcodes: string[],
+  ): Promise<Transaction[]> {
+    return this.makeRequest<Transaction[]>('POST', 'transactions/bulk', token, {
+      ticketcodes,
+    });
+  }
+
+  /**
+   * Bulk send transactions to server
+   * @param token - Auth token
+   * @param transactions - Array of transaction objects to sync
+   * @returns Response with success/failure for each transaction
+   */
+  async sendTransactionsBulk(
+    token: string,
+    transactions: any[],
+  ): Promise<{
+    success: boolean;
+    results: Array<{
+      ticketcode: string;
+      success: boolean;
+      error?: string;
+    }>;
+  }> {
+    return this.makeRequest<{
+      success: boolean;
+      results: Array<{
+        ticketcode: string;
+        success: boolean;
+        error?: string;
+      }>;
+    }>('POST', 'transactions/bulk-sync', token, {transactions});
+  }
 }
 
 // ============================================================================
@@ -330,3 +372,10 @@ export const syncResultAPI = (
 ) => apiClient.syncResult(token, type, draw, date);
 export const checkTransactionAPI = (ticketcode: string, token: string) =>
   apiClient.checkTransaction(ticketcode, token);
+
+// Bulk API methods
+export const getTransactionsBulkAPI = (token: string, ticketcodes: string[]) =>
+  apiClient.getTransactionsBulk(token, ticketcodes);
+
+export const sendTransactionsBulkAPI = (token: string, transactions: any[]) =>
+  apiClient.sendTransactionsBulk(token, transactions);

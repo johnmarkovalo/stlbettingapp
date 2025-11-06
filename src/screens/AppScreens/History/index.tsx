@@ -51,6 +51,8 @@ import {
   getTransactionsAPI,
   sendTransactionAPI,
   getTransactionViaTicketCodeAPI,
+  getTransactionsBulkAPI,
+  sendTransactionsBulkAPI,
 } from '../../../helper/api';
 
 // Define types for Redux state
@@ -379,62 +381,168 @@ const History: React.FC<any> = ({navigation}) => {
             continue;
           }
 
-          // Process batch transactions with concurrency limit
-          const batchResults = await processInBatchesWithConcurrency(
-            batchTransactions,
-            async transaction => {
-              try {
-                // Get bets for this transaction
-                const bets = await getBetsByTransaction(transaction.id);
+          // Use bulk API if we have many transactions, otherwise use individual requests
+          let batchResults: Array<{
+            success: boolean;
+            ticketcode: string;
+            error?: string;
+          }> = [];
 
-                // Prepare transaction data for server
-                // Use trans_data directly if available, otherwise convert bets
-                const transactionData = {
-                  ticketcode: transaction.ticketcode,
-                  trans_data: transaction.trans_data || convertToBets(bets),
-                  betdate: transaction.betdate,
-                  bettime: transaction.bettime,
-                  bettypeid: transaction.bettypeid,
-                  total: transaction.total,
-                  status: transaction.status,
-                  created_at: transaction.created_at,
-                };
+          if (batchTransactions.length >= 50) {
+            // Use bulk API for large batches
+            console.log(
+              `📤 Batch ${batchIndex + 1} - Using bulk API for ${batchTransactions.length} transactions`,
+            );
+            try {
+              // Prepare all transaction data
+              const transactionsToSync = await Promise.all(
+                batchTransactions.map(async transaction => {
+                  const bets = await getBetsByTransaction(transaction.id);
+                  return {
+                    ticketcode: transaction.ticketcode,
+                    trans_data: transaction.trans_data || convertToBets(bets),
+                    betdate: transaction.betdate,
+                    bettime: transaction.bettime,
+                    bettypeid: transaction.bettypeid,
+                    total: transaction.total,
+                    status: transaction.status,
+                    created_at: transaction.created_at,
+                    trans_no: transaction.trans_no || 1,
+                    gateway: 'Retrofit',
+                    bets: Array.isArray(bets)
+                      ? bets.map((bet: any) => ({
+                          betNumber: bet.betNumber || bet.betnumber || '',
+                          betNumberr: bet.betNumberr || bet.betnumberr || '',
+                          targetAmount: bet.targetAmount || bet.target || 0,
+                          rambolAmount: bet.rambolAmount || bet.rambol || 0,
+                          subtotal: bet.subtotal || 0,
+                        }))
+                      : [],
+                  };
+                }),
+              );
 
-                // Send to server
-                const serverResponse = await sendTransactionAPI(
-                  token,
-                  transactionData,
+              // Send bulk request
+              const bulkResponse = await sendTransactionsBulkAPI(
+                token,
+                transactionsToSync,
+              );
+
+              if (bulkResponse && bulkResponse.results) {
+                batchResults = bulkResponse.results.map(result => ({
+                  success: result.success,
+                  ticketcode: result.ticketcode,
+                  error: result.error,
+                }));
+                console.log(
+                  `✅ Batch ${batchIndex + 1} - Bulk sync completed: ${batchResults.filter(r => r.success).length} successful, ${batchResults.filter(r => !r.success).length} failed`,
                 );
+              } else {
+                throw new Error('Invalid bulk response');
+              }
+            } catch (bulkError) {
+              console.error(
+                `❌ Batch ${batchIndex + 1} - Bulk API failed, falling back to individual requests:`,
+                bulkError,
+              );
+              // Fallback to individual requests
+              batchResults = await processInBatchesWithConcurrency(
+                batchTransactions,
+                async transaction => {
+                  try {
+                    const bets = await getBetsByTransaction(transaction.id);
+                    const transactionData = {
+                      ticketcode: transaction.ticketcode,
+                      trans_data: transaction.trans_data || convertToBets(bets),
+                      betdate: transaction.betdate,
+                      bettime: transaction.bettime,
+                      bettypeid: transaction.bettypeid,
+                      total: transaction.total,
+                      status: transaction.status,
+                      created_at: transaction.created_at,
+                    };
 
-                if (serverResponse && serverResponse.success) {
-                  console.log(
-                    `✅ Batch ${batchIndex + 1} - Transaction ${transaction.ticketcode} synced successfully`,
+                    const serverResponse = await sendTransactionAPI(
+                      token,
+                      transactionData,
+                    );
+
+                    if (serverResponse && serverResponse.success) {
+                      return {
+                        success: true,
+                        ticketcode: transaction.ticketcode,
+                      };
+                    } else {
+                      return {
+                        success: false,
+                        ticketcode: transaction.ticketcode,
+                        error: 'Server response error',
+                      };
+                    }
+                  } catch (error) {
+                    return {
+                      success: false,
+                      ticketcode: transaction.ticketcode,
+                      error: (error as any)?.message || 'Unknown error',
+                    };
+                  }
+                },
+                CONCURRENCY_LIMIT,
+              );
+            }
+          } else {
+            // Use individual requests for smaller batches
+            batchResults = await processInBatchesWithConcurrency(
+              batchTransactions,
+              async transaction => {
+                try {
+                  const bets = await getBetsByTransaction(transaction.id);
+                  const transactionData = {
+                    ticketcode: transaction.ticketcode,
+                    trans_data: transaction.trans_data || convertToBets(bets),
+                    betdate: transaction.betdate,
+                    bettime: transaction.bettime,
+                    bettypeid: transaction.bettypeid,
+                    total: transaction.total,
+                    status: transaction.status,
+                    created_at: transaction.created_at,
+                  };
+
+                  const serverResponse = await sendTransactionAPI(
+                    token,
+                    transactionData,
                   );
-                  return {success: true, ticketcode: transaction.ticketcode};
-                } else {
-                  console.log(
-                    `❌ Batch ${batchIndex + 1} - Transaction ${transaction.ticketcode} failed to sync`,
+
+                  if (serverResponse && serverResponse.success) {
+                    console.log(
+                      `✅ Batch ${batchIndex + 1} - Transaction ${transaction.ticketcode} synced successfully`,
+                    );
+                    return {success: true, ticketcode: transaction.ticketcode};
+                  } else {
+                    console.log(
+                      `❌ Batch ${batchIndex + 1} - Transaction ${transaction.ticketcode} failed to sync`,
+                    );
+                    return {
+                      success: false,
+                      ticketcode: transaction.ticketcode,
+                      error: 'Server response error',
+                    };
+                  }
+                } catch (error) {
+                  console.error(
+                    `❌ Batch ${batchIndex + 1} - Error processing transaction ${transaction.ticketcode}:`,
+                    error,
                   );
                   return {
                     success: false,
                     ticketcode: transaction.ticketcode,
-                    error: 'Server response error',
+                    error: (error as any)?.message || 'Unknown error',
                   };
                 }
-              } catch (error) {
-                console.error(
-                  `❌ Batch ${batchIndex + 1} - Error processing transaction ${transaction.ticketcode}:`,
-                  error,
-                );
-                return {
-                  success: false,
-                  ticketcode: transaction.ticketcode,
-                  error: (error as any)?.message || 'Unknown error',
-                };
-              }
-            },
-            CONCURRENCY_LIMIT,
-          );
+              },
+              CONCURRENCY_LIMIT,
+            );
+          }
 
           // Process batch results (results are already unwrapped from processInBatchesWithConcurrency)
           const successfulSyncs: string[] = [];
@@ -666,7 +774,7 @@ const History: React.FC<any> = ({navigation}) => {
       );
       console.log(`🔍 Found ${localTicketcodeSet.size} local transactions`);
 
-      // Step 3: If ticketcode-only response, fetch full details in parallel
+      // Step 3: If ticketcode-only response, fetch full details
       let validServerTransactions: any[] = [];
       if (isTicketcodeOnlyResponse && serverTransactions.length > 0) {
         // Filter missing ticketcodes in memory (much faster)
@@ -678,30 +786,100 @@ const History: React.FC<any> = ({navigation}) => {
         );
 
         if (missingTicketcodes.length > 0) {
-          // Fetch full details in parallel batches (optimization)
-          console.log('📥 Fetching full transaction details in parallel...');
-          const fullTransactions = await processInBatches(
-            missingTicketcodes,
-            async (ticketcode: string) => {
-              try {
-                const fullTransaction = await getTransactionViaTicketCodeAPI(
-                  token,
-                  ticketcode,
+          // Use bulk API if available and we have many transactions (100+)
+          // Otherwise fall back to individual requests for smaller batches
+          if (missingTicketcodes.length >= 100) {
+            console.log(
+              `📥 Using bulk API to fetch ${missingTicketcodes.length} transactions...`,
+            );
+            try {
+              // Split into chunks of 500 to avoid payload size limits
+              const BULK_CHUNK_SIZE = 500;
+              const allTransactions: any[] = [];
+
+              for (
+                let i = 0;
+                i < missingTicketcodes.length;
+                i += BULK_CHUNK_SIZE
+              ) {
+                const chunk = missingTicketcodes.slice(i, i + BULK_CHUNK_SIZE);
+                console.log(
+                  `📥 Fetching bulk chunk ${Math.floor(i / BULK_CHUNK_SIZE) + 1} (${chunk.length} transactions)...`,
                 );
-                return fullTransaction && fullTransaction.ticketcode
-                  ? fullTransaction
-                  : null;
-              } catch (error) {
-                console.error(`❌ Error fetching ${ticketcode}:`, error);
-                return null;
+                const chunkTransactions = await getTransactionsBulkAPI(
+                  token,
+                  chunk,
+                );
+                if (Array.isArray(chunkTransactions)) {
+                  allTransactions.push(...chunkTransactions);
+                }
+                // Small delay between chunks to avoid overwhelming server
+                if (i + BULK_CHUNK_SIZE < missingTicketcodes.length) {
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                }
               }
-            },
-            5, // Process 5 at a time
-          );
-          validServerTransactions = fullTransactions.filter(t => t !== null);
-          console.log(
-            `✅ Fetched ${validServerTransactions.length} full transaction details`,
-          );
+
+              validServerTransactions = allTransactions.filter(
+                (t: any) =>
+                  t && t.ticketcode && typeof t.ticketcode === 'string',
+              );
+              console.log(
+                `✅ Fetched ${validServerTransactions.length} full transaction details via bulk API`,
+              );
+            } catch (bulkError) {
+              console.error(
+                '❌ Bulk API failed, falling back to individual requests:',
+                bulkError,
+              );
+              // Fallback to individual requests
+              const fullTransactions = await processInBatches(
+                missingTicketcodes,
+                async (ticketcode: string) => {
+                  try {
+                    const fullTransaction =
+                      await getTransactionViaTicketCodeAPI(token, ticketcode);
+                    return fullTransaction && fullTransaction.ticketcode
+                      ? fullTransaction
+                      : null;
+                  } catch (error) {
+                    console.error(`❌ Error fetching ${ticketcode}:`, error);
+                    return null;
+                  }
+                },
+                3, // Reduced concurrency for fallback
+              );
+              validServerTransactions = fullTransactions.filter(
+                t => t !== null,
+              );
+            }
+          } else {
+            // For smaller batches, use individual requests
+            console.log(
+              '📥 Fetching full transaction details in parallel (small batch)...',
+            );
+            const fullTransactions = await processInBatches(
+              missingTicketcodes,
+              async (ticketcode: string) => {
+                try {
+                  const fullTransaction = await getTransactionViaTicketCodeAPI(
+                    token,
+                    ticketcode,
+                  );
+                  return fullTransaction && fullTransaction.ticketcode
+                    ? fullTransaction
+                    : null;
+                } catch (error) {
+                  console.error(`❌ Error fetching ${ticketcode}:`, error);
+                  return null;
+                }
+              },
+              5, // Process 5 at a time
+            );
+            validServerTransactions = fullTransactions.filter(t => t !== null);
+            console.log(
+              `✅ Fetched ${validServerTransactions.length} full transaction details`,
+            );
+          }
         }
       } else {
         // Already have full transaction objects
