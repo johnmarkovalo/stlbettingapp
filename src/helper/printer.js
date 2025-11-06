@@ -1,188 +1,382 @@
-import ThermalPrinterModule from 'react-native-thermal-printer';
-import {useSelector} from 'react-redux';
-import {checkIfDouble} from '.';
+// POS SDK (Nyx) for built-in printer
+let NyxPrinterModule, PrintAlign, PrinterStatus;
+try {
+  const nyxModule = require('../native/nyx-printer');
+  NyxPrinterModule = nyxModule.default || nyxModule;
+  PrintAlign = nyxModule.PrintAlign;
+  PrinterStatus = nyxModule.PrinterStatus;
+} catch (error) {
+  console.warn('Nyx printer module not available:', error?.message || error);
+  NyxPrinterModule = null;
+}
 import moment from 'moment';
-async function printSales(betDate, betTime, betType, totalAmount, user) {
-  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
-  const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
-  const total = 'TOTAL SALES: <b>' + totalAmount + '.00</b>';
-  const textToPrint =
-    padStringToLength32(infoHeader) +
-    padStringToLength32(dateTime) +
-    padStringToLength32(user.agent_name) +
-    '--------------------------------' +
-    '\n' +
-    padStringToLength32(total) +
-    '\n\n' +
-    '  ____________________________  ' +
-    "       Teller's Signature       " +
-    '\n\n ';
-  print(textToPrint);
+
+// Global print queue to prevent multiple simultaneous print jobs
+let isPrinting = false;
+
+// Check if Nyx printer is available
+async function checkNyxPrinter() {
+  if (!NyxPrinterModule || !PrintAlign || !PrinterStatus) {
+    throw new Error(
+      'Nyx printer not available. Please ensure the printer service is installed on the device.',
+    );
+  }
+
+  const status = await NyxPrinterModule.getPrinterStatus();
+  if (status !== PrinterStatus.SDK_OK) {
+    throw new Error(`Printer status error: ${PrinterStatus.msg(status)}`);
+  }
 }
 
-async function printHits(betDate, betTime, betType, totalAmount,user) {
-  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'} Draw | ${betType}`;
+async function printSales(betDate, betTime, betType, totalAmount, user) {
+  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${
+    betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'
+  } Draw | ${betType}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
-  const totalTarget = 'TARGET:' + totalAmount.totalTarget + '.00';
-  const totalRambol = 'RAMBOL:' + totalAmount.totalRambol + '.00';
-  const textToPrint =
-    padStringToLength32(infoHeader) +
-    padStringToLength32(dateTime) +
-    padStringToLength32(user.agent_name) +
-    '--------------------------------' +
-    '\n' +
-    justifySpaceBetween2(totalTarget, totalRambol) +
-    '\n\n' +
-    '  ____________________________  ' +
-    "       Teller's Signature       " +
-    '\n\n ';
-  print(textToPrint);
+  const total = `TOTAL SALES:\t${totalAmount}.00`;
+
+  // Prevent concurrent print jobs
+  if (isPrinting) {
+    console.log('Print job already in progress, waiting...');
+    while (isPrinting) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  isPrinting = true;
+
+  try {
+    // Check printer availability
+    await checkNyxPrinter();
+
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(infoHeader, {align: PrintAlign.CENTER});
+    await NyxPrinterModule.printText('Date:\t' + dateTime, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(user.agent_name, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(total, {
+      textSize: 28,
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printText('____________________________', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText("Teller's Signature", {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+
+    // Feed paper and cut
+    await NyxPrinterModule.printEndAutoOut();
+    console.log('Print completed successfully');
+  } catch (error) {
+    console.error('Error printing:', error);
+    throw error;
+  } finally {
+    isPrinting = false;
+  }
+}
+
+async function printHits(betDate, betTime, betType, totalAmount, user) {
+  const infoHeader = `${moment(betDate).format('MM-DD-YYYY')} | ${
+    betTime == 1 ? '1st' : betTime == 2 ? '2nd' : '3rd'
+  } Draw | ${betType}`;
+  const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
+  const totalTarget = `TARGET:\t${totalAmount.totalTarget}.00`;
+  const totalRambol = `RAMBOL:\t${totalAmount.totalRambol}.00`;
+
+  const weights = [1, 1];
+  const styles = [{align: PrintAlign.CENTER}, {align: PrintAlign.CENTER}];
+
+  // Prevent concurrent print jobs
+  if (isPrinting) {
+    console.log('Print job already in progress, waiting...');
+    while (isPrinting) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  isPrinting = true;
+
+  try {
+    // Check printer availability
+    await checkNyxPrinter();
+
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(infoHeader, {align: PrintAlign.CENTER});
+    await NyxPrinterModule.printText('Date:\t' + dateTime, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(user.agent_name, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printTableText([totalTarget, totalRambol], weights, [
+      {textSize: 28, align: PrintAlign.CENTER},
+      {textSize: 28, align: PrintAlign.CENTER},
+    ]);
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printText('____________________________', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText("Teller's Signature", {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+
+    // Feed paper and cut
+    await NyxPrinterModule.printEndAutoOut();
+    console.log('Print completed successfully');
+  } catch (error) {
+    console.error('Error printing:', error);
+    throw error;
+  } finally {
+    isPrinting = false;
+  }
 }
 
 async function printTransaction(transaction, betType, bets, user) {
-  const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'} Draw | ${betType.name.replace(/\s/g, '')}`;
+  const infoHeader = `${moment(transaction.betdate).format('MM-DD-YYYY')} | ${
+    transaction.bettime == 1 ? '1st' : transaction.bettime == 2 ? '2nd' : '3rd'
+  } Draw | ${betType.name.replace(/\s/g, '')}`;
   const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
   const ticket = `${transaction.ticketcode}`;
-  const total = `TOTAL: <b>${transaction.total}.00</b>`;
-  let betString = '';
-  await bets.forEach(bet => {
-    let target = bet.targetAmount.toString() + ' T';
-    let rambol = bet.rambolAmount.toString() + ' R';
-    betString += justifySpaceBetween(bet.betNumber, target, rambol);
-  });
-  const textToPrint =
-    // '<img>http://philippinestl.com/downloads/zianLogo.png</img>\n' +
-    '--------------------------------' +
-    '       SMALL TOWN LOTTERY       ' +
-    '              ZIAN              ' +
-    '--------------------------------' +
-    padStringToLength32(infoHeader) +
-    padStringToLength32('Printed: ' + dateTime) +
-    '<b>' +
-    padStringToLength32(ticket) +
-    '</b>' +
-    padStringToLength32('Agent: ' + user.agent_series) +
-    padStringToLength32(user.agent_name) +
-    '                                ' +
-    padStringToLength32('1PHP T WINS ' + betType.wintar) +
-    padStringToLength32('1PHP R WINS ' + betType.winram) +
-    padStringToLength32('1PHP Double R WINS ' + betType.winram2) +
-    '                                ' +
-    'No.          Target       Rambol' +
-    '--------------------------------' +
-    betString +
-    '--------------------------------' +
-    padStringToLength32(total) +
-    '                                       ' +
-    '      Valid for 1 month after   ' +
-    '   betting, otherwise forfeited ' +
-    '       No Ticket, No Payout     ' +
-    '                                ' +
-    '\n\n' +
-    '  ____________________________  ' +
-    "    Ticket Holder's Signature   " +
-    '                                ' +
-    "\n<qrcode size='25'>" +
-    ticket +
-    '</qrcode>\n ' +
-    '\n\n ';
-  print(textToPrint);
-}
+  const total = `TOTAL:\t${transaction.total}.00`;
 
-async function print(text) {
+  const weights = [1, 1, 1];
+  const styles = [
+    {align: PrintAlign.CENTER},
+    {align: PrintAlign.CENTER},
+    {align: PrintAlign.CENTER},
+  ];
+
+  // Prevent concurrent print jobs
+  if (isPrinting) {
+    console.log('Print job already in progress, waiting...');
+    while (isPrinting) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  isPrinting = true;
+
   try {
-    ThermalPrinterModule.defaultConfig = {
-      ...ThermalPrinterModule.defaultConfig,
-      timeout: 30000,
-      macAddress: '00:11:22:33:44:55',
-    };
-    await ThermalPrinterModule.printBluetooth({
-      payload: text,
-      macAddress: '00:11:22:33:44:55',
+    // Check printer availability
+    await checkNyxPrinter();
+
+    await NyxPrinterModule.printTableText(
+      ['------------------', '------------------', '-----------------'],
+      weights,
+      styles,
+    );
+    await NyxPrinterModule.printText('       SMALL TOWN LOTTERY       ', {
+      align: PrintAlign.CENTER,
     });
-    console.log('Done printing');
+    await NyxPrinterModule.printText('              ZIAN              ', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printTableText(
+      ['------------------', '------------------', '-----------------'],
+      weights,
+      styles,
+    );
+    await NyxPrinterModule.printText(infoHeader, {align: PrintAlign.CENTER});
+    await NyxPrinterModule.printText('Printed:\t' + dateTime, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(ticket, {
+      textSize: 28,
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('Agent:\t' + user.agent_series, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(user.agent_name, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printText('1PHP T WINS ' + betType.wintar, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('1PHP R WINS ' + betType.winram, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('1PHP Double R WINS ' + betType.winram2, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printTableText(
+      ['------------------', '------------------', '-----------------'],
+      weights,
+      styles,
+    );
+    await NyxPrinterModule.printTableText(
+      ['No.', 'Target', 'Rambol'],
+      weights,
+      styles,
+    );
+    await NyxPrinterModule.printTableText(
+      ['------------------', '------------------', '-----------------'],
+      weights,
+      styles,
+    );
+    for (const bet of bets) {
+      await NyxPrinterModule.printTableText(
+        [
+          bet.betNumber,
+          bet.targetAmount.toString() + ' T',
+          bet.rambolAmount.toString() + ' R',
+        ],
+        weights,
+        styles,
+      );
+    }
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printText(total, {align: PrintAlign.CENTER});
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printText(' Valid for 1 month after', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(' betting, otherwise forfeited', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(' No Ticket, No Payout', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('\n\n', {});
+    await NyxPrinterModule.printText('____________________________', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText(" Ticket Holder's Signature", {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+
+    await NyxPrinterModule.printQrCode(
+      String(ticket),
+      300,
+      300,
+      PrintAlign.CENTER,
+    );
+
+    // Feed paper and cut
+    await NyxPrinterModule.printEndAutoOut();
+    console.log('Print completed successfully');
   } catch (error) {
     console.error('Error printing:', error);
+    throw error;
+  } finally {
+    isPrinting = false;
   }
 }
 
-async function listPairedDevices() {
+async function printTest() {
+  const dateTime = moment().format('MM-DD-YYYY HH:mm:ss');
+
+  // Prevent concurrent print jobs
+  if (isPrinting) {
+    console.log('Print job already in progress, waiting...');
+    while (isPrinting) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  isPrinting = true;
+
   try {
-    const pairedDevices = await ThermalPrinterModule.getBluetoothDeviceList();
-    console.log('Paired Bluetooth Devices:', pairedDevices);
+    // Check printer availability
+    await checkNyxPrinter();
+
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('       SMALL TOWN LOTTERY       ', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('              ZIAN              ', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('         TEST PRINT PAGE        ', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('Date:\t' + dateTime, {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('This is a test print to verify', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('that your printer is working', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('correctly.', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('Printer:\tNyx Built-in Printer', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('--------------------------------', {
+      align: PrintAlign.CENTER,
+    });
+    await NyxPrinterModule.printText('', {});
+
+    // Feed paper and cut
+    await NyxPrinterModule.printEndAutoOut();
+    console.log('Print completed successfully');
   } catch (error) {
-    console.error('Error listing devices:', error);
+    console.error('Error printing:', error);
+    throw error;
+  } finally {
+    isPrinting = false;
   }
 }
 
-function padStringToLength32(inputString) {
-  // Get the length of the input string
-  var length = inputString.length;
+// Placeholder functions for compatibility (no longer needed but kept for API compatibility)
+async function listPairedDevices() {
+  // Nyx printer is built-in, no Bluetooth pairing needed
+  return [];
+}
 
-  // Calculate how many spaces need to be added
-  var spacesToAdd = 32 - length;
-
-  // Check if the string is already longer than 32 characters
-  if (spacesToAdd <= 0) {
-    // If so, return the input string as it is
-    return inputString;
+async function checkPrinterConnection() {
+  // Nyx printer connection is automatic
+  try {
+    await checkNyxPrinter();
+    return true;
+  } catch (error) {
+    return false;
   }
-
-  // Add spaces at the start and end of the string
-  var paddedString =
-    ' '.repeat(Math.floor(spacesToAdd / 2)) +
-    inputString +
-    ' '.repeat(Math.ceil(spacesToAdd / 2));
-
-  return paddedString;
 }
 
-function justifySpaceBetween(str1, str2, str3) {
-  // Calculate the length of each string
-  var length2 = str2.length;
-  var length3 = str3.length;
-
-  var spacesBetween1 = 15 - length2;
-  var spacesBetween2 = 14 - length3;
-
-  // Construct the resulting string with spaces added between the input strings
-  var result =
-    str1 +
-    ' '.repeat(spacesBetween1) +
-    str2 +
-    ' '.repeat(spacesBetween2) +
-    str3;
-
-  return result;
+async function resetPrinterConnection() {
+  // Nyx printer connection is automatic
+  // No action needed for built-in printer
+  return;
 }
 
-function justifySpaceBetween2(str1, str2) {
-  // Calculate the length of each string
-  var length1 = str1.length;
-  var length2 = str2.length;
-
-  var spacesBetween1 = 32 - length1 - length2;
-  // Construct the resulting string with spaces added between the input strings
-  var result =
-    '<b>'+str1 +
-    ' '.repeat(spacesBetween1) +
-    str2+'</b>';
-  return result;
-}
-
-function formatNumberWithCommas(value) {
-  // Convert the value to a string
-  let stringValue = String(value);
-
-  // Split the string into parts before and after the decimal point (if any)
-  let parts = stringValue.split('.');
-  let integerPart = parts[0];
-
-  // Add commas to the integer part every three digits from the right
-  integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-  // Return only the integer part without the decimal part
-  return integerPart;
-}
-
-export {printSales, printTransaction, printHits, listPairedDevices};
+export {
+  printSales,
+  printTransaction,
+  printHits,
+  printTest,
+  listPairedDevices,
+  checkPrinterConnection,
+  resetPrinterConnection,
+};

@@ -126,6 +126,22 @@ const Setting = (props: any) => {
                 <Text style={styles.cardTitle}>Sync Settings</Text>
               </View>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                navigation.navigate('PrinterSetup');
+              }}>
+              <View style={styles.cardAvatar}>
+                <MaterialIcon
+                  name="print"
+                  size={50}
+                  color={colors.darkGrey}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Printer Setup</Text>
+              </View>
+            </TouchableOpacity>
           </View>
           {/* <Text style={styles.cardSubTitle}>{APP_VERSION}</Text> */}
           <TouchableOpacity

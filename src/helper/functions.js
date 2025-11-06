@@ -106,8 +106,8 @@ export const getCurrentDraw = draws => {
   const currentTime = moment();
   const currentTimeStr = currentTime.format('HH:mm');
 
-  console.log('🕐 getCurrentDraw - Current time:', currentTimeStr);
-  console.log('📅 getCurrentDraw - Draws config:', draws);
+  // console.log('🕐 getCurrentDraw - Current time:', currentTimeStr);
+  // console.log('📅 getCurrentDraw - Draws config:', draws);
 
   // Find the draw that matches the current time
   const currentDraw = draws.find((draw, index) => {
@@ -117,11 +117,11 @@ export const getCurrentDraw = draws => {
     // Convert current time to moment for comparison
     const current = moment(currentTimeStr, 'HH:mm');
 
-    console.log(`🎯 Draw ${index + 1}: ${draw.start} - ${draw.end}`);
-    console.log(
-      `   Start: ${start.format('HH:mm')}, End: ${end.format('HH:mm')}`,
-    );
-    console.log(`   Current: ${current.format('HH:mm')}`);
+    // console.log(`🎯 Draw ${index + 1}: ${draw.start} - ${draw.end}`);
+    // console.log(
+    //   `   Start: ${start.format('HH:mm')}, End: ${end.format('HH:mm')}`,
+    // );
+    // console.log(`   Current: ${current.format('HH:mm')}`);
 
     // Use a more reliable time comparison method
     // Convert all times to minutes since midnight for accurate comparison
@@ -129,9 +129,9 @@ export const getCurrentDraw = draws => {
     const endMinutes = end.hours() * 60 + end.minutes();
     const currentMinutes = current.hours() * 60 + current.minutes();
 
-    console.log(
-      `   Start minutes: ${startMinutes}, End minutes: ${endMinutes}, Current minutes: ${currentMinutes}`,
-    );
+    // console.log(
+    //   `   Start minutes: ${startMinutes}, End minutes: ${endMinutes}, Current minutes: ${currentMinutes}`,
+    // );
 
     // Check if current time is between start and end (inclusive)
     let isBetween;
@@ -151,7 +151,7 @@ export const getCurrentDraw = draws => {
   });
 
   if (!currentDraw) {
-    console.log('❌ No active draw found - betting is closed');
+    // console.log('❌ No active draw found - betting is closed');
     return null;
   }
 
