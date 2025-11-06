@@ -267,8 +267,8 @@ async function printTransaction(transaction, betType, bets, user) {
 
     await NyxPrinterModule.printQrCode(
       String(ticket),
-      300,
-      300,
+      150,
+      150,
       PrintAlign.CENTER,
     );
 

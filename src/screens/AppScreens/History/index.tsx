@@ -127,6 +127,7 @@ const History: React.FC<any> = ({navigation}) => {
   const prevTypeRef = useRef<number | undefined>();
   const lastFetchTime = useRef<number | undefined>();
   const lastFetchCallTime = useRef<number | undefined>();
+  const isSyncingRef = useRef(false);
 
   // Memoized values
   const minDate = useMemo(() => moment().subtract(1, 'weeks').toDate(), []);
@@ -239,17 +240,21 @@ const History: React.FC<any> = ({navigation}) => {
   );
 
   const syncTransactions = useCallback(async () => {
-    if (syncing) {
+    if (syncing || isSyncingRef.current) {
       console.log('Sync already in progress, skipping...');
       return;
     }
 
+    isSyncingRef.current = true;
     setSyncing(true);
     setRefresh(true);
 
     try {
       if (!internetStatusCheck.current.isConnected()) {
         Alert.alert('Error', 'No internet connection');
+        isSyncingRef.current = false;
+        setRefresh(false);
+        setSyncing(false);
         return;
       }
 
@@ -281,6 +286,7 @@ const History: React.FC<any> = ({navigation}) => {
         'Failed to sync transactions. Please try again.',
       );
     } finally {
+      isSyncingRef.current = false;
       setRefresh(false);
       setSyncing(false);
     }
@@ -295,10 +301,36 @@ const History: React.FC<any> = ({navigation}) => {
     syncing,
   ]);
 
+  // Helper function to process API calls in parallel with concurrency limit
+  const processInBatchesWithConcurrency = async <T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    concurrency: number = 5,
+  ): Promise<R[]> => {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += concurrency) {
+      const batch = items.slice(i, i + concurrency);
+      const batchResults = await Promise.allSettled(
+        batch.map(item => processor(item)),
+      );
+      batchResults.forEach(result => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        }
+      });
+      // Small delay between concurrent batches to avoid overwhelming server
+      if (i + concurrency < items.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+    return results;
+  };
+
   // Batch syncing for 50+ unsynced transactions
   const syncTransactionsBatch = useCallback(
     async (totalUnsynced: number) => {
-      const BATCH_SIZE = 20; // Process 20 transactions at a time
+      const BATCH_SIZE = 20; // Fetch 20 transactions at a time from DB
+      const CONCURRENCY_LIMIT = 5; // Process max 5 API calls simultaneously
       const totalBatches = Math.ceil(totalUnsynced / BATCH_SIZE);
 
       // Initialize progress tracking
@@ -347,17 +379,19 @@ const History: React.FC<any> = ({navigation}) => {
             continue;
           }
 
-          // Process batch transactions
-          const batchResults = await Promise.allSettled(
-            batchTransactions.map(async transaction => {
+          // Process batch transactions with concurrency limit
+          const batchResults = await processInBatchesWithConcurrency(
+            batchTransactions,
+            async transaction => {
               try {
                 // Get bets for this transaction
                 const bets = await getBetsByTransaction(transaction.id);
 
                 // Prepare transaction data for server
+                // Use trans_data directly if available, otherwise convert bets
                 const transactionData = {
                   ticketcode: transaction.ticketcode,
-                  trans_data: convertToBets(bets),
+                  trans_data: transaction.trans_data || convertToBets(bets),
                   betdate: transaction.betdate,
                   bettime: transaction.bettime,
                   bettypeid: transaction.bettypeid,
@@ -398,20 +432,19 @@ const History: React.FC<any> = ({navigation}) => {
                   error: (error as any)?.message || 'Unknown error',
                 };
               }
-            }),
+            },
+            CONCURRENCY_LIMIT,
           );
 
-          // Process batch results
+          // Process batch results (results are already unwrapped from processInBatchesWithConcurrency)
           const successfulSyncs: string[] = [];
           const failedSyncs: string[] = [];
 
           batchResults.forEach(result => {
-            if (result.status === 'fulfilled' && result.value.success) {
-              successfulSyncs.push(result.value.ticketcode);
-            } else if (result.status === 'rejected') {
-              failedSyncs.push('unknown');
-            } else if (result.status === 'fulfilled' && !result.value.success) {
-              failedSyncs.push(result.value.ticketcode);
+            if (result && result.success) {
+              successfulSyncs.push(result.ticketcode);
+            } else {
+              failedSyncs.push(result?.ticketcode || 'unknown');
             }
           });
 
@@ -527,6 +560,27 @@ const History: React.FC<any> = ({navigation}) => {
     insertTransactionFromServer,
   ]);
 
+  // Helper function to process API calls in parallel with concurrency limit
+  const processInBatches = async <T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    batchSize: number = 5,
+  ): Promise<R[]> => {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await Promise.allSettled(
+        batch.map(item => processor(item)),
+      );
+      batchResults.forEach(result => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        }
+      });
+    }
+    return results;
+  };
+
   // Full sync flow: Fetch from server → Save missing → Sync unsynced → Show all
   const performFullSync = useCallback(async () => {
     if (syncing) {
@@ -536,261 +590,152 @@ const History: React.FC<any> = ({navigation}) => {
 
     setSyncing(true);
     setRefresh(true);
-
-    // Clear local state before starting sync
-    console.log('🧹 Clearing local transaction state before sync...');
-    setTransactions([]);
-    setTotalAmount(0);
     setInitialLoading(true);
 
-    // Show clearing state in UI
-    console.log('🧹 UI state cleared - showing loading state');
-
-    // Brief delay to show clearing state to user
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     try {
-      console.log('🚀 Starting full sync flow...');
+      console.log('🚀 Starting optimized full sync flow...');
 
-      // Step 1: Fetch from server (background process - no loading indicator)
-      console.log('📥 Step 1: Fetching transactions from server...');
-      let validServerTransactions: any[] = []; // Declare at function level
-      let serverResponse: any = null;
-      let serverTransactions: any[] = [];
-      let isTicketcodeOnlyResponse = false;
       let allTransactions: any[] = [];
 
-      if (internetStatusCheck.current.isConnected()) {
-        const serverResponse = await getTransactionsAPI(
-          token,
+      if (!internetStatusCheck.current.isConnected()) {
+        // No internet - just show local data
+        console.log('📥 No internet - showing local transactions only');
+        const localTransactions = await getTransactions(
           formattedDate,
           selectedDraw,
           selectedType,
-          user.keycode,
+        );
+        allTransactions = Array.isArray(localTransactions)
+          ? localTransactions
+          : [];
+        setTransactions(allTransactions);
+        setTotalAmount(
+          allTransactions.reduce((sum, item) => sum + (item.total || 0), 0),
+        );
+        setInitialLoading(false);
+        setSyncing(false);
+        setRefresh(false);
+        return;
+      }
+
+      // Step 1: Fetch server transactions
+      console.log('📥 Step 1: Fetching transactions from server...');
+      const serverResponse = await getTransactionsAPI(
+        token,
+        formattedDate,
+        selectedDraw,
+        selectedType,
+        user.keycode,
+      );
+
+      // Parse server response
+      let serverTransactions: any[] = [];
+      let isTicketcodeOnlyResponse = false;
+
+      if (serverResponse && Array.isArray(serverResponse)) {
+        if (
+          serverResponse.length > 0 &&
+          typeof serverResponse[0] === 'string'
+        ) {
+          isTicketcodeOnlyResponse = true;
+          serverTransactions = serverResponse;
+        } else {
+          serverTransactions = serverResponse;
+        }
+      } else if (serverResponse && (serverResponse as any).transactions) {
+        serverTransactions = (serverResponse as any).transactions || [];
+      } else if (serverResponse && (serverResponse as any).data) {
+        serverTransactions = (serverResponse as any).data || [];
+      }
+
+      console.log(
+        `📥 Found ${serverTransactions.length} server transactions (ticketcode-only: ${isTicketcodeOnlyResponse})`,
+      );
+
+      // Step 2: Get all local ticketcodes in ONE query (optimization)
+      console.log('🔍 Step 2: Getting local ticketcodes for comparison...');
+      const localTransactions = await getTransactions(
+        formattedDate,
+        selectedDraw,
+        selectedType,
+      );
+      const localTicketcodeSet = new Set(
+        (Array.isArray(localTransactions) ? localTransactions : []).map(
+          (t: any) => t.ticketcode,
+        ),
+      );
+      console.log(`🔍 Found ${localTicketcodeSet.size} local transactions`);
+
+      // Step 3: If ticketcode-only response, fetch full details in parallel
+      let validServerTransactions: any[] = [];
+      if (isTicketcodeOnlyResponse && serverTransactions.length > 0) {
+        // Filter missing ticketcodes in memory (much faster)
+        const missingTicketcodes = serverTransactions.filter(
+          (tc: string) => typeof tc === 'string' && !localTicketcodeSet.has(tc),
+        );
+        console.log(
+          `📥 Found ${missingTicketcodes.length} missing ticketcodes (out of ${serverTransactions.length} total)`,
         );
 
-        console.log('🔍 Raw server response:', serverResponse);
-
-        // Handle different possible API response structures
-        serverTransactions = [];
-        isTicketcodeOnlyResponse = false;
-
-        if (serverResponse && Array.isArray(serverResponse)) {
-          // Check if this is an array of ticketcode strings or full transaction objects
-          if (
-            serverResponse.length > 0 &&
-            typeof serverResponse[0] === 'string'
-          ) {
-            // This is an array of ticketcode strings only
-            console.log(
-              '📥 API returned ticketcode strings only, need to fetch full details',
-            );
-            isTicketcodeOnlyResponse = true;
-            serverTransactions = serverResponse;
-          } else {
-            // This is an array of full transaction objects
-            serverTransactions = serverResponse;
-          }
-        } else if (
-          serverResponse &&
-          (serverResponse as any).transactions &&
-          Array.isArray((serverResponse as any).transactions)
-        ) {
-          serverTransactions = (serverResponse as any).transactions;
-        } else if (
-          serverResponse &&
-          (serverResponse as any).data &&
-          Array.isArray((serverResponse as any).data)
-        ) {
-          serverTransactions = (serverResponse as any).data;
-        } else {
+        if (missingTicketcodes.length > 0) {
+          // Fetch full details in parallel batches (optimization)
+          console.log('📥 Fetching full transaction details in parallel...');
+          const fullTransactions = await processInBatches(
+            missingTicketcodes,
+            async (ticketcode: string) => {
+              try {
+                const fullTransaction = await getTransactionViaTicketCodeAPI(
+                  token,
+                  ticketcode,
+                );
+                return fullTransaction && fullTransaction.ticketcode
+                  ? fullTransaction
+                  : null;
+              } catch (error) {
+                console.error(`❌ Error fetching ${ticketcode}:`, error);
+                return null;
+              }
+            },
+            5, // Process 5 at a time
+          );
+          validServerTransactions = fullTransactions.filter(t => t !== null);
           console.log(
-            '📥 API response structure not recognized:',
-            serverResponse,
+            `✅ Fetched ${validServerTransactions.length} full transaction details`,
           );
         }
+      } else {
+        // Already have full transaction objects
+        validServerTransactions = serverTransactions.filter(
+          (t: any) => t && t.ticketcode && typeof t.ticketcode === 'string',
+        );
+      }
 
-        if (serverTransactions && Array.isArray(serverTransactions)) {
-          console.log(
-            `📥 Found ${serverTransactions.length} transactions on server`,
-          );
+      // Step 4: Save missing transactions in parallel (optimization)
+      if (validServerTransactions.length > 0) {
+        console.log('💾 Step 4: Saving missing transactions in parallel...');
+        const transactionsToSave = validServerTransactions.filter(
+          (serverTx: any) => !localTicketcodeSet.has(serverTx.ticketcode),
+        );
 
-          // Debug: Log the structure of server transactions
-          console.log('🔍 Server transactions structure:', {
-            isArray: Array.isArray(serverTransactions),
-            length: serverTransactions.length,
-            isTicketcodeOnly: isTicketcodeOnlyResponse,
-            sampleItems: serverTransactions.slice(0, 3).map((item, index) => ({
-              index,
-              item,
-              hasTicketcode: item && item.ticketcode,
-              ticketcodeType:
-                item && item.ticketcode ? typeof item.ticketcode : 'undefined',
-              isString: typeof item === 'string',
-            })),
-          });
-
-          // If we only got ticketcode strings, fetch full transaction details
-          if (isTicketcodeOnlyResponse) {
-            console.log(
-              '📥 API returned ticketcode strings - checking which ones are missing locally...',
-            );
-            const fullTransactions = [];
-            const missingTicketcodes = [];
-
-            // First, check which ticketcodes we don't have locally
-            for (const ticketcode of serverTransactions) {
+        if (transactionsToSave.length > 0) {
+          const saveResults = await processInBatches(
+            transactionsToSave,
+            async (serverTransaction: any) => {
               try {
-                if (typeof ticketcode === 'string') {
-                  // Check if this transaction already exists locally
-                  const existingTransaction = await new Promise(resolve => {
-                    getTransactionByTicketCode(ticketcode, resolve);
-                  });
-
-                  if (!existingTransaction) {
-                    // This ticketcode doesn't exist locally - mark it for fetching
-                    missingTicketcodes.push(ticketcode);
-                    console.log(
-                      `📥 Ticketcode ${ticketcode} is missing locally - will fetch details`,
-                    );
-                  } else {
-                    // This ticketcode already exists locally - skip fetching
-                    console.log(
-                      `✅ Ticketcode ${ticketcode} already exists locally - skipping`,
-                    );
-                  }
-                }
-              } catch (error) {
-                console.error(
-                  `❌ Error checking local existence for ${ticketcode}:`,
-                  error,
-                );
-                // If we can't check, assume it's missing and fetch it
-                missingTicketcodes.push(ticketcode);
-              }
-            }
-
-            console.log(
-              `📥 Found ${missingTicketcodes.length} missing ticketcodes out of ${serverTransactions.length} total`,
-            );
-
-            // Now fetch full details only for missing ticketcodes
-            if (missingTicketcodes.length > 0) {
-              console.log(
-                '📥 Fetching full details for missing ticketcodes...',
-              );
-
-              for (const ticketcode of missingTicketcodes) {
-                try {
-                  console.log(
-                    `📥 Fetching details for missing ticketcode: ${ticketcode}`,
-                  );
-                  const fullTransaction = await getTransactionViaTicketCodeAPI(
-                    token,
-                    ticketcode,
-                  );
-
-                  if (fullTransaction && fullTransaction.ticketcode) {
-                    fullTransactions.push(fullTransaction);
-                    console.log(`✅ Fetched full details for: ${ticketcode}`);
-                  } else {
-                    console.log(
-                      `⚠️ Failed to fetch details for: ${ticketcode} - invalid response:`,
-                      fullTransaction,
-                    );
-                  }
-                } catch (error) {
-                  console.error(
-                    `❌ Error fetching details for ${ticketcode}:`,
-                    error,
-                  );
-                }
-              }
-
-              console.log(
-                `📥 Successfully fetched ${fullTransactions.length} full transaction details for missing ticketcodes`,
-              );
-            } else {
-              console.log(
-                '✅ All ticketcodes already exist locally - no need to fetch details',
-              );
-            }
-
-            // Update serverTransactions to only include the newly fetched transactions
-            serverTransactions = fullTransactions;
-
-            // Validate that we got the expected number of transactions
-            if (fullTransactions.length !== missingTicketcodes.length) {
-              console.warn(
-                `⚠️ Mismatch: Expected ${missingTicketcodes.length} transactions, but got ${fullTransactions.length} full details`,
-              );
-            }
-          }
-
-          // Filter out undefined or invalid transactions
-          validServerTransactions = serverTransactions.filter(
-            transaction =>
-              transaction &&
-              transaction.ticketcode &&
-              typeof transaction.ticketcode === 'string',
-          );
-
-          console.log(
-            `📥 Filtered to ${validServerTransactions.length} valid transactions`,
-          );
-
-          // Step 2: Save missing transactions (background process)
-          console.log('💾 Step 2: Saving missing transactions...');
-          let savedCount = 0;
-          let skippedCount = 0;
-
-          for (const serverTransaction of validServerTransactions) {
-            try {
-              // Check if transaction already exists locally using Promise wrapper
-              const existingTransaction = await new Promise(resolve => {
-                getTransactionByTicketCode(
-                  serverTransaction.ticketcode,
-                  resolve,
-                );
-              });
-
-              if (!existingTransaction) {
-                console.log(
-                  `💾 Saving missing transaction: ${serverTransaction.ticketcode}`,
-                );
-                // Type assertion to access server-specific properties
                 const serverTx = serverTransaction as any;
 
-                // Validate required properties before processing
+                // Validate required properties
                 if (
                   !serverTx.trans_data ||
-                  typeof serverTx.trans_data !== 'string'
+                  typeof serverTx.trans_data !== 'string' ||
+                  !serverTx.printed_at
                 ) {
-                  console.log(
-                    `⚠️ Skipping transaction ${serverTransaction.ticketcode} - invalid trans_data:`,
-                    serverTx.trans_data,
-                  );
-                  skippedCount++;
-                  continue;
-                }
-
-                if (!serverTx.printed_at) {
-                  console.log(
-                    `⚠️ Skipping transaction ${serverTransaction.ticketcode} - missing printed_at`,
-                  );
-                  skippedCount++;
-                  continue;
+                  return {success: false, ticketcode: serverTx.ticketcode};
                 }
 
                 const bets = convertToBets(serverTx.trans_data);
-
-                // Validate that bets were parsed correctly
                 if (!Array.isArray(bets) || bets.length === 0) {
-                  console.log(
-                    `⚠️ Skipping transaction ${serverTransaction.ticketcode} - no valid bets parsed from: ${serverTx.trans_data}`,
-                  );
-                  skippedCount++;
-                  continue;
+                  return {success: false, ticketcode: serverTx.ticketcode};
                 }
 
                 const newTransaction = {
@@ -806,228 +751,78 @@ const History: React.FC<any> = ({navigation}) => {
                   bets: bets,
                   trans_data: serverTx.trans_data,
                   trans_no: serverTx.trans_no || 1,
-                } as any; // Type assertion to avoid property conflicts
+                } as any;
 
                 await insertTransaction(newTransaction, bets);
-                console.log(
-                  `✅ Saved missing transaction: ${serverTransaction.ticketcode}`,
+                return {success: true, ticketcode: serverTx.ticketcode};
+              } catch (error) {
+                console.error(
+                  `❌ Error saving ${serverTransaction.ticketcode}:`,
+                  error,
                 );
-                savedCount++;
+                return {
+                  success: false,
+                  ticketcode: serverTransaction.ticketcode,
+                };
               }
-            } catch (error) {
-              console.error(
-                `❌ Error saving missing transaction ${serverTransaction.ticketcode}:`,
-                error,
-              );
-              skippedCount++;
-            }
-          }
+            },
+            3, // Process 3 at a time (DB writes are slower)
+          );
 
+          const savedCount = saveResults.filter(r => r.success).length;
           console.log(
-            `📊 Step 2 Summary: ${savedCount} saved, ${skippedCount} skipped`,
+            `💾 Saved ${savedCount} out of ${transactionsToSave.length} missing transactions`,
           );
-
-          // Step 3: Sync unsynced transactions to server (background process)
-          console.log('📤 Step 3: Syncing unsynced transactions to server...');
-          if (internetStatusCheck.current.isConnected()) {
-            await syncTransactions();
-          } else {
-            console.log('📤 Skipping server sync - no internet connection');
-          }
-
-          // Step 4: Wait a moment for database operations to complete, then show all transactions
-          console.log('⏳ Waiting for database operations to complete...');
-          await new Promise(resolve => setTimeout(resolve, 500)); // Small delay to ensure DB is updated
-
-          console.log('📊 Step 4: Fetching all transactions for display...');
-          allTransactions = [];
-
-          try {
-            const result = await getTransactions(
-              formattedDate,
-              selectedDraw,
-              selectedType,
-            );
-            allTransactions = Array.isArray(result) ? result : [];
-          } catch (error) {
-            console.error('❌ Error fetching local transactions:', error);
-            // Fallback: use the transactions we just processed during sync
-            if (validServerTransactions && validServerTransactions.length > 0) {
-              console.log(
-                '🔄 Using fallback: displaying transactions from sync process',
-              );
-              allTransactions = validServerTransactions;
-            } else {
-              console.log('🔄 Local fetch failed, showing empty state');
-              allTransactions = [];
-            }
-          }
-
-          if (Array.isArray(allTransactions)) {
-            setTransactions(allTransactions);
-            const total = allTransactions.reduce(
-              (sum, item) => sum + (item.total || 0),
-              0,
-            );
-            setTotalAmount(total);
-            console.log(
-              `📊 Displaying ${allTransactions.length} transactions, total: ${total}`,
-            );
-          } else {
-            setTransactions([]);
-            setTotalAmount(0);
-            console.log('📊 No transactions found locally');
-          }
-
-          // Additional step: Ensure UI is updated with fresh data
-          console.log('🔄 Refreshing UI with latest data...');
-          setRefresh(false); // Clear any existing refresh state
-          setInitialLoading(false); // Clear loading state - show results to user
-
-          // Force a re-render by updating state
-          if (Array.isArray(allTransactions) && allTransactions.length > 0) {
-            console.log('✅ UI updated with transaction data');
-
-            // Force a UI refresh to ensure the list is displayed
-            setTransactions([...allTransactions]); // Create new array reference to trigger re-render
-
-            // Additional state refresh to ensure UI updates
-            setTimeout(() => {
-              console.log('🔄 Forcing additional UI refresh...');
-              setTransactions(prev => {
-                if (Array.isArray(allTransactions)) {
-                  return [...allTransactions];
-                }
-                return prev;
-              });
-            }, 100);
-          } else {
-            console.log('⚠️ UI shows empty state - no transactions found');
-            setTransactions([]);
-          }
-
-          // Final verification: Double-check that transactions are displayed
-          setTimeout(() => {
-            console.log('🔍 Final verification - Current transactions state:', {
-              transactionsCount: Array.isArray(allTransactions)
-                ? allTransactions.length
-                : 0,
-              totalAmount: Array.isArray(allTransactions)
-                ? allTransactions.reduce(
-                    (sum: number, item: any) => sum + (item.total || 0),
-                    0,
-                  )
-                : 0,
-            });
-          }, 100);
-        } else {
-          console.log('📥 No transactions found on server or invalid response');
-
-          // Even if no server transactions, still try to show local data
-          console.log('📊 Attempting to display local transactions...');
-          try {
-            const localTransactions = await getTransactions(
-              formattedDate,
-              selectedDraw,
-              selectedType,
-            );
-
-            if (Array.isArray(localTransactions)) {
-              setTransactions(localTransactions);
-              const total = localTransactions.reduce(
-                (sum, item) => sum + (item.total || 0),
-                0,
-              );
-              setTotalAmount(total);
-              console.log(
-                `📊 Displaying ${localTransactions.length} local transactions, total: ${total}`,
-              );
-            } else {
-              setTransactions([]);
-              setTotalAmount(0);
-              console.log('📊 No local transactions found');
-            }
-          } catch (error) {
-            console.error('❌ Error fetching local transactions:', error);
-            setTransactions([]);
-            setTotalAmount(0);
-          }
-
-          // Clear loading state
-          setInitialLoading(false);
         }
-      } else {
-        // No internet connection - just show local data
-        console.log(
-          '📥 No internet connection - showing local transactions only',
-        );
-        try {
-          const localTransactions = await getTransactions(
-            formattedDate,
-            selectedDraw,
-            selectedType,
-          );
-
-          if (Array.isArray(localTransactions)) {
-            setTransactions(localTransactions);
-            const total = localTransactions.reduce(
-              (sum, item) => sum + (item.total || 0),
-              0,
-            );
-            setTotalAmount(total);
-            console.log(
-              `📊 Displaying ${localTransactions.length} local transactions, total: ${total}`,
-            );
-          } else {
-            setTransactions([]);
-            setTotalAmount(0);
-            console.log('📊 No local transactions found');
-          }
-        } catch (error) {
-          console.error('❌ Error fetching local transactions:', error);
-          setTransactions([]);
-          setTotalAmount(0);
-        }
-
-        // Clear loading state
-        setInitialLoading(false);
       }
 
-      console.log('✅ Full sync flow completed successfully');
+      // Step 5: Sync unsynced transactions to server (background)
+      console.log('📤 Step 5: Syncing unsynced transactions...');
+      if (internetStatusCheck.current.isConnected()) {
+        // Check if sync is already running to avoid conflicts
+        if (!isSyncingRef.current) {
+          // Don't await - let it run in background
+          syncTransactions().catch(error => {
+            console.error('❌ Error in background sync:', error);
+          });
+        } else {
+          console.log('📤 Sync already in progress, skipping background sync');
+        }
+      }
 
-      // Log comprehensive sync summary
-      console.log('📊 SYNC SUMMARY:', {
-        originalServerResponse: serverResponse ? 'Received' : 'None',
-        serverTransactionsCount: serverTransactions
-          ? serverTransactions.length
-          : 0,
-        wasTicketcodeOnlyResponse: isTicketcodeOnlyResponse,
-        missingTicketcodesCount: isTicketcodeOnlyResponse
-          ? serverTransactions
-            ? serverTransactions.length
-            : 0
-          : 'N/A',
-        validTransactionsCount: validServerTransactions.length,
-        finalDisplayCount: Array.isArray(allTransactions)
-          ? allTransactions.length
-          : 0,
-        totalAmount: Array.isArray(allTransactions)
-          ? allTransactions.reduce(
-              (sum: number, item: any) => sum + (item.total || 0),
-              0,
-            )
-          : 0,
-        syncTimestamp: new Date().toISOString(),
-      });
+      // Step 6: Fetch and display all transactions
+      console.log('📊 Step 6: Fetching all transactions for display...');
+      await new Promise(resolve => setTimeout(resolve, 300)); // Brief delay for DB writes
+
+      const finalTransactions = await getTransactions(
+        formattedDate,
+        selectedDraw,
+        selectedType,
+      );
+      allTransactions = Array.isArray(finalTransactions)
+        ? finalTransactions
+        : [];
+
+      const total = allTransactions.reduce(
+        (sum, item) => sum + (item.total || 0),
+        0,
+      );
+
+      setTransactions(allTransactions);
+      setTotalAmount(total);
+      setInitialLoading(false);
+
+      console.log(
+        `✅ Sync complete: ${allTransactions.length} transactions, total: ${total}`,
+      );
     } catch (error) {
       console.error('❌ Full sync flow error:', error);
       setTransactions([]);
       setTotalAmount(0);
-      setInitialLoading(false); // Ensure loading state is cleared on error
+      setInitialLoading(false);
     } finally {
       setSyncing(false);
       setRefresh(false);
-      // Note: setInitialLoading(false) is handled in the success/error paths above
     }
   }, [
     token,

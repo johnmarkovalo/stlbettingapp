@@ -47,10 +47,7 @@ import {
   useCameraDevice,
   useCodeScanner,
 } from 'react-native-vision-camera';
-import {
-  printHits,
-  printSales,
-} from '../../../helper/printer';
+import {printHits, printSales} from '../../../helper/printer';
 import debounce from 'lodash/debounce';
 import {typesActions} from '../../../store/actions';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
@@ -84,6 +81,13 @@ const Result: React.FC<any> = ({navigation}) => {
 
   const dispatch = useDispatch();
   const internetStatusCheck = useRef(checkInternetConnection());
+
+  // Refs for optimization
+  const lastFetchTime = useRef<number | undefined>();
+  const lastFetchCallTime = useRef<number | undefined>();
+  const prevDrawRef = useRef<number | undefined>();
+  const prevTypeRef = useRef<number | undefined>();
+  const prevDateRef = useRef<string | undefined>();
 
   // State
   const [showQRCam, setShowQRCam] = useState(false);
@@ -187,7 +191,50 @@ const Result: React.FC<any> = ({navigation}) => {
     },
   });
 
+  const getNewWinners = useCallback(
+    async (newResult: {result: number}) => {
+      const betType = betTypes.find(item => item.bettypeid === selectedType);
+      if (newResult.result === 0 || betType === null) {
+        setTransactions([]);
+        setTotalAmount({totalTarget: 0, totalRambol: 0});
+        return;
+      }
+
+      const transactions = await getWinners(betType, newResult);
+      console.log('getNewWinners', transactions);
+
+      if (
+        transactions &&
+        Array.isArray(transactions) &&
+        transactions.length > 0
+      ) {
+        setTransactions(transactions as any[]);
+        // Optimize total calculation using reduce
+        const totals = (transactions as any[]).reduce(
+          (acc, item: any) => ({
+            totalTarget: acc.totalTarget + (item.targetTotal || 0),
+            totalRambol: acc.totalRambol + (item.rambolTotal || 0),
+          }),
+          {totalTarget: 0, totalRambol: 0},
+        );
+        setTotalAmount(totals);
+      } else {
+        setTransactions([]);
+        setTotalAmount({totalTarget: 0, totalRambol: 0});
+      }
+    },
+    [betTypes, selectedType],
+  );
+
   const fetchData = useCallback(async () => {
+    // Debounce rapid successive calls
+    const now = Date.now();
+    if (lastFetchCallTime.current && now - lastFetchCallTime.current < 1000) {
+      console.log('🔄 Result fetchData - Debounced rapid call');
+      return;
+    }
+    lastFetchCallTime.current = now;
+
     setRefresh(true);
     try {
       // Validate parameters before making the call
@@ -207,6 +254,7 @@ const Result: React.FC<any> = ({navigation}) => {
         typeName: typeLabel(),
       });
 
+      // Fetch local result first (fast, always available)
       const localResult = await getResult(
         formattedDate,
         selectedDraw,
@@ -215,29 +263,54 @@ const Result: React.FC<any> = ({navigation}) => {
 
       console.log('📊 Result fetchData - Local result:', localResult);
 
+      // If we have internet, sync with server
       if (hasInternet()) {
-        const serverResult = await syncResultAPI(
-          token,
-          selectedType,
-          selectedDraw,
-          formattedDate,
-        );
+        try {
+          const serverResult = await syncResultAPI(
+            token,
+            selectedType,
+            selectedDraw,
+            formattedDate,
+          );
 
-        console.log('📊 Result fetchData - Server result:', serverResult);
+          console.log('📊 Result fetchData - Server result:', serverResult);
 
-        if (serverResult) {
-          await Promise.all([
-            insertOrUpdateResult(serverResult),
-            getNewWinners(serverResult),
-          ]);
-          setResult(serverResult as {result: number});
-        } else {
-          handleEmptyResult();
+          if (serverResult) {
+            // Convert server result to number format for component state
+            const resultNumber = Number(serverResult.result) || 0;
+            const resultForState = {result: resultNumber};
+
+            // Update result and get winners in parallel
+            await Promise.all([
+              insertOrUpdateResult(serverResult),
+              getNewWinners(resultForState),
+            ]);
+            setResult(resultForState);
+          } else {
+            // No server result - use local if available
+            if (localResult) {
+              setResult(localResult as {result: number});
+              await getNewWinners(localResult as {result: number});
+            } else {
+              handleEmptyResult();
+            }
+          }
+        } catch (syncError) {
+          console.error('❌ Error syncing with server:', syncError);
+          // Fallback to local result if server sync fails
+          if (localResult) {
+            setResult(localResult as {result: number});
+            await getNewWinners(localResult as {result: number});
+          } else {
+            handleEmptyResult();
+          }
         }
       } else if (localResult) {
+        // No internet - use local result
         setResult(localResult as {result: number});
         await getNewWinners(localResult as {result: number});
       } else {
+        // No internet and no local result
         handleNoInternet();
       }
     } catch (error) {
@@ -245,6 +318,7 @@ const Result: React.FC<any> = ({navigation}) => {
       handleEmptyResult();
     } finally {
       setRefresh(false);
+      lastFetchTime.current = Date.now();
     }
   }, [
     formattedDate,
@@ -255,43 +329,11 @@ const Result: React.FC<any> = ({navigation}) => {
     token,
     handleEmptyResult,
     handleNoInternet,
+    getNewWinners,
   ]);
 
-  const getNewWinners = useCallback(
-    async (newResult: {result: number}) => {
-      const betType = betTypes.find(item => item.bettypeid === selectedType);
-      if (newResult.result === 0 || betType === null) return;
-
-      const transactions = await getWinners(betType, newResult);
-      console.log('getNewWinners', transactions);
-
-      if (
-        transactions &&
-        Array.isArray(transactions) &&
-        transactions.length > 0
-      ) {
-        setTransactions(transactions as any[]);
-        let totalTarget = 0;
-        let totalRambol = 0;
-        (transactions as any[]).forEach((item: any) => {
-          totalTarget += item.targetTotal;
-          totalRambol += item.rambolTotal;
-        });
-        setTotalAmount({totalTarget: totalTarget, totalRambol: totalRambol});
-      } else {
-        setTransactions([]);
-        setTotalAmount({totalTarget: 0, totalRambol: 0});
-      }
-    },
-    [betTypes, selectedType],
-  );
-
   const onRefresh = useCallback(() => {
-    setRefresh(true);
     fetchData();
-    setTimeout(() => {
-      setRefresh(false);
-    }, 1000);
   }, [fetchData]);
 
   // Modal handlers
@@ -379,12 +421,48 @@ const Result: React.FC<any> = ({navigation}) => {
 
   // Effects
   useEffect(() => {
+    // Initial load
     fetchData();
-  }, [fetchData]);
+  }, []); // Only run on mount
 
+  // Watch for changes in selectedDraw, selectedType, and selectedDate
+  useEffect(() => {
+    // Only fetch if values actually changed
+    const drawChanged = prevDrawRef.current !== selectedDraw;
+    const typeChanged = prevTypeRef.current !== selectedType;
+    const dateChanged = prevDateRef.current !== formattedDate;
+
+    if (drawChanged || typeChanged || dateChanged) {
+      console.log('🔄 Result - Draw/Type/Date changed, fetching new data...');
+      prevDrawRef.current = selectedDraw;
+      prevTypeRef.current = selectedType;
+      prevDateRef.current = formattedDate;
+      fetchData();
+    } else {
+      // First time, just store the values
+      prevDrawRef.current = selectedDraw;
+      prevTypeRef.current = selectedType;
+      prevDateRef.current = formattedDate;
+    }
+  }, [selectedDraw, selectedType, formattedDate, fetchData]);
+
+  // Navigation focus effect - only fetch if data is stale
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchData();
+      // Only fetch if we haven't fetched recently or if parameters changed
+      const timeSinceLastFetch = Date.now() - (lastFetchTime.current || 0);
+      const shouldFetch = timeSinceLastFetch > 30000; // 30 seconds threshold
+
+      if (shouldFetch) {
+        console.log(
+          '🔄 Result - Screen focused, fetching data (stale data)...',
+        );
+        fetchData();
+      } else {
+        console.log(
+          '🔄 Result - Screen focused, data is fresh, skipping fetch',
+        );
+      }
     });
     return unsubscribe;
   }, [navigation, fetchData]);
