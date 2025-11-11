@@ -132,8 +132,8 @@ const History: React.FC<any> = ({navigation}) => {
   const isSyncingRef = useRef(false);
 
   // Memoized values
-  const minDate = useMemo(() => moment().subtract(1, 'weeks').toDate(), []);
-  const maxDate = useMemo(() => moment().toDate(), []);
+  const minDate = moment().subtract(1, 'weeks').toDate();
+  const maxDate = moment().toDate();
   const formattedDate = useMemo(
     () => moment(selectedDate).format('YYYY-MM-DD'),
     [selectedDate],

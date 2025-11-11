@@ -218,6 +218,9 @@ const Home = (props: any) => {
   // Enhanced database cleanup function
   const performDatabaseCleanup = async () => {
     try {
+      console.log('🧹 Database cleanup temporarily disabled');
+      return;
+
       const currentHour = moment().hour();
       const currentMinute = moment().minute();
 
