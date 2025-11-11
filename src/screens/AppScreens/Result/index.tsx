@@ -31,6 +31,7 @@ import moment from 'moment';
 import DrawModal from '../../../components/DrawModal';
 import TypeModal from '../../../components/TypeModal';
 import Type from '../../../models/Type';
+import type ResultModel from '../../../models/Result';
 import Ionic from 'react-native-vector-icons/Ionicons';
 import {
   getResult,
@@ -100,7 +101,7 @@ const Result: React.FC<any> = ({navigation}) => {
   const [drawModalVisible, setDrawModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [result, setResult] = useState<{result: number}>({result: 0});
+  const [result, setResult] = useState<ResultModel | null>(null);
   const [totalAmount, setTotalAmount] = useState({
     totalTarget: 0,
     totalRambol: 0,
@@ -138,7 +139,7 @@ const Result: React.FC<any> = ({navigation}) => {
   }, []);
 
   const handleEmptyResult = useCallback(() => {
-    setResult({result: 0});
+    setResult(null);
     setTransactions([]);
     setTotalAmount({totalTarget: 0, totalRambol: 0});
   }, []);
@@ -192,9 +193,15 @@ const Result: React.FC<any> = ({navigation}) => {
   });
 
   const getNewWinners = useCallback(
-    async (newResult: {result: number}) => {
+    async (newResult: ResultModel | null) => {
+      if (!newResult || !newResult.result) {
+        setTransactions([]);
+        setTotalAmount({totalTarget: 0, totalRambol: 0});
+        return;
+      }
+
       const betType = betTypes.find(item => item.bettypeid === selectedType);
-      if (newResult.result === 0 || betType === null) {
+      if (!betType) {
         setTransactions([]);
         setTotalAmount({totalTarget: 0, totalRambol: 0});
         return;
@@ -226,6 +233,20 @@ const Result: React.FC<any> = ({navigation}) => {
     [betTypes, selectedType],
   );
 
+  const normalizeResult = useCallback((data: any): ResultModel | null => {
+    if (!data) {
+      return null;
+    }
+
+    const {result: rawResult, resultr: rawResultr, ...rest} = data;
+
+    return {
+      ...rest,
+      result: rawResult != null ? String(rawResult) : '',
+      resultr: rawResultr != null ? String(rawResultr) : '',
+    } as ResultModel;
+  }, []);
+
   const fetchData = useCallback(async () => {
     // Debounce rapid successive calls
     const now = Date.now();
@@ -255,42 +276,42 @@ const Result: React.FC<any> = ({navigation}) => {
       });
 
       // Fetch local result first (fast, always available)
-      const localResult = await getResult(
+      const localResultRaw = await getResult(
         formattedDate,
         selectedDraw,
         selectedType,
       );
 
-      console.log('📊 Result fetchData - Local result:', localResult);
+      const localResult = normalizeResult(localResultRaw);
+
+      console.log('📊 Result fetchData - Local result:', localResultRaw);
 
       // If we have internet, sync with server
       if (hasInternet()) {
         try {
-          const serverResult = await syncResultAPI(
+          const serverResultRaw = await syncResultAPI(
             token,
             selectedType,
             selectedDraw,
             formattedDate,
           );
 
-          console.log('📊 Result fetchData - Server result:', serverResult);
+          console.log('📊 Result fetchData - Server result:', serverResultRaw);
+
+          const serverResult = normalizeResult(serverResultRaw);
 
           if (serverResult) {
-            // Convert server result to number format for component state
-            const resultNumber = Number(serverResult.result) || 0;
-            const resultForState = {result: resultNumber};
-
             // Update result and get winners in parallel
             await Promise.all([
               insertOrUpdateResult(serverResult),
-              getNewWinners(resultForState),
+              getNewWinners(serverResult),
             ]);
-            setResult(resultForState);
+            setResult(serverResult);
           } else {
             // No server result - use local if available
             if (localResult) {
-              setResult(localResult as {result: number});
-              await getNewWinners(localResult as {result: number});
+              setResult(localResult);
+              await getNewWinners(localResult);
             } else {
               handleEmptyResult();
             }
@@ -299,16 +320,16 @@ const Result: React.FC<any> = ({navigation}) => {
           console.error('❌ Error syncing with server:', syncError);
           // Fallback to local result if server sync fails
           if (localResult) {
-            setResult(localResult as {result: number});
-            await getNewWinners(localResult as {result: number});
+            setResult(localResult);
+            await getNewWinners(localResult);
           } else {
             handleEmptyResult();
           }
         }
       } else if (localResult) {
         // No internet - use local result
-        setResult(localResult as {result: number});
-        await getNewWinners(localResult as {result: number});
+        setResult(localResult);
+        await getNewWinners(localResult);
       } else {
         // No internet and no local result
         handleNoInternet();
@@ -330,6 +351,7 @@ const Result: React.FC<any> = ({navigation}) => {
     handleEmptyResult,
     handleNoInternet,
     getNewWinners,
+    normalizeResult,
   ]);
 
   const onRefresh = useCallback(() => {
@@ -394,10 +416,14 @@ const Result: React.FC<any> = ({navigation}) => {
   }, [hasInternet]);
 
   const handlePrintHits = useCallback(() => {
+    if (!result) {
+      return;
+    }
+
     if (totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) {
       printHits(selectedDate, selectedDraw, typeLabel(), totalAmount, user);
     }
-  }, [totalAmount, selectedDate, selectedDraw, typeLabel, user]);
+  }, [result, totalAmount, selectedDate, selectedDraw, typeLabel, user]);
 
   // Render functions
   const renderItem = useCallback(
@@ -562,7 +588,7 @@ const Result: React.FC<any> = ({navigation}) => {
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'Result'}</Text>
           <Text style={styles.resultDisplay}>
-            <Text style={styles.resultNumber}>{result.result}</Text>
+            <Text style={styles.resultNumber}>{result?.result ?? ''}</Text>
           </Text>
           {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && (
             <TouchableOpacity onPress={handlePrintHits}>
@@ -643,13 +669,13 @@ const Result: React.FC<any> = ({navigation}) => {
         )}
 
         {/* Empty States */}
-        {!refresh && transactions.length === 0 && result.result !== 0 && (
+        {!refresh && transactions.length === 0 && !!result?.result && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No Winners</Text>
           </View>
         )}
 
-        {!refresh && result.result === 0 && (
+        {!refresh && (!result || result.result === '') && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No Result Yet</Text>
           </View>

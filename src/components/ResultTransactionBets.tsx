@@ -2,6 +2,7 @@ import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {View, StyleSheet, Text, FlatList} from 'react-native';
 import Colors from '../Styles/Colors';
 import Bet from '../models/Bet';
+import type ResultModel from '../models/Result';
 import {TransactionBetItem} from './TransactionBetItem';
 import {formatNumberWithCommas} from '../helper';
 import {getWinningTransactionBets} from '../database';
@@ -10,7 +11,7 @@ import BaseModal from './shared/BaseModal';
 // Define types for component props
 interface ResultTransactionBetsProps {
   hide: () => void;
-  result: {result: number};
+  result: ResultModel | null;
   transaction: {
     id: number;
     ticketcode: string;
@@ -35,6 +36,12 @@ const ResultTransactionBets: React.FC<ResultTransactionBetsProps> = React.memo(
     );
 
     const fetchWinningBets = useCallback(async () => {
+      if (!result || !result.result) {
+        setBets([]);
+        setTotalAmount(0);
+        return;
+      }
+
       try {
         await getWinningTransactionBets(
           transaction.id,
