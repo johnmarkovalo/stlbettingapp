@@ -131,16 +131,35 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     // Memoized functions
     const validateBet = useCallback(
       (type = '') => {
-        // Check capping
-        if (
-          parseInt(targetAmount.value) > betType.capping ||
-          parseInt(rambolAmount.value) > betType.capping
-        ) {
-          Alert.alert(
-            'Amount',
-            `Amount cannot be greater than ${betType.capping}`,
-          );
-          return true;
+        // Check capping - validate only the relevant field based on type
+        const capping = betType?.capping;
+        if (!capping || capping <= 0) {
+          // If capping is not defined, skip validation
+          // (This shouldn't happen, but handle gracefully)
+        } else {
+          // Validate targetAmount if it has a value and is being checked
+          if (targetAmount.value && targetAmount.value !== '') {
+            const targetValue = parseInt(targetAmount.value, 10);
+            if (!isNaN(targetValue) && targetValue > capping) {
+              Alert.alert(
+                'Amount',
+                `Target amount cannot be greater than ${capping}`,
+              );
+              return true;
+            }
+          }
+
+          // Validate rambolAmount if it has a value and is being checked
+          if (rambolAmount.value && rambolAmount.value !== '') {
+            const rambolValue = parseInt(rambolAmount.value, 10);
+            if (!isNaN(rambolValue) && rambolValue > capping) {
+              Alert.alert(
+                'Amount',
+                `Rambol amount cannot be greater than ${capping}`,
+              );
+              return true;
+            }
+          }
         }
 
         // Check sold out
@@ -272,17 +291,43 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
             value: prev.value + input,
           }));
         } else if (targetAmount.isFocus && targetAmount.value.length < 3) {
+          // Check capping before allowing input
+          const newValue = targetAmount.value + input;
+          const capping = betType?.capping;
+          if (capping && capping > 0) {
+            const numericValue = parseInt(newValue, 10);
+            if (!isNaN(numericValue) && numericValue > capping) {
+              Alert.alert(
+                'Amount',
+                `Target amount cannot be greater than ${capping}`,
+              );
+              return;
+            }
+          }
           setTargetAmount(prev => ({
             ...prev,
             value: prev.value + input,
           }));
         } else if (rambolAmount.isFocus && rambolAmount.value.length < 3) {
-          if (!checkIfTriple(betNumber.value))
+          if (!checkIfTriple(betNumber.value)) {
+            // Check capping before allowing input
+            const newValue = rambolAmount.value + input;
+            const capping = betType?.capping;
+            if (capping && capping > 0) {
+              const numericValue = parseInt(newValue, 10);
+              if (!isNaN(numericValue) && numericValue > capping) {
+                Alert.alert(
+                  'Amount',
+                  `Rambol amount cannot be greater than ${capping}`,
+                );
+                return;
+              }
+            }
             setRambolAmount(prev => ({
               ...prev,
               value: prev.value + input,
             }));
-          else
+          } else
             Alert.alert(
               'Triple Digit',
               'You cannot enter rambol amount if tripple digit.',
@@ -296,6 +341,9 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         targetAmount.isFocus,
         rambolAmount.isFocus,
         betNumber.value,
+        targetAmount.value,
+        rambolAmount.value,
+        betType?.capping,
       ],
     );
 
