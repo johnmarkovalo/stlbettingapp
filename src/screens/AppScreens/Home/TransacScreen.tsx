@@ -128,6 +128,39 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       [betNumber.value],
     );
 
+    // Helper function to check if a bet number is sold out
+    const checkSoldOut = useCallback(
+      (number: string, checkType: 'target' | 'rambol'): boolean => {
+        if (!number || number.length !== 3 || soldouts.length === 0) {
+          return false;
+        }
+
+        if (checkType === 'target') {
+          const isSoldOut = soldouts.some(
+            soldout =>
+              soldout.combination === number && soldout.is_target === 1,
+          );
+          if (isSoldOut) {
+            Alert.alert('Sold Out', `Number ${number} is sold out for target`);
+            return true;
+          }
+        } else if (checkType === 'rambol') {
+          const sortedNumber = sortNumber(number);
+          const isSoldOut = soldouts.some(
+            soldout =>
+              soldout.combination === sortedNumber && soldout.is_target === 0,
+          );
+          if (isSoldOut) {
+            Alert.alert('Sold Out', `Number ${number} is sold out for rambol`);
+            return true;
+          }
+        }
+
+        return false;
+      },
+      [soldouts],
+    );
+
     // Memoized functions
     const validateBet = useCallback(
       (type = '') => {
@@ -212,6 +245,22 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     const changeFocus = useCallback(
       (type: string) => {
         if (validateBet(type)) return;
+
+        // Additional soldout checks before changing focus
+        if (type === 'targetAmount' && betNumber.value.length === 3) {
+          if (checkSoldOut(betNumber.value, 'target')) {
+            setBetNumber({value: '', isFocus: true});
+            return;
+          }
+        }
+        if (type === 'rambolAmount' && betNumber.value.length === 3) {
+          if (checkSoldOut(betNumber.value, 'rambol')) {
+            setBetNumber({value: '', isFocus: true});
+            setTargetAmount({value: '', isFocus: false});
+            return;
+          }
+        }
+
         setBetNumber({
           value: betNumber.value,
           isFocus: false,
@@ -247,7 +296,13 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
             break;
         }
       },
-      [validateBet, betNumber.value, targetAmount.value, rambolAmount.value],
+      [
+        validateBet,
+        betNumber.value,
+        targetAmount.value,
+        rambolAmount.value,
+        checkSoldOut,
+      ],
     );
 
     const addBet = useCallback(() => {
@@ -286,6 +341,16 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       (input: string) => {
         // Map first if what is focused
         if (betNumber.isFocus && betNumber.value.length < 3) {
+          const newBetNumber = betNumber.value + input;
+          // If bet number will be complete (3 digits), check soldouts before setting
+          if (newBetNumber.length === 3) {
+            // Check if sold out for target (we'll check rambol later when needed)
+            if (checkSoldOut(newBetNumber, 'target')) {
+              // Clear the bet number if sold out
+              setBetNumber({value: '', isFocus: true});
+              return;
+            }
+          }
           setBetNumber(prev => ({
             ...prev,
             value: prev.value + input,
@@ -344,6 +409,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         targetAmount.value,
         rambolAmount.value,
         betType?.capping,
+        checkSoldOut,
       ],
     );
 
@@ -387,6 +453,15 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       if (validateBet()) return;
 
       if (targetAmount.isFocus && !checkIfTriple(betNumber.value)) {
+        // Check if sold out for rambol before allowing focus change
+        if (
+          betNumber.value.length === 3 &&
+          checkSoldOut(betNumber.value, 'rambol')
+        ) {
+          setBetNumber({value: '', isFocus: true});
+          setTargetAmount({value: '', isFocus: false});
+          return;
+        }
         setTargetAmount(prev => ({
           ...prev,
           value: '0',
@@ -401,6 +476,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       betNumber.value,
       changeFocus,
       addBet,
+      checkSoldOut,
     ]);
 
     const onNoRambol = useCallback(() => {
@@ -582,14 +658,36 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       if (validateBet()) return;
       // Check the length after state has been updated
       if (betNumber.value.length === 3 && betNumber.isFocus) {
-        changeFocus('targetAmount');
+        // Check if sold out for target before allowing focus change
+        if (!checkSoldOut(betNumber.value, 'target')) {
+          changeFocus('targetAmount');
+        } else {
+          // Clear bet number if sold out
+          setBetNumber({value: '', isFocus: true});
+        }
       }
       if (targetAmount.value.length === 3 && targetAmount.isFocus) {
-        if (!checkIfTriple(betNumber.value)) changeFocus('rambolAmount');
+        if (!checkIfTriple(betNumber.value)) {
+          // Check if sold out for rambol before allowing focus change
+          if (!checkSoldOut(betNumber.value, 'rambol')) {
+            changeFocus('rambolAmount');
+          } else {
+            // Clear inputs if sold out
+            setBetNumber({value: '', isFocus: true});
+            setTargetAmount({value: '', isFocus: false});
+          }
+        }
       }
       if (rambolAmount.value.length === 3 && rambolAmount.isFocus) {
       }
-    }, [betNumber.value, targetAmount.value, rambolAmount.value]);
+    }, [
+      betNumber.value,
+      targetAmount.value,
+      rambolAmount.value,
+      validateBet,
+      checkSoldOut,
+      changeFocus,
+    ]);
 
     // Memoized keyboard buttons
     const keyboardButtons = useMemo(
