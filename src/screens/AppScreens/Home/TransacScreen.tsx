@@ -208,12 +208,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         if (!isWithinCutoff || !currentDraw) return false;
 
         const key = `${betType.id}_${currentDraw}`;
-        let totalAmount = 0;
+        const LIMIT = 50;
 
         // Get target amount for exact bet number (target 123 and target 321 are separate)
         const targetKey = `${key}_target_${betNum}`;
         const existingTarget = combinationAmounts[targetKey] || 0;
-        totalAmount += existingTarget + targetAmt;
 
         // Get rambol amount for sorted number (all permutations share the same rambol total)
         // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
@@ -221,11 +220,40 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         const sortedNumber = sortNumber(betNum);
         const rambolKey = `${key}_rambol_${sortedNumber}`;
         const existingRambol = combinationAmounts[rambolKey] || 0;
-        totalAmount += existingRambol + rambolAmt;
+
+        // Calculate current total and new total
+        const currentTotal = existingTarget + existingRambol;
+        const newTotal = currentTotal + targetAmt + rambolAmt;
 
         // Check if total exceeds 50
-        if (totalAmount > 50) {
-          Alert.alert('Sold Out', `Combination ${betNum} is sold out`);
+        if (newTotal > LIMIT) {
+          const remaining = LIMIT - currentTotal;
+
+          // Calculate maximum amounts they can bet
+          let maxTarget = remaining;
+          let maxRambol = remaining;
+
+          // If they're betting both, we need to show the maximum for each
+          // The remaining can be split between target and rambol
+          if (targetAmt > 0 && rambolAmt > 0) {
+            // Show maximum for each (they can bet up to remaining total)
+            Alert.alert(
+              'Sold Out',
+              `Combination ${betNum} is sold out. Maximum you can bet: Target ${maxTarget}, Rambol ${maxRambol} (Total: ${remaining})`,
+            );
+          } else if (targetAmt > 0) {
+            // Only betting target
+            Alert.alert(
+              'Sold Out',
+              `Combination ${betNum} is sold out. Maximum you can bet for target: ${maxTarget}`,
+            );
+          } else if (rambolAmt > 0) {
+            // Only betting rambol
+            Alert.alert(
+              'Sold Out',
+              `Combination ${betNum} is sold out. Maximum you can bet for rambol: ${maxRambol}`,
+            );
+          }
           return true;
         }
 
@@ -269,22 +297,50 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         if (!currentDraw) return false;
 
         const key = `${betType.id}_${currentDraw}`;
-        let totalAmount = 0;
+        const LIMIT = 750;
 
         // Get target amount for exact bet number
         const targetKey = `${key}_target_${betNum}`;
         const existingTarget = posCombinationCap[targetKey] || 0;
-        totalAmount += existingTarget + targetAmt;
 
         // Get rambol amount for sorted number (all permutations share the same rambol total)
         const sortedNumber = sortNumber(betNum);
         const rambolKey = `${key}_rambol_${sortedNumber}`;
         const existingRambol = posCombinationCap[rambolKey] || 0;
-        totalAmount += existingRambol + rambolAmt;
+
+        // Calculate current total and new total
+        const currentTotal = existingTarget + existingRambol;
+        const newTotal = currentTotal + targetAmt + rambolAmt;
 
         // Check if total exceeds 750
-        if (totalAmount > 750) {
-          Alert.alert('Sold Out', `Combination ${betNum} is sold out`);
+        if (newTotal > LIMIT) {
+          const remaining = LIMIT - currentTotal;
+
+          // Calculate maximum amounts they can bet
+          let maxTarget = remaining;
+          let maxRambol = remaining;
+
+          // If they're betting both, we need to show the maximum for each
+          // The remaining can be split between target and rambol
+          if (targetAmt > 0 && rambolAmt > 0) {
+            // Show maximum for each (they can bet up to remaining total)
+            Alert.alert(
+              'Sold Out',
+              `Combination ${betNum} is sold out. Maximum you can bet: Target ${maxTarget}, Rambol ${maxRambol} (Total: ${remaining})`,
+            );
+          } else if (targetAmt > 0) {
+            // Only betting target
+            Alert.alert(
+              'Sold Out',
+              `Combination ${betNum} is sold out. Maximum you can bet for target: ${maxTarget}`,
+            );
+          } else if (rambolAmt > 0) {
+            // Only betting rambol
+            Alert.alert(
+              'Sold Out',
+              `Combination ${betNum} is sold out. Maximum you can bet for rambol: ${maxRambol}`,
+            );
+          }
           return true;
         }
 
