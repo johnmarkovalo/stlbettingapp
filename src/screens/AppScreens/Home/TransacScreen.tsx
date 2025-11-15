@@ -33,6 +33,7 @@ import {
   sortNumber,
   isWithin15MinutesOfCutoff,
   calculateCombinationAmounts,
+  calculatePOSCombinationAmounts,
 } from '../../../helper/functions';
 import {
   getLatestTransaction,
@@ -42,8 +43,9 @@ import {
 import {printTransaction} from '../../../helper/printer';
 import {sendTransactionAPI, getSoldOutsAPI} from '../../../helper/api';
 import {
-  soldoutsActions,
+  localSoldOutsActions,
   combinationAmountsActions,
+  posCombinationCapActions,
 } from '../../../store/actions';
 import {getTransactions, getBetsByTransaction} from '../../../database';
 
@@ -53,10 +55,16 @@ interface RootState {
     user: any;
     token: string;
   };
-  soldouts: {
-    soldouts: any[];
+  localSoldOuts: {
+    serverSoldouts: any[];
+    loading: boolean;
+    error: any;
   };
   combinationAmounts: {
+    amounts: Record<string, number>;
+    lastUpdated: string | null;
+  };
+  posCombinationCap: {
     amounts: Record<string, number>;
     lastUpdated: string | null;
   };
@@ -91,9 +99,14 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
   ({route, navigation}) => {
     const user = useSelector((state: RootState) => state.auth.user);
     const token = useSelector((state: RootState) => state.auth.token);
-    const soldouts = useSelector((state: RootState) => state.soldouts.soldouts);
+    const serverSoldouts = useSelector(
+      (state: RootState) => state.localSoldOuts.serverSoldouts,
+    );
     const combinationAmounts = useSelector(
       (state: RootState) => state.combinationAmounts.amounts,
+    );
+    const posCombinationCap = useSelector(
+      (state: RootState) => state.posCombinationCap.amounts,
     );
     const dispatch = useDispatch();
 
@@ -139,39 +152,6 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     const canAddRambol = useMemo(
       () => !checkIfTriple(betNumber.value),
       [betNumber.value],
-    );
-
-    // Helper function to check if a bet number is sold out
-    const checkSoldOut = useCallback(
-      (number: string, checkType: 'target' | 'rambol'): boolean => {
-        if (!number || number.length !== 3 || soldouts.length === 0) {
-          return false;
-        }
-
-        if (checkType === 'target') {
-          const isSoldOut = soldouts.some(
-            soldout =>
-              soldout.combination === number && soldout.is_target === 1,
-          );
-          if (isSoldOut) {
-            Alert.alert('Sold Out', `Number ${number} is sold out for target`);
-            return true;
-          }
-        } else if (checkType === 'rambol') {
-          const sortedNumber = sortNumber(number);
-          const isSoldOut = soldouts.some(
-            soldout =>
-              soldout.combination === sortedNumber && soldout.is_target === 0,
-          );
-          if (isSoldOut) {
-            Alert.alert('Sold Out', `Number ${number} is sold out for rambol`);
-            return true;
-          }
-        }
-
-        return false;
-      },
-      [soldouts],
     );
 
     // Check if within 15 minutes of cutoff
@@ -245,16 +225,137 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
         // Check if total exceeds 50
         if (totalAmount > 50) {
-          Alert.alert(
-            'Limit Exceeded',
-            `Total amount for combination ${betNum} cannot exceed 50 within 15 minutes before cutoff. Current total would be ${totalAmount} (Target: ${existingTarget + targetAmt}, Rambol: ${existingRambol + rambolAmt}).`,
-          );
+          Alert.alert('Sold Out', `Combination ${betNum} is sold out`);
           return true;
         }
 
         return false;
       },
       [isWithinCutoff, currentDraw, betType.id, combinationAmounts],
+    );
+
+    // Fetch and update POS combination amounts (for entire draw, not just 15 minutes)
+    const fetchPOSCombinationAmounts = useCallback(async () => {
+      if (!currentDraw) return;
+
+      try {
+        const transactions = (await getTransactions(
+          betDate,
+          currentDraw,
+          betType.id,
+        )) as any[];
+
+        // Get bets for all transactions
+        const betsByTransaction: Record<number, any[]> = {};
+        for (const transaction of transactions) {
+          const bets = (await getBetsByTransaction(transaction.id)) as any[];
+          betsByTransaction[transaction.id] = bets;
+        }
+
+        const amounts = calculatePOSCombinationAmounts(
+          transactions,
+          betsByTransaction,
+        ) as Record<string, number>;
+        dispatch(posCombinationCapActions.update(amounts));
+      } catch (error) {
+        console.error('Error fetching POS combination amounts:', error);
+      }
+    }, [currentDraw, betDate, betType.id, dispatch]);
+
+    // Check POS combination amount limit (750 per draw)
+    // Same logic as checkCombinationLimit but for entire draw with 750 limit
+    const checkPOSCombinationLimit = useCallback(
+      (betNum: string, targetAmt: number, rambolAmt: number): boolean => {
+        if (!currentDraw) return false;
+
+        const key = `${betType.id}_${currentDraw}`;
+        let totalAmount = 0;
+
+        // Get target amount for exact bet number
+        const targetKey = `${key}_target_${betNum}`;
+        const existingTarget = posCombinationCap[targetKey] || 0;
+        totalAmount += existingTarget + targetAmt;
+
+        // Get rambol amount for sorted number (all permutations share the same rambol total)
+        const sortedNumber = sortNumber(betNum);
+        const rambolKey = `${key}_rambol_${sortedNumber}`;
+        const existingRambol = posCombinationCap[rambolKey] || 0;
+        totalAmount += existingRambol + rambolAmt;
+
+        // Check if total exceeds 750
+        if (totalAmount > 750) {
+          Alert.alert('Sold Out', `Combination ${betNum} is sold out`);
+          return true;
+        }
+
+        return false;
+      },
+      [currentDraw, betType.id, posCombinationCap],
+    );
+
+    // Unified LocalSoldOut check - hierarchical checks in order:
+    // 1. Server Soldout (from API) - if true, stop (no need to proceed)
+    // 2. Local Soldout (POSCombinationCap - 750 per draw) - if true, stop (no need to proceed)
+    // 3. 15-minute limit (50) - only if within 15 minutes of cutoff
+    const checkLocalSoldOut = useCallback(
+      (
+        number: string,
+        checkType: 'target' | 'rambol',
+        targetAmt: number = 0,
+        rambolAmt: number = 0,
+      ): boolean => {
+        if (!number || number.length !== 3) {
+          return false;
+        }
+
+        // 1. Check Server Soldout (from API) - if true, stop immediately
+        if (serverSoldouts.length > 0) {
+          if (checkType === 'target') {
+            const isSoldOut = serverSoldouts.some(
+              soldout =>
+                soldout.combination === number && soldout.is_target === 1,
+            );
+            if (isSoldOut) {
+              Alert.alert('Sold Out', `Combination ${number} is sold out`);
+              return true; // Stop here, no need to check further
+            }
+          } else if (checkType === 'rambol') {
+            const sortedNumber = sortNumber(number);
+            const isSoldOut = serverSoldouts.some(
+              soldout =>
+                soldout.combination === sortedNumber && soldout.is_target === 0,
+            );
+            if (isSoldOut) {
+              Alert.alert('Sold Out', `Combination ${number} is sold out`);
+              return true; // Stop here, no need to check further
+            }
+          }
+        }
+
+        // 2. Check Local Soldout (POSCombinationCap - 750 per draw) - if true, stop immediately
+        // Only check if amounts are provided (need amounts to calculate total)
+        if (targetAmt > 0 || rambolAmt > 0) {
+          if (checkPOSCombinationLimit(number, targetAmt, rambolAmt)) {
+            return true; // Stop here, no need to check further
+          }
+        }
+
+        // 3. Check 15-minute limit (50) - only if within 15 minutes of cutoff
+        // Only check if within cutoff and amounts are provided
+        if (isWithinCutoff && (targetAmt > 0 || rambolAmt > 0)) {
+          if (checkCombinationLimit(number, targetAmt, rambolAmt)) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+      [
+        serverSoldouts,
+        checkPOSCombinationLimit,
+        isWithinCutoff,
+        checkCombinationLimit,
+      ],
     );
 
     // Memoized functions
@@ -291,45 +392,8 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           }
         }
 
-        // Check sold out
-        if (soldouts.length > 0) {
-          switch (type) {
-            case 'targetAmount': {
-              const targetAmountSoldOut = soldouts.find(
-                soldout =>
-                  soldout.combination === betNumber.value &&
-                  soldout.is_target === 1,
-              );
-              if (targetAmountSoldOut) {
-                Alert.alert(
-                  'Sold Out',
-                  `Number ${targetAmount.value} is sold out for target`,
-                );
-                return true;
-              }
-              break;
-            }
-            case 'rambolAmount': {
-              const rambolAmountSoldOut = soldouts.find(
-                soldout =>
-                  soldout.combination === sortNumber(betNumber.value) &&
-                  soldout.is_target === 0,
-              );
-              if (rambolAmountSoldOut) {
-                Alert.alert(
-                  'Sold Out',
-                  `Number ${rambolAmount.value} is sold out for rambol`,
-                );
-                return true;
-              }
-              break;
-            }
-          }
-        }
-
-        // Check combination limit (50 within 15 minutes before cutoff)
-        // Always check total (target + rambol) for the combination
-        if (isWithinCutoff && betNumber.value.length === 3) {
+        // Check LocalSoldOut (combines server soldouts + combination limits)
+        if (betNumber.value.length === 3) {
           const targetAmt =
             targetAmount.value && targetAmount.value !== ''
               ? parseInt(targetAmount.value, 10)
@@ -339,9 +403,20 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               ? parseInt(rambolAmount.value, 10)
               : 0;
 
-          // Check limit: sum of target (exact match) + rambol (all permutations)
-          if (checkCombinationLimit(betNumber.value, targetAmt, rambolAmt)) {
-            return true;
+          // Check based on type being validated
+          if (type === 'targetAmount' || type === '') {
+            if (
+              checkLocalSoldOut(betNumber.value, 'target', targetAmt, rambolAmt)
+            ) {
+              return true;
+            }
+          }
+          if (type === 'rambolAmount' || type === '') {
+            if (
+              checkLocalSoldOut(betNumber.value, 'rambol', targetAmt, rambolAmt)
+            ) {
+              return true;
+            }
           }
         }
 
@@ -352,9 +427,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         targetAmount.value,
         rambolAmount.value,
         betType.capping,
-        soldouts,
-        isWithinCutoff,
-        checkCombinationLimit,
+        checkLocalSoldOut,
       ],
     );
 
@@ -362,15 +435,35 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       (type: string) => {
         if (validateBet(type)) return;
 
-        // Additional soldout checks before changing focus
+        // Additional LocalSoldOut checks before changing focus
         if (type === 'targetAmount' && betNumber.value.length === 3) {
-          if (checkSoldOut(betNumber.value, 'target')) {
+          const targetAmt =
+            targetAmount.value && targetAmount.value !== ''
+              ? parseInt(targetAmount.value, 10)
+              : 0;
+          const rambolAmt =
+            rambolAmount.value && rambolAmount.value !== ''
+              ? parseInt(rambolAmount.value, 10)
+              : 0;
+          if (
+            checkLocalSoldOut(betNumber.value, 'target', targetAmt, rambolAmt)
+          ) {
             setBetNumber({value: '', isFocus: true});
             return;
           }
         }
         if (type === 'rambolAmount' && betNumber.value.length === 3) {
-          if (checkSoldOut(betNumber.value, 'rambol')) {
+          const targetAmt =
+            targetAmount.value && targetAmount.value !== ''
+              ? parseInt(targetAmount.value, 10)
+              : 0;
+          const rambolAmt =
+            rambolAmount.value && rambolAmount.value !== ''
+              ? parseInt(rambolAmount.value, 10)
+              : 0;
+          if (
+            checkLocalSoldOut(betNumber.value, 'rambol', targetAmt, rambolAmt)
+          ) {
             setBetNumber({value: '', isFocus: true});
             setTargetAmount({value: '', isFocus: false});
             return;
@@ -417,7 +510,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         betNumber.value,
         targetAmount.value,
         rambolAmount.value,
-        checkSoldOut,
+        checkLocalSoldOut,
       ],
     );
 
@@ -462,6 +555,29 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           dispatch(combinationAmountsActions.update(updatedAmounts));
         }
 
+        // Update POS combination amounts in Redux (for entire draw)
+        if (currentDraw) {
+          const key = `${betType.id}_${currentDraw}`;
+          const updatedPOSAmounts = {...posCombinationCap};
+
+          // Update target amount
+          if (newBet.targetAmount > 0) {
+            const targetKey = `${key}_target_${newBet.betNumber}`;
+            updatedPOSAmounts[targetKey] =
+              (updatedPOSAmounts[targetKey] || 0) + newBet.targetAmount;
+          }
+
+          // Update rambol amount (use sorted number - all permutations grouped together)
+          if (newBet.rambolAmount > 0) {
+            const sortedNumber = sortNumber(newBet.betNumber);
+            const rambolKey = `${key}_rambol_${sortedNumber}`;
+            updatedPOSAmounts[rambolKey] =
+              (updatedPOSAmounts[rambolKey] || 0) + newBet.rambolAmount;
+          }
+
+          dispatch(posCombinationCapActions.update(updatedPOSAmounts));
+        }
+
         // Reset inputs
         setBetNumber({value: '', isFocus: true});
         setTargetAmount({value: '', isFocus: false});
@@ -479,6 +595,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       currentDraw,
       betType.id,
       combinationAmounts,
+      posCombinationCap,
       dispatch,
     ]);
 
@@ -487,10 +604,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         // Map first if what is focused
         if (betNumber.isFocus && betNumber.value.length < 3) {
           const newBetNumber = betNumber.value + input;
-          // If bet number will be complete (3 digits), check soldouts before setting
+          // If bet number will be complete (3 digits), check LocalSoldOut before setting
           if (newBetNumber.length === 3) {
             // Check if sold out for target (we'll check rambol later when needed)
-            if (checkSoldOut(newBetNumber, 'target')) {
+            // At this point, no amounts yet, so only server soldouts will be checked
+            if (checkLocalSoldOut(newBetNumber, 'target', 0, 0)) {
               // Clear the bet number if sold out
               setBetNumber({value: '', isFocus: true});
               return;
@@ -554,7 +672,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         targetAmount.value,
         rambolAmount.value,
         betType?.capping,
-        checkSoldOut,
+        checkLocalSoldOut,
       ],
     );
 
@@ -599,9 +717,13 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
       if (targetAmount.isFocus && !checkIfTriple(betNumber.value)) {
         // Check if sold out for rambol before allowing focus change
+        const targetAmt =
+          targetAmount.value && targetAmount.value !== ''
+            ? parseInt(targetAmount.value, 10)
+            : 0;
         if (
           betNumber.value.length === 3 &&
-          checkSoldOut(betNumber.value, 'rambol')
+          checkLocalSoldOut(betNumber.value, 'rambol', targetAmt, 0)
         ) {
           setBetNumber({value: '', isFocus: true});
           setTargetAmount({value: '', isFocus: false});
@@ -621,7 +743,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       betNumber.value,
       changeFocus,
       addBet,
-      checkSoldOut,
+      checkLocalSoldOut,
     ]);
 
     const onNoRambol = useCallback(() => {
@@ -759,7 +881,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       try {
         const soldoutsData = await getSoldOutsAPI(token);
         if (soldoutsData) {
-          dispatch(soldoutsActions.update(soldoutsData));
+          dispatch(localSoldOutsActions.updateServerSoldouts(soldoutsData));
         }
       } catch (error) {
         console.error('Error fetching soldouts:', error);
@@ -806,6 +928,19 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       }
     }, [isWithinCutoff, currentDraw, fetchCombinationAmounts, dispatch]);
 
+    // Fetch POS combination amounts when draw changes (for entire draw, not just 15 minutes)
+    useEffect(() => {
+      if (currentDraw) {
+        fetchPOSCombinationAmounts();
+        // Refresh every 30 seconds to keep amounts updated
+        const intervalId = setInterval(fetchPOSCombinationAmounts, 30000);
+        return () => clearInterval(intervalId);
+      } else {
+        // Clear amounts when no draw
+        dispatch(posCombinationCapActions.clear());
+      }
+    }, [currentDraw, fetchPOSCombinationAmounts, dispatch]);
+
     useEffect(() => {
       setTotalAmount(
         bets.reduce((total, current) => total + (current.subtotal || 0), 0),
@@ -817,7 +952,8 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       // Check the length after state has been updated
       if (betNumber.value.length === 3 && betNumber.isFocus) {
         // Check if sold out for target before allowing focus change
-        if (!checkSoldOut(betNumber.value, 'target')) {
+        // At this point, no amounts yet, so only server soldouts will be checked
+        if (!checkLocalSoldOut(betNumber.value, 'target', 0, 0)) {
           changeFocus('targetAmount');
         } else {
           // Clear bet number if sold out
@@ -827,7 +963,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       if (targetAmount.value.length === 3 && targetAmount.isFocus) {
         if (!checkIfTriple(betNumber.value)) {
           // Check if sold out for rambol before allowing focus change
-          if (!checkSoldOut(betNumber.value, 'rambol')) {
+          const targetAmt =
+            targetAmount.value && targetAmount.value !== ''
+              ? parseInt(targetAmount.value, 10)
+              : 0;
+          if (!checkLocalSoldOut(betNumber.value, 'rambol', targetAmt, 0)) {
             changeFocus('rambolAmount');
           } else {
             // Clear inputs if sold out
@@ -843,7 +983,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       targetAmount.value,
       rambolAmount.value,
       validateBet,
-      checkSoldOut,
+      checkLocalSoldOut,
       changeFocus,
     ]);
 

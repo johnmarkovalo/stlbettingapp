@@ -2,16 +2,18 @@ import {combineReducers} from 'redux';
 
 import {auth} from './auth.reducer';
 import {types} from './types.reducer';
-import {soldouts} from './soldouts.reducer';
+import {localSoldOuts} from './localSoldOuts.reducer';
 import {printer} from './printer.reducer';
 import {combinationAmounts} from './combinationAmounts.reducer';
+import {posCombinationCap} from './posCombinationCap.reducer';
 
 const rootReducer = combineReducers({
   auth,
   types,
-  soldouts,
+  localSoldOuts,
   printer,
   combinationAmounts,
+  posCombinationCap,
 });
 
 export default (state, action) =>

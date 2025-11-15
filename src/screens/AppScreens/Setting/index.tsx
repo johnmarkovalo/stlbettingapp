@@ -21,7 +21,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {
   userActions,
   typesActions,
-  soldoutsActions,
+  localSoldOutsActions,
 } from '../../../store/actions';
 import {syncBetTypesAPI, getSoldOutsAPI} from '../../../helper/api';
 import {insertTypes} from '../../../database';
@@ -85,7 +85,7 @@ const Setting = (props: any) => {
 
     const soldouts = await getSoldOutsAPI(token);
     if (soldouts) {
-      dispatch(soldoutsActions.update(soldouts));
+      dispatch(localSoldOutsActions.updateServerSoldouts(soldouts));
     }
   };
 

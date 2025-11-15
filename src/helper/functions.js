@@ -374,6 +374,46 @@ export const calculateCombinationAmounts = (transactions, betsByTransaction) => 
   return amounts;
 };
 
+// Calculate POS combination amounts from transactions (for entire draw, not just 15 minutes)
+// Returns: { [betTypeId_draw_combination]: totalAmount }
+// Same logic as calculateCombinationAmounts but includes all transactions in the draw
+export const calculatePOSCombinationAmounts = (transactions, betsByTransaction) => {
+  const amounts = {};
+
+  transactions.forEach(transaction => {
+    const bets = betsByTransaction[transaction.id] || [];
+    const key = `${transaction.bettypeid}_${transaction.bettime}`;
+
+    bets.forEach(bet => {
+      // Handle both database format (betnumber, target, rambol) and model format (betNumber, targetAmount, rambolAmount)
+      const betNumber = bet.betnumber || bet.betNumber || '';
+      const targetAmount = bet.target || bet.targetAmount || 0;
+      const rambolAmount = bet.rambol || bet.rambolAmount || 0;
+
+      // For target: use exact bet number
+      if (targetAmount > 0 && betNumber) {
+        const targetKey = `${key}_target_${betNumber}`;
+        if (!amounts[targetKey]) {
+          amounts[targetKey] = 0;
+        }
+        amounts[targetKey] += targetAmount;
+      }
+
+      // For rambol: use sorted bet number (123 and 321 are same)
+      if (rambolAmount > 0 && betNumber) {
+        const sortedNumber = sortNumber(betNumber);
+        const rambolKey = `${key}_rambol_${sortedNumber}`;
+        if (!amounts[rambolKey]) {
+          amounts[rambolKey] = 0;
+        }
+        amounts[rambolKey] += rambolAmount;
+      }
+    });
+  });
+
+  return amounts;
+};
+
 export const checkInternetConnection = () => {
   let isConnected = false;
   let isSlow = true; // New variable for slow connection
