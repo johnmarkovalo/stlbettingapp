@@ -299,6 +299,81 @@ export const formatBetTypes = betTypes => {
   });
 };
 
+// Check if current time is within 15 minutes before draw cutoff
+export const isWithin15MinutesOfCutoff = (draws, currentDraw) => {
+  if (!currentDraw || currentDraw < 1 || currentDraw > draws.length) {
+    return false;
+  }
+
+  const draw = draws[currentDraw - 1];
+  if (!draw || !draw.end) {
+    return false;
+  }
+
+  const currentTime = moment();
+  const endTime = moment(draw.end, 'HH:mm');
+  
+  // Set today's date for endTime
+  endTime.year(currentTime.year());
+  endTime.month(currentTime.month());
+  endTime.date(currentTime.date());
+
+  // Handle case where end time is next day (crosses midnight)
+  if (endTime.isBefore(currentTime)) {
+    endTime.add(1, 'day');
+  }
+
+  const minutesUntilCutoff = endTime.diff(currentTime, 'minutes');
+  
+  // Return true if within 15 minutes of cutoff
+  return minutesUntilCutoff >= 0 && minutesUntilCutoff <= 15;
+};
+
+// Calculate combination amounts from transactions
+// Returns: { [betTypeId_draw_combination]: totalAmount }
+export const calculateCombinationAmounts = (transactions, betsByTransaction) => {
+  const amounts = {};
+  const fifteenMinutesAgo = moment().subtract(15, 'minutes');
+
+  transactions.forEach(transaction => {
+    const created_at = moment(transaction.created_at);
+    
+    // Only count transactions from last 15 minutes
+    if (created_at.isAfter(fifteenMinutesAgo)) {
+      const bets = betsByTransaction[transaction.id] || [];
+      const key = `${transaction.bettypeid}_${transaction.bettime}`;
+
+      bets.forEach(bet => {
+        // Handle both database format (betnumber, target, rambol) and model format (betNumber, targetAmount, rambolAmount)
+        const betNumber = bet.betnumber || bet.betNumber || '';
+        const targetAmount = bet.target || bet.targetAmount || 0;
+        const rambolAmount = bet.rambol || bet.rambolAmount || 0;
+
+        // For target: use exact bet number
+        if (targetAmount > 0 && betNumber) {
+          const targetKey = `${key}_target_${betNumber}`;
+          if (!amounts[targetKey]) {
+            amounts[targetKey] = 0;
+          }
+          amounts[targetKey] += targetAmount;
+        }
+
+        // For rambol: use sorted bet number (123 and 321 are same)
+        if (rambolAmount > 0 && betNumber) {
+          const sortedNumber = sortNumber(betNumber);
+          const rambolKey = `${key}_rambol_${sortedNumber}`;
+          if (!amounts[rambolKey]) {
+            amounts[rambolKey] = 0;
+          }
+          amounts[rambolKey] += rambolAmount;
+        }
+      });
+    }
+  });
+
+  return amounts;
+};
+
 export const checkInternetConnection = () => {
   let isConnected = false;
   let isSlow = true; // New variable for slow connection

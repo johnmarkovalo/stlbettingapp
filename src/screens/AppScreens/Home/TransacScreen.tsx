@@ -31,6 +31,8 @@ import {
   convertToTransData,
   getCurrentDraw,
   sortNumber,
+  isWithin15MinutesOfCutoff,
+  calculateCombinationAmounts,
 } from '../../../helper/functions';
 import {
   getLatestTransaction,
@@ -39,7 +41,11 @@ import {
 } from '../../../database';
 import {printTransaction} from '../../../helper/printer';
 import {sendTransactionAPI, getSoldOutsAPI} from '../../../helper/api';
-import {soldoutsActions} from '../../../store/actions';
+import {
+  soldoutsActions,
+  combinationAmountsActions,
+} from '../../../store/actions';
+import {getTransactions, getBetsByTransaction} from '../../../database';
 
 // Define types for Redux state
 interface RootState {
@@ -49,6 +55,10 @@ interface RootState {
   };
   soldouts: {
     soldouts: any[];
+  };
+  combinationAmounts: {
+    amounts: Record<string, number>;
+    lastUpdated: string | null;
   };
 }
 
@@ -82,6 +92,9 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     const user = useSelector((state: RootState) => state.auth.user);
     const token = useSelector((state: RootState) => state.auth.token);
     const soldouts = useSelector((state: RootState) => state.soldouts.soldouts);
+    const combinationAmounts = useSelector(
+      (state: RootState) => state.combinationAmounts.amounts,
+    );
     const dispatch = useDispatch();
 
     // Refs
@@ -161,6 +174,89 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       [soldouts],
     );
 
+    // Check if within 15 minutes of cutoff
+    const isWithinCutoff = useMemo(
+      () => isWithin15MinutesOfCutoff(betType.draws, currentDraw),
+      [betType.draws, currentDraw],
+    );
+
+    // Fetch and update combination amounts
+    const fetchCombinationAmounts = useCallback(async () => {
+      if (!isWithinCutoff || !currentDraw) return;
+
+      try {
+        const transactions = (await getTransactions(
+          betDate,
+          currentDraw,
+          betType.id,
+        )) as any[];
+
+        // Get bets for all transactions
+        const betsByTransaction: Record<number, any[]> = {};
+        for (const transaction of transactions) {
+          const bets = (await getBetsByTransaction(transaction.id)) as any[];
+          betsByTransaction[transaction.id] = bets;
+        }
+
+        const amounts = calculateCombinationAmounts(
+          transactions,
+          betsByTransaction,
+        ) as Record<string, number>;
+        dispatch(combinationAmountsActions.update(amounts));
+      } catch (error) {
+        console.error('Error fetching combination amounts:', error);
+      }
+    }, [isWithinCutoff, currentDraw, betDate, betType.id, dispatch]);
+
+    // Check combination amount limit (50 within 15 minutes before cutoff)
+    // Purpose: Limit total winning payout amount to prevent competitors from placing large bets
+    //
+    // Business Logic: If winning number is "123", payout includes:
+    // - All target bets with exact "123"
+    // - All rambol bets with ANY permutation of "123" (123, 321, 213, 231, 312, 132)
+    // Total Payout = target(123) + rambol(all permutations of 123)
+    //
+    // Implementation:
+    // - Target amounts are separate per exact bet number (target 123 ≠ target 321)
+    // - Rambol amounts are shared across all permutations (rambol 123 = rambol 321 = rambol 213, etc.)
+    // - Total = target(exact) + rambol(all permutations)
+    // Example 1: Target 123=10, Rambol 123=10 → Total Payout = 10 + 10 = 20
+    // Example 2: Target 321=10, Rambol 321=10 → Total Payout = 10 + (10 + 10) = 30
+    //   (target 321 is separate, but rambol includes previous rambol from 123)
+    const checkCombinationLimit = useCallback(
+      (betNum: string, targetAmt: number, rambolAmt: number): boolean => {
+        if (!isWithinCutoff || !currentDraw) return false;
+
+        const key = `${betType.id}_${currentDraw}`;
+        let totalAmount = 0;
+
+        // Get target amount for exact bet number (target 123 and target 321 are separate)
+        const targetKey = `${key}_target_${betNum}`;
+        const existingTarget = combinationAmounts[targetKey] || 0;
+        totalAmount += existingTarget + targetAmt;
+
+        // Get rambol amount for sorted number (all permutations share the same rambol total)
+        // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
+        // So rambol 321 uses the same rambol_123 key as rambol 123
+        const sortedNumber = sortNumber(betNum);
+        const rambolKey = `${key}_rambol_${sortedNumber}`;
+        const existingRambol = combinationAmounts[rambolKey] || 0;
+        totalAmount += existingRambol + rambolAmt;
+
+        // Check if total exceeds 50
+        if (totalAmount > 50) {
+          Alert.alert(
+            'Limit Exceeded',
+            `Total amount for combination ${betNum} cannot exceed 50 within 15 minutes before cutoff. Current total would be ${totalAmount} (Target: ${existingTarget + targetAmt}, Rambol: ${existingRambol + rambolAmt}).`,
+          );
+          return true;
+        }
+
+        return false;
+      },
+      [isWithinCutoff, currentDraw, betType.id, combinationAmounts],
+    );
+
     // Memoized functions
     const validateBet = useCallback(
       (type = '') => {
@@ -231,6 +327,24 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           }
         }
 
+        // Check combination limit (50 within 15 minutes before cutoff)
+        // Always check total (target + rambol) for the combination
+        if (isWithinCutoff && betNumber.value.length === 3) {
+          const targetAmt =
+            targetAmount.value && targetAmount.value !== ''
+              ? parseInt(targetAmount.value, 10)
+              : 0;
+          const rambolAmt =
+            rambolAmount.value && rambolAmount.value !== ''
+              ? parseInt(rambolAmount.value, 10)
+              : 0;
+
+          // Check limit: sum of target (exact match) + rambol (all permutations)
+          if (checkCombinationLimit(betNumber.value, targetAmt, rambolAmt)) {
+            return true;
+          }
+        }
+
         return false;
       },
       [
@@ -239,6 +353,8 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         rambolAmount.value,
         betType.capping,
         soldouts,
+        isWithinCutoff,
+        checkCombinationLimit,
       ],
     );
 
@@ -322,6 +438,30 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
         setBets(prev => [newBet, ...prev]);
 
+        // Update combination amounts in Redux if within cutoff
+        if (isWithinCutoff && currentDraw) {
+          const key = `${betType.id}_${currentDraw}`;
+          const updatedAmounts = {...combinationAmounts};
+
+          // Update target amount
+          if (newBet.targetAmount > 0) {
+            const targetKey = `${key}_target_${newBet.betNumber}`;
+            updatedAmounts[targetKey] =
+              (updatedAmounts[targetKey] || 0) + newBet.targetAmount;
+          }
+
+          // Update rambol amount (use sorted number - all permutations grouped together)
+          // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
+          if (newBet.rambolAmount > 0) {
+            const sortedNumber = sortNumber(newBet.betNumber);
+            const rambolKey = `${key}_rambol_${sortedNumber}`;
+            updatedAmounts[rambolKey] =
+              (updatedAmounts[rambolKey] || 0) + newBet.rambolAmount;
+          }
+
+          dispatch(combinationAmountsActions.update(updatedAmounts));
+        }
+
         // Reset inputs
         setBetNumber({value: '', isFocus: true});
         setTargetAmount({value: '', isFocus: false});
@@ -335,6 +475,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       targetAmount.value,
       rambolAmount.value,
       bets.length,
+      isWithinCutoff,
+      currentDraw,
+      betType.id,
+      combinationAmounts,
+      dispatch,
     ]);
 
     const onKeyPress = useCallback(
@@ -647,6 +792,19 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       const intervalId = setInterval(recalculateCurrentDraw, 30000);
       return () => clearInterval(intervalId);
     }, [recalculateCurrentDraw]);
+
+    // Fetch combination amounts when within 15 minutes of cutoff
+    useEffect(() => {
+      if (isWithinCutoff && currentDraw) {
+        fetchCombinationAmounts();
+        // Refresh every 30 seconds to keep amounts updated
+        const intervalId = setInterval(fetchCombinationAmounts, 30000);
+        return () => clearInterval(intervalId);
+      } else {
+        // Clear amounts when not within cutoff
+        dispatch(combinationAmountsActions.clear());
+      }
+    }, [isWithinCutoff, currentDraw, fetchCombinationAmounts, dispatch]);
 
     useEffect(() => {
       setTotalAmount(
