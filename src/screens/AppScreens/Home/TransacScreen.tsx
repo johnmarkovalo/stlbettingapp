@@ -210,16 +210,28 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         const key = `${betType.id}_${currentDraw}`;
         const LIMIT = 50;
 
-        // Get target amount for exact bet number (target 123 and target 321 are separate)
+        // Get target amount for exact bet number from Redux
         const targetKey = `${key}_target_${betNum}`;
-        const existingTarget = combinationAmounts[targetKey] || 0;
+        let existingTarget = combinationAmounts[targetKey] || 0;
 
-        // Get rambol amount for sorted number (all permutations share the same rambol total)
+        // Get rambol amount for sorted number from Redux
         // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
         // So rambol 321 uses the same rambol_123 key as rambol 123
         const sortedNumber = sortNumber(betNum);
         const rambolKey = `${key}_rambol_${sortedNumber}`;
-        const existingRambol = combinationAmounts[rambolKey] || 0;
+        let existingRambol = combinationAmounts[rambolKey] || 0;
+
+        // Also include amounts from bets already in the current transaction
+        // This is critical - we need to check against ALL bets, not just Redux
+        bets.forEach(bet => {
+          if (bet.betNumber === betNum) {
+            existingTarget += bet.targetAmount || 0;
+          }
+          // For rambol, check if sorted numbers match
+          if (sortNumber(bet.betNumber) === sortedNumber) {
+            existingRambol += bet.rambolAmount || 0;
+          }
+        });
 
         // Calculate current total and new total
         const currentTotal = existingTarget + existingRambol;
@@ -259,7 +271,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
         return false;
       },
-      [isWithinCutoff, currentDraw, betType.id, combinationAmounts],
+      [isWithinCutoff, currentDraw, betType.id, combinationAmounts, bets],
     );
 
     // Fetch and update POS combination amounts (for entire draw, not just 15 minutes)
@@ -299,14 +311,26 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         const key = `${betType.id}_${currentDraw}`;
         const LIMIT = 750;
 
-        // Get target amount for exact bet number
+        // Get target amount for exact bet number from Redux
         const targetKey = `${key}_target_${betNum}`;
-        const existingTarget = posCombinationCap[targetKey] || 0;
+        let existingTarget = posCombinationCap[targetKey] || 0;
 
-        // Get rambol amount for sorted number (all permutations share the same rambol total)
+        // Get rambol amount for sorted number from Redux
         const sortedNumber = sortNumber(betNum);
         const rambolKey = `${key}_rambol_${sortedNumber}`;
-        const existingRambol = posCombinationCap[rambolKey] || 0;
+        let existingRambol = posCombinationCap[rambolKey] || 0;
+
+        // Also include amounts from bets already in the current transaction
+        // This is critical - we need to check against ALL bets, not just Redux
+        bets.forEach(bet => {
+          if (bet.betNumber === betNum) {
+            existingTarget += bet.targetAmount || 0;
+          }
+          // For rambol, check if sorted numbers match
+          if (sortNumber(bet.betNumber) === sortedNumber) {
+            existingRambol += bet.rambolAmount || 0;
+          }
+        });
 
         // Calculate current total and new total
         const currentTotal = existingTarget + existingRambol;
@@ -346,7 +370,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
         return false;
       },
-      [currentDraw, betType.id, posCombinationCap],
+      [currentDraw, betType.id, posCombinationCap, bets],
     );
 
     // Unified LocalSoldOut check - hierarchical checks in order:
@@ -459,20 +483,20 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               ? parseInt(rambolAmount.value, 10)
               : 0;
 
-          // Check based on type being validated
-          if (type === 'targetAmount' || type === '') {
-            if (
-              checkLocalSoldOut(betNumber.value, 'target', targetAmt, rambolAmt)
-            ) {
-              return true;
-            }
+          // Always check both target and rambol soldout status
+          // Check target soldout first
+          if (
+            checkLocalSoldOut(betNumber.value, 'target', targetAmt, rambolAmt)
+          ) {
+            return true;
           }
-          if (type === 'rambolAmount' || type === '') {
-            if (
-              checkLocalSoldOut(betNumber.value, 'rambol', targetAmt, rambolAmt)
-            ) {
-              return true;
-            }
+          // Check rambol soldout (only if not triple and rambol amount exists)
+          if (
+            rambolAmt > 0 &&
+            !checkIfTriple(betNumber.value) &&
+            checkLocalSoldOut(betNumber.value, 'rambol', targetAmt, rambolAmt)
+          ) {
+            return true;
           }
         }
 
