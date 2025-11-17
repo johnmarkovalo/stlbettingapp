@@ -5,6 +5,8 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 import {appConfig} from '../config/appConfig';
+import {store} from '../store/store';
+import {userActions} from '../store/actions';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -120,18 +122,29 @@ class ApiClient {
           `❌ API Error: ${error.response?.status} ${error.config?.url}`,
         );
 
+        // Handle authentication errors (401 Unauthorized)
+        if (error.response?.status === 401) {
+          console.warn('🔒 Authentication failed - User will be logged out');
+          // Dispatch logout action to clear auth state
+          // This will automatically redirect to login screen via navigation
+          store.dispatch(userActions.logout());
+          // Don't retry authentication errors
+          return Promise.reject(error);
+        }
+
         // Retry logic for network errors
         if (error.code === 'ECONNABORTED' || !error.response) {
           const config = error.config as ExtendedAxiosRequestConfig;
           const currentRetryCount = config?.retryCount || 0;
           if (config && currentRetryCount < this.retryAttempts) {
-            config.retryCount = currentRetryCount + 1;
+            const nextRetryCount = currentRetryCount + 1;
+            config.retryCount = nextRetryCount;
             console.log(
-              `🔄 Retrying request (${config.retryCount}/${this.retryAttempts})...`,
+              `🔄 Retrying request (${nextRetryCount}/${this.retryAttempts})...`,
             );
 
             await new Promise(resolve =>
-              setTimeout(resolve, this.retryDelay * config.retryCount),
+              setTimeout(resolve, this.retryDelay * nextRetryCount),
             );
             return this.client.request(config);
           }
