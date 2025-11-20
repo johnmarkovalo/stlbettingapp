@@ -269,8 +269,8 @@ const History: React.FC<any> = ({navigation}) => {
 
       console.log(`🔄 Sync - Found ${unsyncedCount} unsynced transactions`);
 
-      // If we have 50+ unsynced items, use batch processing
-      if (unsyncedCount >= 50) {
+      // If we have 20+ unsynced items, use batch processing
+      if (unsyncedCount >= 20) {
         console.log(
           '📦 Sync - Using batch processing for large number of transactions',
         );
@@ -388,7 +388,7 @@ const History: React.FC<any> = ({navigation}) => {
             error?: string;
           }> = [];
 
-          if (batchTransactions.length >= 50) {
+          if (batchTransactions.length >= 20) {
             // Use bulk API for large batches
             console.log(
               `📤 Batch ${batchIndex + 1} - Using bulk API for ${batchTransactions.length} transactions`,
