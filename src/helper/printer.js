@@ -176,23 +176,34 @@ async function printTransaction(transaction, betType, bets, user) {
   try {
     // Check printer availability
     await checkNyxPrinter();
-
-    await NyxPrinterModule.printTableText(
-      ['------------------', '------------------', '-----------------'],
-      weights,
-      styles,
+    await NyxPrinterModule.printText(
+      '-------------------------------------------------------',
+      {
+        align: PrintAlign.CENTER,
+      },
     );
+    // await NyxPrinterModule.printTableText(
+    //   ['------------------', '------------------', '-----------------'],
+    //   weights,
+    //   styles,
+    // );
     await NyxPrinterModule.printText('       SMALL TOWN LOTTERY       ', {
       align: PrintAlign.CENTER,
     });
     await NyxPrinterModule.printText('              ZIAN              ', {
       align: PrintAlign.CENTER,
     });
-    await NyxPrinterModule.printTableText(
-      ['------------------', '------------------', '-----------------'],
-      weights,
-      styles,
+    await NyxPrinterModule.printText(
+      '-------------------------------------------------------',
+      {
+        align: PrintAlign.CENTER,
+      },
     );
+    // await NyxPrinterModule.printTableText(
+    //   ['------------------', '------------------', '-----------------'],
+    //   weights,
+    //   styles,
+    // );
     await NyxPrinterModule.printText(infoHeader, {align: PrintAlign.CENTER});
     await NyxPrinterModule.printText('Printed:\t' + dateTime, {
       align: PrintAlign.CENTER,
@@ -218,21 +229,21 @@ async function printTransaction(transaction, betType, bets, user) {
       align: PrintAlign.CENTER,
     });
     await NyxPrinterModule.printText('', {});
-    await NyxPrinterModule.printTableText(
-      ['------------------', '------------------', '-----------------'],
-      weights,
-      styles,
-    );
-    await NyxPrinterModule.printTableText(
-      ['No.', 'Target', 'Rambol'],
-      weights,
-      styles,
-    );
-    await NyxPrinterModule.printTableText(
-      ['------------------', '------------------', '-----------------'],
-      weights,
-      styles,
-    );
+    // await NyxPrinterModule.printTableText(
+    //   ['------------------', '------------------', '-----------------'],
+    //   weights,
+    //   styles,
+    // );
+    // await NyxPrinterModule.printTableText(
+    //   ['No.', 'Target', 'Rambol'],
+    //   weights,
+    //   styles,
+    // );
+    // await NyxPrinterModule.printTableText(
+    //   ['------------------', '------------------', '-----------------'],
+    //   weights,
+    //   styles,
+    // );
     const normalizeNumber = value => {
       if (value === null || value === undefined) {
         return '0';
@@ -250,26 +261,95 @@ async function printTransaction(transaction, betType, bets, user) {
       }
       return String(value);
     };
+    // for (const bet of bets) {
+    //   try {
+    //     const betNumber = normalizeText(bet.betNumber, '---');
+    //     const targetAmount = normalizeNumber(bet.targetAmount);
+    //     const rambolAmount = normalizeNumber(bet.rambolAmount);
+    //     console.log(betNumber, targetAmount, rambolAmount);
+    //     await NyxPrinterModule.printTableText(
+    //       [`${betNumber}`, `${targetAmount}T`, `${rambolAmount}R`],
+    //       weights,
+    //       styles,
+    //     );
+    //   } catch (betError) {
+    //     console.error('Failed to print bet row:', bet, betError);
+    //     await NyxPrinterModule.printTableText(
+    //       ['ERR', '0 T', '0 R'],
+    //       weights,
+    //       styles,
+    //     );
+    //   }
+    // }
+
+    // Helper function to ensure exact column width
+    const formatColumn = (text, width, align) => {
+      const truncated = String(text || '').substring(0, width);
+      if (align === 'left') {
+        return truncated.padEnd(width).substring(0, width);
+      } else if (align === 'right') {
+        return truncated.padStart(width).substring(0, width);
+      } else {
+        // center
+        const padding = width - truncated.length;
+        const leftPad = Math.floor(padding / 2);
+        const rightPad = padding - leftPad;
+        return (
+          ' '.repeat(leftPad) +
+          truncated +
+          ' '.repeat(rightPad)
+        ).substring(0, width);
+      }
+    };
+
+    // Table header: 45 chars max (no left/right padding)
+    // Calculation: 45 total - 2 gaps (1 each) = 43 chars for 3 columns
+    // Distribution: Bet Number (13) + Target (15, includes ' T') + Rambol (15, includes ' R')
+    // Total: 13 + 1 + 15 + 1 + 15 = 45 chars
+    const headerNo = formatColumn('No.', 13, 'left');
+    const headerTarget = formatColumn('Target', 15, 'center');
+    const headerRambol = formatColumn('Rambol', 15, 'right');
+    const header = `${headerNo} ${headerTarget} ${headerRambol}`;
+    await NyxPrinterModule.printText(header, {
+      align: PrintAlign.LEFT,
+    });
+
+    // Separator line (45 chars)
+    await NyxPrinterModule.printText(
+      '-------------------------------------------------------',
+      {
+        align: PrintAlign.CENTER,
+      },
+    );
 
     for (const bet of bets) {
-      try {
-        const betNumber = normalizeText(bet.betNumber, '---');
-        const targetAmount = normalizeNumber(bet.targetAmount);
-        const rambolAmount = normalizeNumber(bet.rambolAmount);
+      const betNumber = normalizeText(bet.betNumber, '---');
+      const targetAmount = normalizeNumber(bet.targetAmount);
+      const rambolAmount = normalizeNumber(bet.rambolAmount);
 
-        await NyxPrinterModule.printTableText(
-          [`${betNumber}`, `${targetAmount} T`, `${rambolAmount} R`],
-          weights,
-          styles,
-        );
-      } catch (betError) {
-        console.error('Failed to print bet row:', bet, betError);
-        await NyxPrinterModule.printTableText(
-          ['ERR', '0 T', '0 R'],
-          weights,
-          styles,
-        );
-      }
+      // Format: Bet Number (13 chars, left-aligned) + gap (1 char) + Target (15 chars including ' T', center-aligned) + gap (1 char) + Rambol (15 chars including ' R', right-aligned)
+      // Total: 13 + 1 + 15 + 1 + 15 = 45 chars (full width, fixed gaps prevent bet number shifting)
+
+      // Bet number: left-aligned, exactly 13 chars (fixed position, no suffix)
+      const betNumCol = formatColumn(betNumber, 13, 'left');
+
+      // Fixed gap: 1 space
+      const gap1 = ' ';
+
+      // Target: center-aligned, exactly 15 chars (includes ' T' suffix = 2 chars)
+      // So number part can be up to 13 chars: "798 T" = 5 chars, fits in 15
+      const targetCol = formatColumn(`${targetAmount} T`, 15, 'center');
+
+      // Fixed gap: 1 space
+      const gap2 = ' ';
+
+      // Rambol: right-aligned, exactly 15 chars (includes ' R' suffix = 2 chars)
+      // So number part can be up to 13 chars: "798 R" = 5 chars, fits in 15
+      const rambolCol = formatColumn(`${rambolAmount} R`, 15, 'right');
+
+      const line = `${betNumCol}${gap1}${targetCol}${gap2}${rambolCol}`;
+      // Line should be exactly 45 chars (13 + 1 + 15 + 1 + 15)
+      await NyxPrinterModule.printText(line, {align: PrintAlign.LEFT});
     }
     await NyxPrinterModule.printText('', {});
     await NyxPrinterModule.printText(total, {align: PrintAlign.CENTER});
@@ -298,6 +378,9 @@ async function printTransaction(transaction, betType, bets, user) {
       150,
       PrintAlign.CENTER,
     );
+
+    await NyxPrinterModule.printText('', {});
+    await NyxPrinterModule.printText('', {});
 
     // Feed paper and cut
     await NyxPrinterModule.printEndAutoOut();
