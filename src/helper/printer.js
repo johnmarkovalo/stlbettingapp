@@ -233,16 +233,43 @@ async function printTransaction(transaction, betType, bets, user) {
       weights,
       styles,
     );
+    const normalizeNumber = value => {
+      if (value === null || value === undefined) {
+        return '0';
+      }
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return numeric.toString();
+      }
+      return String(value);
+    };
+
+    const normalizeText = (value, fallback = '') => {
+      if (value === null || value === undefined || value === '') {
+        return fallback;
+      }
+      return String(value);
+    };
+
     for (const bet of bets) {
-      await NyxPrinterModule.printTableText(
-        [
-          bet.betNumber,
-          bet.targetAmount.toString() + ' T',
-          bet.rambolAmount.toString() + ' R',
-        ],
-        weights,
-        styles,
-      );
+      try {
+        const betNumber = normalizeText(bet.betNumber, '---');
+        const targetAmount = normalizeNumber(bet.targetAmount);
+        const rambolAmount = normalizeNumber(bet.rambolAmount);
+
+        await NyxPrinterModule.printTableText(
+          [`${betNumber}`, `${targetAmount} T`, `${rambolAmount} R`],
+          weights,
+          styles,
+        );
+      } catch (betError) {
+        console.error('Failed to print bet row:', bet, betError);
+        await NyxPrinterModule.printTableText(
+          ['ERR', '0 T', '0 R'],
+          weights,
+          styles,
+        );
+      }
     }
     await NyxPrinterModule.printText('', {});
     await NyxPrinterModule.printText(total, {align: PrintAlign.CENTER});
