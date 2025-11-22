@@ -30,6 +30,7 @@ import {
   checkInternetConnection,
 } from '../../../helper/functions';
 import {APP_VERSION, appConfig} from '../../../config/appConfig';
+import {manualUpdateCheck} from '../../../services/updateService';
 
 // Define types for Redux state
 interface RootState {
@@ -140,6 +141,22 @@ const Setting = (props: any) => {
               </View>
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>Printer Setup</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                manualUpdateCheck();
+              }}>
+              <View style={styles.cardAvatar}>
+                <MaterialIcon
+                  name="system-update"
+                  size={50}
+                  color={colors.darkGrey}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Check for Updates</Text>
               </View>
             </TouchableOpacity>
           </View>

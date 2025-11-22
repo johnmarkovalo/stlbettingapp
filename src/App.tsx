@@ -16,6 +16,11 @@ import {Colors} from 'react-native/Libraries/NewAppScreen';
 import Navigation from './navigation';
 import {DatabaseService, clearDatabase} from './database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  automaticUpdateCheck,
+  silentBackgroundUpdate,
+  aggressiveAutoUpdate,
+} from './services/updateService';
 
 const theme = {
   ...DefaultTheme,
@@ -65,6 +70,18 @@ function App(): React.JSX.Element {
     };
 
     checkAndInitializeDatabase();
+
+    // Check for app updates automatically on startup
+    // Choose one of these options:
+
+    // Option 1: Show dialog immediately (current behavior)
+    // automaticUpdateCheck();
+
+    // Option 2: Silent background download, notify when ready (recommended)
+    silentBackgroundUpdate();
+
+    // Option 3: Aggressive - force update if server says so
+    // aggressiveAutoUpdate();
 
     // Clean up function to close database connection when component unmounts
     // return () => {
