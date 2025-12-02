@@ -114,6 +114,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     const internetStatusCheck = useRef(checkInternetConnection());
     const bottomDrawerRef = useRef<BottomDrawerMethods>(null);
     const hasInitialSync = useRef(false);
+    const previousDrawRef = useRef<number | null>(null);
 
     // Route params
     const betType = route.params.betType;
@@ -203,75 +204,119 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     // Example 1: Target 123=10, Rambol 123=10 → Total Payout = 10 + 10 = 20
     // Example 2: Target 321=10, Rambol 321=10 → Total Payout = 10 + (10 + 10) = 30
     //   (target 321 is separate, but rambol includes previous rambol from 123)
+    //
+    // IMPORTANT: Redux contains amounts from DB transactions only (fetched via fetchCombinationAmounts).
+    // Current transaction's bets are NOT in DB yet, so we need to add them manually.
+    // However, we must be careful: if fetchCombinationAmounts runs AFTER addBet updates Redux,
+    // it will REPLACE Redux with DB amounts only, losing the current transaction's bets.
+    // So we always add current transaction's bets to ensure accuracy.
     const checkCombinationLimit = useCallback(
       (betNum: string, targetAmt: number, rambolAmt: number): boolean => {
-        if (!isWithinCutoff || !currentDraw) return false;
+        try {
+          if (!isWithinCutoff || !currentDraw || !betNum) return false;
 
-        const key = `${betType.id}_${currentDraw}`;
-        const LIMIT = 50;
-
-        // Get target amount for exact bet number from Redux
-        const targetKey = `${key}_target_${betNum}`;
-        let existingTarget = combinationAmounts[targetKey] || 0;
-
-        // Get rambol amount for sorted number from Redux
-        // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
-        // So rambol 321 uses the same rambol_123 key as rambol 123
-        const sortedNumber = sortNumber(betNum);
-        const rambolKey = `${key}_rambol_${sortedNumber}`;
-        let existingRambol = combinationAmounts[rambolKey] || 0;
-
-        // Also include amounts from bets already in the current transaction
-        // This is critical - we need to check against ALL bets, not just Redux
-        bets.forEach(bet => {
-          if (bet.betNumber === betNum) {
-            existingTarget += bet.targetAmount || 0;
+          // Safety check: Ensure betType exists
+          if (!betType || !betType.id) {
+            console.error('betType is not available in checkCombinationLimit');
+            return false;
           }
-          // For rambol, check if sorted numbers match
-          if (sortNumber(bet.betNumber) === sortedNumber) {
-            existingRambol += bet.rambolAmount || 0;
+
+          // Safety check: Ensure combinationAmounts exists
+          if (!combinationAmounts || typeof combinationAmounts !== 'object') {
+            console.error('combinationAmounts is not available');
+            return false;
           }
-        });
 
-        // Calculate current total and new total
-        const currentTotal = existingTarget + existingRambol;
-        const newTotal = currentTotal + targetAmt + rambolAmt;
+          const key = `${betType.id}_${currentDraw}`;
+          const LIMIT = 50;
 
-        // Check if total exceeds 50
-        if (newTotal > LIMIT) {
-          const remaining = LIMIT - currentTotal;
+          // Get target amount for exact bet number from Redux (DB transactions only)
+          const targetKey = `${key}_target_${betNum}`;
+          let existingTarget = combinationAmounts[targetKey] || 0;
 
-          // Calculate maximum amounts they can bet
-          let maxTarget = remaining;
-          let maxRambol = remaining;
-
-          // If they're betting both, we need to show the maximum for each
-          // The remaining can be split between target and rambol
-          if (targetAmt > 0 && rambolAmt > 0) {
-            // Show maximum for each (they can bet up to remaining total)
-            Alert.alert(
-              'Sold Out',
-              `Combination ${betNum} is sold out. Maximum you can bet: Target ${maxTarget}, Rambol ${maxRambol} (Total: ${remaining})`,
-            );
-          } else if (targetAmt > 0) {
-            // Only betting target
-            Alert.alert(
-              'Sold Out',
-              `Combination ${betNum} is sold out. Maximum you can bet for target: ${maxTarget}`,
-            );
-          } else if (rambolAmt > 0) {
-            // Only betting rambol
-            Alert.alert(
-              'Sold Out',
-              `Combination ${betNum} is sold out. Maximum you can bet for rambol: ${maxRambol}`,
-            );
+          // Get rambol amount for sorted number from Redux (DB transactions only)
+          // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
+          // So rambol 321 uses the same rambol_123 key as rambol 123
+          const sortedNumber = sortNumber(betNum);
+          if (!sortedNumber) {
+            console.error('Failed to sort bet number:', betNum);
+            return false;
           }
-          return true;
+          const rambolKey = `${key}_rambol_${sortedNumber}`;
+          let existingRambol = combinationAmounts[rambolKey] || 0;
+
+          // Add amounts from bets already in the current transaction (not yet saved to DB)
+          // Note: These bets are NOT in Redux because Redux only contains DB amounts.
+          // Even if addBet updated Redux, fetchCombinationAmounts will replace it with DB amounts.
+          if (bets && Array.isArray(bets)) {
+            bets.forEach(bet => {
+              // Safety check: Ensure bet object exists and has required properties
+              if (!bet || !bet.betNumber) {
+                return;
+              }
+              try {
+                if (bet.betNumber === betNum) {
+                  existingTarget += bet.targetAmount || 0;
+                }
+                // For rambol, check if sorted numbers match
+                const betSortedNumber = sortNumber(bet.betNumber);
+                if (betSortedNumber && betSortedNumber === sortedNumber) {
+                  existingRambol += bet.rambolAmount || 0;
+                }
+              } catch (error) {
+                console.error(
+                  'Error processing bet in checkCombinationLimit:',
+                  error,
+                );
+                // Continue processing other bets
+              }
+            });
+          }
+
+          // Calculate current total and new total
+          const currentTotal = existingTarget + existingRambol;
+          const newTotal = currentTotal + targetAmt + rambolAmt;
+
+          // Check if total exceeds 50
+          if (newTotal > LIMIT) {
+            const remaining = LIMIT - currentTotal;
+
+            // Calculate maximum amounts they can bet
+            let maxTarget = remaining;
+            let maxRambol = remaining;
+
+            // If they're betting both, we need to show the maximum for each
+            // The remaining can be split between target and rambol
+            if (targetAmt > 0 && rambolAmt > 0) {
+              // Show maximum for each (they can bet up to remaining total)
+              Alert.alert(
+                'Sold Out',
+                `Combination ${betNum} is sold out. Maximum you can bet: Target ${maxTarget}, Rambol ${maxRambol} (Total: ${remaining})`,
+              );
+            } else if (targetAmt > 0) {
+              // Only betting target
+              Alert.alert(
+                'Sold Out',
+                `Combination ${betNum} is sold out. Maximum you can bet for target: ${maxTarget}`,
+              );
+            } else if (rambolAmt > 0) {
+              // Only betting rambol
+              Alert.alert(
+                'Sold Out',
+                `Combination ${betNum} is sold out. Maximum you can bet for rambol: ${maxRambol}`,
+              );
+            }
+            return true;
+          }
+
+          return false;
+        } catch (error) {
+          console.error('Error in checkCombinationLimit:', error);
+          // Return false to allow betting to continue rather than crash
+          return false;
         }
-
-        return false;
       },
-      [isWithinCutoff, currentDraw, betType.id, combinationAmounts, bets],
+      [isWithinCutoff, currentDraw, betType, combinationAmounts, bets],
     );
 
     // Fetch and update POS combination amounts (for entire draw, not just 15 minutes)
@@ -304,79 +349,126 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
     // Check POS combination amount limit (750 per draw)
     // Same logic as checkCombinationLimit but for entire draw with 750 limit
+    //
+    // IMPORTANT: Redux contains amounts from DB transactions only (fetched via fetchPOSCombinationAmounts).
+    // Current transaction's bets are NOT in DB yet, so we need to add them manually.
+    // However, we must be careful: if fetchPOSCombinationAmounts runs AFTER addBet updates Redux,
+    // it will REPLACE Redux with DB amounts only, losing the current transaction's bets.
+    // So we always add current transaction's bets to ensure accuracy.
     const checkPOSCombinationLimit = useCallback(
       (betNum: string, targetAmt: number, rambolAmt: number): boolean => {
-        if (!currentDraw) return false;
+        try {
+          if (!currentDraw || !betNum) return false;
 
-        const key = `${betType.id}_${currentDraw}`;
-        const LIMIT = 750;
-
-        // Get target amount for exact bet number from Redux
-        const targetKey = `${key}_target_${betNum}`;
-        let existingTarget = posCombinationCap[targetKey] || 0;
-
-        // Get rambol amount for sorted number from Redux
-        const sortedNumber = sortNumber(betNum);
-        const rambolKey = `${key}_rambol_${sortedNumber}`;
-        let existingRambol = posCombinationCap[rambolKey] || 0;
-
-        // Also include amounts from bets already in the current transaction
-        // This is critical - we need to check against ALL bets, not just Redux
-        bets.forEach(bet => {
-          if (bet.betNumber === betNum) {
-            existingTarget += bet.targetAmount || 0;
-          }
-          // For rambol, check if sorted numbers match
-          if (sortNumber(bet.betNumber) === sortedNumber) {
-            existingRambol += bet.rambolAmount || 0;
-          }
-        });
-
-        // Calculate current total and new total
-        const currentTotal = existingTarget + existingRambol;
-        const newTotal = currentTotal + targetAmt + rambolAmt;
-
-        // Check if total exceeds 750
-        if (newTotal > LIMIT) {
-          const remaining = LIMIT - currentTotal;
-
-          // Calculate maximum amounts they can bet
-          let maxTarget = remaining;
-          let maxRambol = remaining;
-
-          // If they're betting both, we need to show the maximum for each
-          // The remaining can be split between target and rambol
-          if (targetAmt > 0 && rambolAmt > 0) {
-            // Show maximum for each (they can bet up to remaining total)
-            Alert.alert(
-              'Sold Out',
-              `Combination ${betNum} is sold out. Maximum you can bet: Target ${maxTarget}, Rambol ${maxRambol} (Total: ${remaining})`,
+          // Safety check: Ensure betType exists
+          if (!betType || !betType.id) {
+            console.error(
+              'betType is not available in checkPOSCombinationLimit',
             );
-          } else if (targetAmt > 0) {
-            // Only betting target
-            Alert.alert(
-              'Sold Out',
-              `Combination ${betNum} is sold out. Maximum you can bet for target: ${maxTarget}`,
-            );
-          } else if (rambolAmt > 0) {
-            // Only betting rambol
-            Alert.alert(
-              'Sold Out',
-              `Combination ${betNum} is sold out. Maximum you can bet for rambol: ${maxRambol}`,
-            );
+            return false;
           }
-          return true;
+
+          // Safety check: Ensure posCombinationCap exists
+          if (!posCombinationCap || typeof posCombinationCap !== 'object') {
+            console.error('posCombinationCap is not available');
+            return false;
+          }
+
+          const key = `${betType.id}_${currentDraw}`;
+          const LIMIT = 750;
+
+          // Get target amount for exact bet number from Redux (DB transactions only)
+          const targetKey = `${key}_target_${betNum}`;
+          let existingTarget = posCombinationCap[targetKey] || 0;
+
+          // Get rambol amount for sorted number from Redux (DB transactions only)
+          const sortedNumber = sortNumber(betNum);
+          if (!sortedNumber) {
+            console.error('Failed to sort bet number:', betNum);
+            return false;
+          }
+          const rambolKey = `${key}_rambol_${sortedNumber}`;
+          let existingRambol = posCombinationCap[rambolKey] || 0;
+
+          // Add amounts from bets already in the current transaction (not yet saved to DB)
+          // Note: These bets are NOT in Redux because Redux only contains DB amounts.
+          // Even if addBet updated Redux, fetchPOSCombinationAmounts will replace it with DB amounts.
+          if (bets && Array.isArray(bets)) {
+            bets.forEach(bet => {
+              // Safety check: Ensure bet object exists and has required properties
+              if (!bet || !bet.betNumber) {
+                return;
+              }
+              try {
+                if (bet.betNumber === betNum) {
+                  existingTarget += bet.targetAmount || 0;
+                }
+                // For rambol, check if sorted numbers match
+                const betSortedNumber = sortNumber(bet.betNumber);
+                if (betSortedNumber && betSortedNumber === sortedNumber) {
+                  existingRambol += bet.rambolAmount || 0;
+                }
+              } catch (error) {
+                console.error(
+                  'Error processing bet in checkPOSCombinationLimit:',
+                  error,
+                );
+                // Continue processing other bets
+              }
+            });
+          }
+
+          // Calculate current total and new total
+          const currentTotal = existingTarget + existingRambol;
+          const newTotal = currentTotal + targetAmt + rambolAmt;
+
+          // Check if total exceeds 750
+          if (newTotal > LIMIT) {
+            const remaining = LIMIT - currentTotal;
+
+            // Calculate maximum amounts they can bet
+            let maxTarget = remaining;
+            let maxRambol = remaining;
+
+            // If they're betting both, we need to show the maximum for each
+            // The remaining can be split between target and rambol
+            if (targetAmt > 0 && rambolAmt > 0) {
+              // Show maximum for each (they can bet up to remaining total)
+              Alert.alert(
+                'Sold Out',
+                `Combination ${betNum} is sold out. Maximum you can bet: Target ${maxTarget}, Rambol ${maxRambol} (Total: ${remaining})`,
+              );
+            } else if (targetAmt > 0) {
+              // Only betting target
+              Alert.alert(
+                'Sold Out',
+                `Combination ${betNum} is sold out. Maximum you can bet for target: ${maxTarget}`,
+              );
+            } else if (rambolAmt > 0) {
+              // Only betting rambol
+              Alert.alert(
+                'Sold Out',
+                `Combination ${betNum} is sold out. Maximum you can bet for rambol: ${maxRambol}`,
+              );
+            }
+            return true;
+          }
+
+          return false;
+        } catch (error) {
+          console.error('Error in checkPOSCombinationLimit:', error);
+          // Return false to allow betting to continue rather than crash
+          return false;
         }
-
-        return false;
       },
-      [currentDraw, betType.id, posCombinationCap, bets],
+      [currentDraw, betType, posCombinationCap, bets],
     );
 
     // Unified LocalSoldOut check - hierarchical checks in order:
-    // 1. Server Soldout (from API) - if true, stop (no need to proceed)
-    // 2. Local Soldout (POSCombinationCap - 750 per draw) - if true, stop (no need to proceed)
-    // 3. 15-minute limit (50) - only if within 15 minutes of cutoff
+    // 1. Check Server Soldout (from API/Redux) filtered by bettypeid, date, draw - if true, stop
+    //    (Check regardless of online/offline status - use cached serverSoldouts if available)
+    // 2. If OFFLINE and no serverSoldouts match: Check Local Soldout (POSCombinationCap - 750 per draw) - if true, stop
+    // 3. Check 15-minute limit (50) - only if within 15 minutes of cutoff
     const checkLocalSoldOut = useCallback(
       (
         number: string,
@@ -384,54 +476,123 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         targetAmt: number = 0,
         rambolAmt: number = 0,
       ): boolean => {
-        if (!number || number.length !== 3) {
+        try {
+          if (!number || number.length !== 3) {
+            return false;
+          }
+
+          // Safety check: Ensure internetStatusCheck ref is initialized
+          if (!internetStatusCheck.current) {
+            console.error('internetStatusCheck ref is not initialized');
+            return false;
+          }
+
+          // Safety check: Ensure betType exists
+          if (!betType || !betType.id) {
+            console.error('betType is not available');
+            return false;
+          }
+
+          const isOnline = internetStatusCheck.current.isConnected();
+          let isSoldOutFromServer = false;
+
+          // 1. Check Server Soldout (from API/Redux) - filtered by bettypeid, date, draw
+          // Check regardless of online/offline status - use cached serverSoldouts if available
+          if (
+            serverSoldouts &&
+            Array.isArray(serverSoldouts) &&
+            serverSoldouts.length > 0 &&
+            currentDraw
+          ) {
+            // Filter soldouts by bettypeid, date, and draw to ensure we're checking the correct draw
+            // IMPORTANT: Only include soldouts that match ALL criteria (bettypeid, date, draw)
+            // If any field is missing, exclude it to prevent false positives from other draws
+            const filteredSoldouts = serverSoldouts.filter(soldout => {
+              // Safety check: Ensure soldout object exists
+              if (!soldout || typeof soldout !== 'object') {
+                return false;
+              }
+
+              // Require all fields to exist and match - strict filtering prevents cross-draw contamination
+              const hasBetType = soldout.bettypeid !== undefined;
+              const hasDate = soldout.betdate !== undefined;
+              const hasDraw = soldout.bettime !== undefined;
+
+              // Only include if all fields exist and match
+              if (!hasBetType || !hasDate || !hasDraw) {
+                return false; // Exclude soldouts with missing fields
+              }
+
+              return (
+                soldout.bettypeid === betType.id &&
+                soldout.betdate === betDate &&
+                soldout.bettime === currentDraw
+              );
+            });
+
+            if (checkType === 'target') {
+              isSoldOutFromServer = filteredSoldouts.some(
+                soldout =>
+                  soldout &&
+                  soldout.combination === number &&
+                  soldout.is_target === 1,
+              );
+            } else if (checkType === 'rambol') {
+              const sortedNumber = sortNumber(number);
+              if (sortedNumber) {
+                isSoldOutFromServer = filteredSoldouts.some(
+                  soldout =>
+                    soldout &&
+                    soldout.combination === sortedNumber &&
+                    soldout.is_target === 0,
+                );
+              }
+            }
+
+            if (isSoldOutFromServer) {
+              Alert.alert('Sold Out', `Combination ${number} is sold out`);
+              return true; // Stop here, no need to check further
+            }
+          }
+
+          // 2. If OFFLINE and not sold out from server: Check Local Soldout (POSCombinationCap - 750 per draw)
+          // Only check if offline, amounts are provided, and we have a current draw
+          if (!isOnline && currentDraw && (targetAmt > 0 || rambolAmt > 0)) {
+            try {
+              if (checkPOSCombinationLimit(number, targetAmt, rambolAmt)) {
+                return true; // Stop here, no need to check further
+              }
+            } catch (error) {
+              console.error('Error checking POS combination limit:', error);
+              // Continue to next check instead of crashing
+            }
+          }
+
+          // 3. Check 15-minute limit (50) - only if within 15 minutes of cutoff
+          // Only check if within cutoff and amounts are provided
+          if (isWithinCutoff && (targetAmt > 0 || rambolAmt > 0)) {
+            try {
+              if (checkCombinationLimit(number, targetAmt, rambolAmt)) {
+                return true;
+              }
+            } catch (error) {
+              console.error('Error checking combination limit:', error);
+              // Continue instead of crashing
+            }
+          }
+
+          return false;
+        } catch (error) {
+          console.error('Error in checkLocalSoldOut:', error);
+          // Return false to allow betting to continue rather than crash
           return false;
         }
-
-        // 1. Check Server Soldout (from API) - if true, stop immediately
-        if (serverSoldouts.length > 0) {
-          if (checkType === 'target') {
-            const isSoldOut = serverSoldouts.some(
-              soldout =>
-                soldout.combination === number && soldout.is_target === 1,
-            );
-            if (isSoldOut) {
-              Alert.alert('Sold Out', `Combination ${number} is sold out`);
-              return true; // Stop here, no need to check further
-            }
-          } else if (checkType === 'rambol') {
-            const sortedNumber = sortNumber(number);
-            const isSoldOut = serverSoldouts.some(
-              soldout =>
-                soldout.combination === sortedNumber && soldout.is_target === 0,
-            );
-            if (isSoldOut) {
-              Alert.alert('Sold Out', `Combination ${number} is sold out`);
-              return true; // Stop here, no need to check further
-            }
-          }
-        }
-
-        // 2. Check Local Soldout (POSCombinationCap - 750 per draw) - if true, stop immediately
-        // Only check if amounts are provided (need amounts to calculate total)
-        if (targetAmt > 0 || rambolAmt > 0) {
-          if (checkPOSCombinationLimit(number, targetAmt, rambolAmt)) {
-            return true; // Stop here, no need to check further
-          }
-        }
-
-        // 3. Check 15-minute limit (50) - only if within 15 minutes of cutoff
-        // Only check if within cutoff and amounts are provided
-        if (isWithinCutoff && (targetAmt > 0 || rambolAmt > 0)) {
-          if (checkCombinationLimit(number, targetAmt, rambolAmt)) {
-            return true;
-          }
-        }
-
-        return false;
       },
       [
         serverSoldouts,
+        currentDraw,
+        betType.id,
+        betDate,
         checkPOSCombinationLimit,
         isWithinCutoff,
         checkCombinationLimit,
@@ -595,75 +756,73 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     );
 
     const addBet = useCallback(() => {
-      if (validateBet()) return;
+      try {
+        if (validateBet()) return;
 
-      if (betNumber.value && (targetAmount.value || rambolAmount.value)) {
-        const newBet: Bet = {
-          betNumber: betNumber.value,
-          betNumberr: sortNumber(betNumber.value),
-          tranno: bets.length + 1,
-          targetAmount:
-            targetAmount.value === '' ? 0 : parseInt(targetAmount.value),
-          rambolAmount:
-            rambolAmount.value === '' ? 0 : parseInt(rambolAmount.value),
-          subtotal: Number(targetAmount.value) + Number(rambolAmount.value),
-        };
-
-        setBets(prev => [newBet, ...prev]);
-
-        // Update combination amounts in Redux if within cutoff
-        if (isWithinCutoff && currentDraw) {
-          const key = `${betType.id}_${currentDraw}`;
-          const updatedAmounts = {...combinationAmounts};
-
-          // Update target amount
-          if (newBet.targetAmount > 0) {
-            const targetKey = `${key}_target_${newBet.betNumber}`;
-            updatedAmounts[targetKey] =
-              (updatedAmounts[targetKey] || 0) + newBet.targetAmount;
-          }
-
-          // Update rambol amount (use sorted number - all permutations grouped together)
-          // e.g., rambol for "123" includes amounts from 123, 321, 213, 231, 312, 132
-          if (newBet.rambolAmount > 0) {
-            const sortedNumber = sortNumber(newBet.betNumber);
-            const rambolKey = `${key}_rambol_${sortedNumber}`;
-            updatedAmounts[rambolKey] =
-              (updatedAmounts[rambolKey] || 0) + newBet.rambolAmount;
-          }
-
-          dispatch(combinationAmountsActions.update(updatedAmounts));
+        // Safety checks
+        if (!betNumber || !betNumber.value) {
+          Alert.alert('Error', 'Bet number is required');
+          return;
         }
 
-        // Update POS combination amounts in Redux (for entire draw)
-        if (currentDraw) {
-          const key = `${betType.id}_${currentDraw}`;
-          const updatedPOSAmounts = {...posCombinationCap};
-
-          // Update target amount
-          if (newBet.targetAmount > 0) {
-            const targetKey = `${key}_target_${newBet.betNumber}`;
-            updatedPOSAmounts[targetKey] =
-              (updatedPOSAmounts[targetKey] || 0) + newBet.targetAmount;
-          }
-
-          // Update rambol amount (use sorted number - all permutations grouped together)
-          if (newBet.rambolAmount > 0) {
-            const sortedNumber = sortNumber(newBet.betNumber);
-            const rambolKey = `${key}_rambol_${sortedNumber}`;
-            updatedPOSAmounts[rambolKey] =
-              (updatedPOSAmounts[rambolKey] || 0) + newBet.rambolAmount;
-          }
-
-          dispatch(posCombinationCapActions.update(updatedPOSAmounts));
+        if (!targetAmount && !rambolAmount) {
+          Alert.alert('Error', 'Please enter target or rambol amount');
+          return;
         }
 
-        // Reset inputs
-        setBetNumber({value: '', isFocus: true});
-        setTargetAmount({value: '', isFocus: false});
-        setRambolAmount({value: '', isFocus: false});
-      } else {
-        Alert.alert('Error', 'Please fill in all fields');
+        if (betNumber.value && (targetAmount.value || rambolAmount.value)) {
+          // Safety check: Ensure sortNumber doesn't fail
+          const sortedBetNumber = sortNumber(betNumber.value);
+          if (!sortedBetNumber) {
+            Alert.alert('Error', 'Invalid bet number format');
+            return;
+          }
+
+          const targetAmt =
+            targetAmount.value === '' ? 0 : parseInt(targetAmount.value, 10);
+          const rambolAmt =
+            rambolAmount.value === '' ? 0 : parseInt(rambolAmount.value, 10);
+
+          // Safety check: Ensure amounts are valid numbers
+          if (isNaN(targetAmt) || isNaN(rambolAmt)) {
+            Alert.alert('Error', 'Invalid amount format');
+            return;
+          }
+
+          const newBet: Bet = {
+            betNumber: betNumber.value,
+            betNumberr: sortedBetNumber,
+            tranno: (bets && Array.isArray(bets) ? bets.length : 0) + 1,
+            targetAmount: targetAmt,
+            rambolAmount: rambolAmt,
+            subtotal: targetAmt + rambolAmt,
+          };
+
+          setBets(prev => {
+            // Safety check: Ensure prev is an array
+            if (!Array.isArray(prev)) {
+              return [newBet];
+            }
+            return [newBet, ...prev];
+          });
+
+          // NOTE: We do NOT update Redux here because:
+          // 1. Redux should only contain amounts from DB transactions (fetched via fetchCombinationAmounts/fetchPOSCombinationAmounts)
+          // 2. Current transaction's bets are NOT in DB yet, so they shouldn't be in Redux
+          // 3. The check functions (checkCombinationLimit/checkPOSCombinationLimit) will add current transaction's bets
+          //    from the `bets` array to Redux amounts when checking sold out
+          // 4. This prevents double-counting and ensures consistency
+
+          // Reset inputs
+          setBetNumber({value: '', isFocus: true});
+          setTargetAmount({value: '', isFocus: false});
+          setRambolAmount({value: '', isFocus: false});
+        } else {
+          Alert.alert('Error', 'Please fill in all fields');
+        }
+      } catch (error) {
+        console.error('Error in addBet:', error);
+        Alert.alert('Error', 'Failed to add bet. Please try again.');
       }
     }, [
       validateBet,
@@ -671,77 +830,115 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       targetAmount.value,
       rambolAmount.value,
       bets.length,
-      isWithinCutoff,
-      currentDraw,
-      betType.id,
-      combinationAmounts,
-      posCombinationCap,
-      dispatch,
     ]);
 
     const onKeyPress = useCallback(
       (input: string) => {
-        // Map first if what is focused
-        if (betNumber.isFocus && betNumber.value.length < 3) {
-          const newBetNumber = betNumber.value + input;
-          // If bet number will be complete (3 digits), check LocalSoldOut before setting
-          if (newBetNumber.length === 3) {
-            // Check if sold out for target (we'll check rambol later when needed)
-            // At this point, no amounts yet, so only server soldouts will be checked
-            if (checkLocalSoldOut(newBetNumber, 'target', 0, 0)) {
-              // Clear the bet number if sold out
-              setBetNumber({value: '', isFocus: true});
-              return;
-            }
+        try {
+          // Safety check: Ensure input is valid
+          if (!input || typeof input !== 'string') {
+            return;
           }
-          setBetNumber(prev => ({
-            ...prev,
-            value: prev.value + input,
-          }));
-        } else if (targetAmount.isFocus && targetAmount.value.length < 3) {
-          // Check capping before allowing input
-          const newValue = targetAmount.value + input;
-          const capping = betType?.capping;
-          if (capping && capping > 0) {
-            const numericValue = parseInt(newValue, 10);
-            if (!isNaN(numericValue) && numericValue > capping) {
-              Alert.alert(
-                'Amount',
-                `Target amount cannot be greater than ${capping}`,
-              );
-              return;
+
+          // Map first if what is focused
+          if (
+            betNumber &&
+            betNumber.isFocus &&
+            betNumber.value &&
+            betNumber.value.length < 3
+          ) {
+            const newBetNumber = betNumber.value + input;
+            // If bet number will be complete (3 digits), check LocalSoldOut before setting
+            if (newBetNumber.length === 3) {
+              // Check if sold out for target (we'll check rambol later when needed)
+              // At this point, no amounts yet, so only server soldouts will be checked
+              try {
+                if (checkLocalSoldOut(newBetNumber, 'target', 0, 0)) {
+                  // Clear the bet number if sold out
+                  setBetNumber({value: '', isFocus: true});
+                  return;
+                }
+              } catch (error) {
+                console.error('Error checking sold out:', error);
+                // Continue with input if check fails
+              }
             }
-          }
-          setTargetAmount(prev => ({
-            ...prev,
-            value: prev.value + input,
-          }));
-        } else if (rambolAmount.isFocus && rambolAmount.value.length < 3) {
-          if (!checkIfTriple(betNumber.value)) {
+            setBetNumber(prev => {
+              if (!prev) return {value: input, isFocus: true};
+              return {
+                ...prev,
+                value: (prev.value || '') + input,
+              };
+            });
+          } else if (
+            targetAmount &&
+            targetAmount.isFocus &&
+            targetAmount.value &&
+            targetAmount.value.length < 3
+          ) {
             // Check capping before allowing input
-            const newValue = rambolAmount.value + input;
+            const newValue = targetAmount.value + input;
             const capping = betType?.capping;
             if (capping && capping > 0) {
               const numericValue = parseInt(newValue, 10);
               if (!isNaN(numericValue) && numericValue > capping) {
                 Alert.alert(
                   'Amount',
-                  `Rambol amount cannot be greater than ${capping}`,
+                  `Target amount cannot be greater than ${capping}`,
                 );
                 return;
               }
             }
-            setRambolAmount(prev => ({
-              ...prev,
-              value: prev.value + input,
-            }));
-          } else
-            Alert.alert(
-              'Triple Digit',
-              'You cannot enter rambol amount if tripple digit.',
-              [{text: 'OK', onPress: () => console.log('OK Pressed')}],
-              {cancelable: false},
-            );
+            setTargetAmount(prev => {
+              if (!prev) return {value: input, isFocus: false};
+              return {
+                ...prev,
+                value: (prev.value || '') + input,
+              };
+            });
+          } else if (
+            rambolAmount &&
+            rambolAmount.isFocus &&
+            rambolAmount.value &&
+            rambolAmount.value.length < 3
+          ) {
+            if (
+              betNumber &&
+              betNumber.value &&
+              !checkIfTriple(betNumber.value)
+            ) {
+              // Check capping before allowing input
+              const newValue = rambolAmount.value + input;
+              const capping = betType?.capping;
+              if (capping && capping > 0) {
+                const numericValue = parseInt(newValue, 10);
+                if (!isNaN(numericValue) && numericValue > capping) {
+                  Alert.alert(
+                    'Amount',
+                    `Rambol amount cannot be greater than ${capping}`,
+                  );
+                  return;
+                }
+              }
+              setRambolAmount(prev => {
+                if (!prev) return {value: input, isFocus: false};
+                return {
+                  ...prev,
+                  value: (prev.value || '') + input,
+                };
+              });
+            } else {
+              Alert.alert(
+                'Triple Digit',
+                'You cannot enter rambol amount if tripple digit.',
+                [{text: 'OK', onPress: () => console.log('OK Pressed')}],
+                {cancelable: false},
+              );
+            }
+          }
+        } catch (error) {
+          console.error('Error in onKeyPress:', error);
+          Alert.alert('Error', 'Failed to process input. Please try again.');
         }
       },
       [
@@ -975,10 +1172,13 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       console.log('currentDraw trans', draw);
 
       if (draw !== null) {
+        const drawChanged =
+          previousDrawRef.current !== null && previousDrawRef.current !== draw;
         setCurrentDraw(draw);
+        previousDrawRef.current = draw;
 
-        // Fetch soldouts only once on initial load
-        if (!hasInitialSync.current) {
+        // Fetch soldouts on initial load OR when draw changes (to get fresh soldouts for new draw)
+        if (!hasInitialSync.current || drawChanged) {
           await fetchSoldouts();
           hasInitialSync.current = true;
         }

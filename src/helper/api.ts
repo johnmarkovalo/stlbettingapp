@@ -39,6 +39,9 @@ export interface SoldOut {
   combination: string;
   is_target: number;
   status: string;
+  bettypeid?: number;
+  betdate?: string;
+  bettime?: number;
 }
 
 export interface Transaction {

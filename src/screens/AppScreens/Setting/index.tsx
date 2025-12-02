@@ -133,11 +133,7 @@ const Setting = (props: any) => {
                 navigation.navigate('PrinterSetup');
               }}>
               <View style={styles.cardAvatar}>
-                <MaterialIcon
-                  name="print"
-                  size={50}
-                  color={colors.darkGrey}
-                />
+                <MaterialIcon name="print" size={50} color={colors.darkGrey} />
               </View>
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>Printer Setup</Text>
