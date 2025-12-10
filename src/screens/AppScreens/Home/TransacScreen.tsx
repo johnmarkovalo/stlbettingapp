@@ -855,10 +855,10 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           if (
             betNumber &&
             betNumber.isFocus &&
-            betNumber.value &&
+            typeof betNumber.value === 'string' &&
             betNumber.value.length < 3
           ) {
-            const newBetNumber = betNumber.value + input;
+            const newBetNumber = (betNumber.value || '') + input;
             // If bet number will be complete (3 digits), check LocalSoldOut before setting
             if (newBetNumber.length === 3) {
               // Check if sold out for target (we'll check rambol later when needed)
@@ -884,11 +884,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           } else if (
             targetAmount &&
             targetAmount.isFocus &&
-            targetAmount.value &&
+            typeof targetAmount.value === 'string' &&
             targetAmount.value.length < 3
           ) {
             // Check capping before allowing input
-            const newValue = targetAmount.value + input;
+            const newValue = (targetAmount.value || '') + input;
             const capping = betType?.capping;
             if (capping && capping > 0) {
               const numericValue = parseInt(newValue, 10);
@@ -910,7 +910,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           } else if (
             rambolAmount &&
             rambolAmount.isFocus &&
-            rambolAmount.value &&
+            typeof rambolAmount.value === 'string' &&
             rambolAmount.value.length < 3
           ) {
             if (
@@ -919,7 +919,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               !checkIfTriple(betNumber.value)
             ) {
               // Check capping before allowing input
-              const newValue = rambolAmount.value + input;
+              const newValue = (rambolAmount.value || '') + input;
               const capping = betType?.capping;
               if (capping && capping > 0) {
                 const numericValue = parseInt(newValue, 10);
