@@ -301,32 +301,51 @@ export const formatBetTypes = betTypes => {
 
 // Check if current time is within 15 minutes before draw cutoff
 export const isWithin15MinutesOfCutoff = (draws, currentDraw) => {
-  if (!currentDraw || currentDraw < 1 || currentDraw > draws.length) {
-    return false;
+  try {
+    // Safety checks to prevent crashes
+    if (!draws || !Array.isArray(draws) || draws.length === 0) {
+      return false;
+    }
+    
+    if (!currentDraw || currentDraw < 1 || currentDraw > draws.length) {
+      return false;
+    }
+
+    const draw = draws[currentDraw - 1];
+    if (!draw || !draw.end || typeof draw.end !== 'string') {
+      return false;
+    }
+
+    const currentTime = moment();
+    if (!currentTime.isValid()) {
+      console.error('Invalid current time in isWithin15MinutesOfCutoff');
+      return false;
+    }
+
+    const endTime = moment(draw.end, 'HH:mm');
+    if (!endTime.isValid()) {
+      console.error('Invalid end time format:', draw.end);
+      return false;
+    }
+    
+    // Set today's date for endTime
+    endTime.year(currentTime.year());
+    endTime.month(currentTime.month());
+    endTime.date(currentTime.date());
+
+    // Handle case where end time is next day (crosses midnight)
+    if (endTime.isBefore(currentTime)) {
+      endTime.add(1, 'day');
+    }
+
+    const minutesUntilCutoff = endTime.diff(currentTime, 'minutes');
+    
+    // Return true if within 15 minutes of cutoff
+    return minutesUntilCutoff >= 0 && minutesUntilCutoff <= 15;
+  } catch (error) {
+    console.error('Error in isWithin15MinutesOfCutoff:', error);
+    return false; // Return false on error to prevent crashes
   }
-
-  const draw = draws[currentDraw - 1];
-  if (!draw || !draw.end) {
-    return false;
-  }
-
-  const currentTime = moment();
-  const endTime = moment(draw.end, 'HH:mm');
-  
-  // Set today's date for endTime
-  endTime.year(currentTime.year());
-  endTime.month(currentTime.month());
-  endTime.date(currentTime.date());
-
-  // Handle case where end time is next day (crosses midnight)
-  if (endTime.isBefore(currentTime)) {
-    endTime.add(1, 'day');
-  }
-
-  const minutesUntilCutoff = endTime.diff(currentTime, 'minutes');
-  
-  // Return true if within 15 minutes of cutoff
-  return minutesUntilCutoff >= 0 && minutesUntilCutoff <= 15;
 };
 
 // Calculate combination amounts from transactions

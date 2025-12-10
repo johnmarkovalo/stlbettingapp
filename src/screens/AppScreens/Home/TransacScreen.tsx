@@ -156,10 +156,21 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     );
 
     // Check if within 15 minutes of cutoff
-    const isWithinCutoff = useMemo(
-      () => isWithin15MinutesOfCutoff(betType.draws, currentDraw),
-      [betType.draws, currentDraw],
-    );
+    // Add safety checks to prevent crashes if betType.draws is undefined/null
+    const isWithinCutoff = useMemo(() => {
+      try {
+        if (!betType || !betType.draws || !Array.isArray(betType.draws)) {
+          return false;
+        }
+        if (!currentDraw) {
+          return false;
+        }
+        return isWithin15MinutesOfCutoff(betType.draws, currentDraw);
+      } catch (error) {
+        console.error('Error calculating isWithinCutoff:', error);
+        return false;
+      }
+    }, [betType, currentDraw]);
 
     // Fetch and update combination amounts
     const fetchCombinationAmounts = useCallback(async () => {
@@ -1168,24 +1179,35 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     }, [token, dispatch]);
 
     const recalculateCurrentDraw = useCallback(async () => {
-      const draw = getCurrentDraw(betType.draws);
-      console.log('currentDraw trans', draw);
-
-      if (draw !== null) {
-        const drawChanged =
-          previousDrawRef.current !== null && previousDrawRef.current !== draw;
-        setCurrentDraw(draw);
-        previousDrawRef.current = draw;
-
-        // Fetch soldouts on initial load OR when draw changes (to get fresh soldouts for new draw)
-        if (!hasInitialSync.current || drawChanged) {
-          await fetchSoldouts();
-          hasInitialSync.current = true;
+      try {
+        // Safety check: Ensure betType and draws exist
+        if (!betType || !betType.draws || !Array.isArray(betType.draws)) {
+          console.error('betType.draws is not available in recalculateCurrentDraw');
+          return;
         }
-      } else {
-        navigation.goBack();
+
+        const draw = getCurrentDraw(betType.draws);
+        console.log('currentDraw trans', draw);
+
+        if (draw !== null) {
+          const drawChanged =
+            previousDrawRef.current !== null && previousDrawRef.current !== draw;
+          setCurrentDraw(draw);
+          previousDrawRef.current = draw;
+
+          // Fetch soldouts on initial load OR when draw changes (to get fresh soldouts for new draw)
+          if (!hasInitialSync.current || drawChanged) {
+            await fetchSoldouts();
+            hasInitialSync.current = true;
+          }
+        } else {
+          navigation.goBack();
+        }
+      } catch (error) {
+        console.error('Error in recalculateCurrentDraw:', error);
+        // Don't navigate away on error, just log it
       }
-    }, [betType.draws, fetchSoldouts, navigation]);
+    }, [betType, fetchSoldouts, navigation]);
 
     // Effects
     useEffect(() => {
@@ -1197,16 +1219,27 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
 
     // Fetch combination amounts when within 15 minutes of cutoff
     useEffect(() => {
-      if (isWithinCutoff && currentDraw) {
-        fetchCombinationAmounts();
-        // Refresh every 30 seconds to keep amounts updated
-        const intervalId = setInterval(fetchCombinationAmounts, 30000);
-        return () => clearInterval(intervalId);
-      } else {
-        // Clear amounts when not within cutoff
+      try {
+        if (isWithinCutoff && currentDraw && betType && betType.id) {
+          fetchCombinationAmounts();
+          // Refresh every 30 seconds to keep amounts updated
+          const intervalId = setInterval(() => {
+            // Safety check before fetching
+            if (isWithinCutoff && currentDraw && betType && betType.id) {
+              fetchCombinationAmounts();
+            }
+          }, 30000);
+          return () => clearInterval(intervalId);
+        } else {
+          // Clear amounts when not within cutoff
+          dispatch(combinationAmountsActions.clear());
+        }
+      } catch (error) {
+        console.error('Error in combination amounts effect:', error);
+        // Clear amounts on error to prevent stale data
         dispatch(combinationAmountsActions.clear());
       }
-    }, [isWithinCutoff, currentDraw, fetchCombinationAmounts, dispatch]);
+    }, [isWithinCutoff, currentDraw, betType, fetchCombinationAmounts, dispatch]);
 
     // Fetch POS combination amounts when draw changes (for entire draw, not just 15 minutes)
     useEffect(() => {
