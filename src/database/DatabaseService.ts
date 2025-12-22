@@ -4,6 +4,8 @@ import {
   DatabaseTransaction,
   ResultSet,
   DatabaseError,
+  TABLES,
+  COLUMNS,
 } from './DatabaseTypes';
 import {DATABASE_SCHEMA, INITIAL_DATA} from './DatabaseSchema';
 import {SQLBuilder} from './SQLBuilder';
@@ -56,6 +58,10 @@ export class DatabaseService {
           },
           () => {
             this.insertInitialData()
+              .then(() => {
+                // Run migrations for existing databases
+                return this.runMigrations();
+              })
               .then(() => resolve(true))
               .catch(reject);
           },
@@ -64,6 +70,89 @@ export class DatabaseService {
         console.error('Error in database initialization:', error);
         reject(error);
       }
+    });
+  }
+
+  /**
+   * Run database migrations for existing databases
+   * This ensures new tables are created even if database was initialized before
+   * Can be called independently to update existing databases
+   */
+  public async runMigrations(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(
+        (tx: DatabaseTransaction) => {
+          try {
+            // Migration: Create maintenance_schedule table if it doesn't exist
+            // Check if table exists by querying sqlite_master
+            tx.executeSql(
+              `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+              [TABLES.MAINTENANCE_SCHEDULE],
+              (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                if (results.rows.length === 0) {
+                  // Table doesn't exist, create it
+                  console.log('🔄 Creating maintenance_schedule table...');
+                  try {
+                    const schema = DATABASE_SCHEMA[TABLES.MAINTENANCE_SCHEDULE];
+                    if (schema) {
+                      tx.executeSql(schema.create);
+                      
+                      // Create indexes
+                      schema.indexes.forEach(indexSql => {
+                        try {
+                          tx.executeSql(indexSql);
+                        } catch (indexError) {
+                          // Index might already exist, ignore error
+                          console.log('Index creation skipped (may already exist)');
+                        }
+                      });
+                      console.log('✅ maintenance_schedule table created successfully');
+                    }
+                  } catch (createError) {
+                    console.error('Error creating maintenance_schedule table:', createError);
+                  }
+                } else {
+                  console.log('✅ maintenance_schedule table already exists');
+                }
+              },
+              (tx: DatabaseTransaction, error: DatabaseError) => {
+                // If query fails, try to create the table anyway using IF NOT EXISTS
+                console.log('🔄 Attempting to create maintenance_schedule table...');
+                try {
+                  const schema = DATABASE_SCHEMA[TABLES.MAINTENANCE_SCHEDULE];
+                  if (schema) {
+                    // Use CREATE TABLE IF NOT EXISTS - safe to run multiple times
+                    tx.executeSql(schema.create);
+                    
+                    // Create indexes (with IF NOT EXISTS equivalent by catching errors)
+                    schema.indexes.forEach(indexSql => {
+                      try {
+                        tx.executeSql(indexSql);
+                      } catch (indexError) {
+                        // Index might already exist, ignore error
+                        console.log('Index creation skipped (may already exist)');
+                      }
+                    });
+                    console.log('✅ maintenance_schedule table created successfully');
+                  }
+                } catch (createError) {
+                  console.error('Error creating maintenance_schedule table:', createError);
+                }
+              },
+            );
+          } catch (error) {
+            console.error('Error running migrations:', error);
+          }
+        },
+        (error: DatabaseError) => {
+          console.error('Transaction error during migrations:', error);
+          // Don't reject - migrations should not block app startup
+        },
+        () => {
+          // Migration completed
+          resolve();
+        },
+      );
     });
   }
 
@@ -786,6 +875,464 @@ export class DatabaseService {
           reject(error);
         },
       );
+    });
+  }
+
+  /**
+   * Save or update a single maintenance schedule
+   * @param schedule - Maintenance schedule object
+   * @returns The ID of the saved/updated schedule
+   */
+  public async saveMaintenanceSchedule(schedule: {
+    id?: number;
+    start_time: string;
+    end_time: string;
+    reason?: string;
+    is_active?: number;
+  }): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(
+        (tx: DatabaseTransaction) => {
+          try {
+            // First, deactivate all existing schedules
+            tx.executeSql(
+              `UPDATE ${TABLES.MAINTENANCE_SCHEDULE} SET ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 0, ${COLUMNS.MAINTENANCE_SCHEDULE.UPDATED_AT} = ?`,
+              [moment().format('YYYY-MM-DD HH:mm:ss')],
+            );
+
+            // Check if there's an existing active schedule
+            tx.executeSql(
+              `SELECT ${COLUMNS.MAINTENANCE_SCHEDULE.ID} FROM ${TABLES.MAINTENANCE_SCHEDULE} WHERE ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 1 LIMIT 1`,
+              [],
+              (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                const now = moment().format('YYYY-MM-DD HH:mm:ss');
+                const scheduleData = {
+                  start_time: schedule.start_time,
+                  end_time: schedule.end_time,
+                  reason: schedule.reason || '',
+                  is_active: schedule.is_active !== undefined ? schedule.is_active : 1,
+                  updated_at: now,
+                };
+
+                if (results.rows.length > 0) {
+                  // Update existing schedule
+                  const existingId = results.rows.item(0).id;
+                  const {sql, values} = SQLBuilder.update(
+                    TABLES.MAINTENANCE_SCHEDULE,
+                    scheduleData,
+                    {id: existingId},
+                  );
+                  tx.executeSql(
+                    sql,
+                    values,
+                    () => resolve(existingId),
+                    (tx: DatabaseTransaction, error: DatabaseError) => {
+                      console.error('Error updating maintenance schedule:', error);
+                      reject(error);
+                    },
+                  );
+                } else {
+                  // Insert new schedule
+                  const {sql, values} = SQLBuilder.insert(
+                    TABLES.MAINTENANCE_SCHEDULE,
+                    {
+                      ...scheduleData,
+                      created_at: now,
+                    },
+                  );
+                  tx.executeSql(
+                    sql,
+                    values,
+                    (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                      resolve(results.insertId);
+                    },
+                    (tx: DatabaseTransaction, error: DatabaseError) => {
+                      console.error('Error inserting maintenance schedule:', error);
+                      reject(error);
+                    },
+                  );
+                }
+              },
+              (tx: DatabaseTransaction, error: DatabaseError) => {
+                console.error('Error checking existing maintenance schedule:', error);
+                reject(error);
+              },
+            );
+          } catch (error) {
+            reject(error);
+          }
+        },
+        (error: DatabaseError) => {
+          console.error('Transaction error during maintenance schedule save:', error);
+          reject(error);
+        },
+      );
+    });
+  }
+
+  /**
+   * Save multiple maintenance schedules (replaces all existing schedules)
+   * @param schedules - Array of maintenance schedule objects
+   * @returns Array of saved schedule IDs
+   */
+  public async saveMaintenanceSchedules(
+    schedules: Array<{
+      id?: number;
+      start_time: string;
+      end_time: string;
+      reason?: string;
+      is_active?: number;
+    }>,
+  ): Promise<number[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(
+        (tx: DatabaseTransaction) => {
+          try {
+            // First, deactivate all existing schedules
+            tx.executeSql(
+              `UPDATE ${TABLES.MAINTENANCE_SCHEDULE} SET ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 0, ${COLUMNS.MAINTENANCE_SCHEDULE.UPDATED_AT} = ?`,
+              [moment().format('YYYY-MM-DD HH:mm:ss')],
+            );
+
+            // Delete old schedules that are more than 7 days in the past
+            const sevenDaysAgo = moment().subtract(7, 'days').format('YYYY-MM-DD HH:mm:ss');
+            tx.executeSql(
+              `DELETE FROM ${TABLES.MAINTENANCE_SCHEDULE} WHERE ${COLUMNS.MAINTENANCE_SCHEDULE.END_TIME} < ?`,
+              [sevenDaysAgo],
+            );
+
+            const savedIds: number[] = [];
+            const now = moment().format('YYYY-MM-DD HH:mm:ss');
+            let completedCount = 0;
+            const totalSchedules = schedules.length;
+
+            console.log(`💾 [Maintenance DB] Saving ${totalSchedules} schedule(s) to database...`);
+
+            if (totalSchedules === 0) {
+              console.log('ℹ️ [Maintenance DB] No schedules to save');
+              resolve([]);
+              return;
+            }
+
+            // Save each schedule
+            schedules.forEach((schedule, index) => {
+              const scheduleData = {
+                start_time: schedule.start_time,
+                end_time: schedule.end_time,
+                reason: schedule.reason || '',
+                is_active: schedule.is_active !== undefined ? schedule.is_active : 1,
+                updated_at: now,
+              };
+
+              const handleComplete = () => {
+                completedCount++;
+                console.log(`💾 [Maintenance DB] Saved ${completedCount}/${totalSchedules} schedule(s)`);
+                if (completedCount === totalSchedules) {
+                  console.log(`✅ [Maintenance DB] All ${totalSchedules} schedule(s) saved successfully:`, savedIds);
+                  resolve(savedIds);
+                }
+              };
+
+              if (schedule.id) {
+                // Use INSERT OR REPLACE to handle both insert and update
+                console.log(`🔄 [Maintenance DB] Upserting schedule ID ${schedule.id}:`, {
+                  start: schedule.start_time,
+                  end: schedule.end_time,
+                  reason: schedule.reason,
+                  is_active: scheduleData.is_active,
+                });
+                
+                // Use INSERT OR REPLACE (SQLite specific) - will insert if not exists, replace if exists
+                const insertData = {
+                  id: schedule.id,
+                  ...scheduleData,
+                  created_at: now,
+                };
+                const columns = Object.keys(insertData);
+                const placeholders = columns.map(() => '?').join(', ');
+                const sql = `INSERT OR REPLACE INTO ${TABLES.MAINTENANCE_SCHEDULE} (${columns.join(', ')}) VALUES (${placeholders})`;
+                const values = Object.values(insertData);
+                
+                console.log(`🔧 [Maintenance DB] Upsert SQL: ${sql}`);
+                console.log(`🔧 [Maintenance DB] Upsert values:`, values);
+                
+                tx.executeSql(
+                  sql,
+                  values,
+                  (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                    savedIds.push(schedule.id!);
+                    console.log(`✅ [Maintenance DB] Schedule ${schedule.id} upserted successfully`);
+                    handleComplete();
+                  },
+                  (tx: DatabaseTransaction, error: DatabaseError) => {
+                    console.error(`❌ [Maintenance DB] Error upserting schedule ${schedule.id}:`, error);
+                    handleComplete();
+                  },
+                );
+              } else {
+                // Insert new schedule
+                console.log(`➕ [Maintenance DB] Inserting new schedule:`, {
+                  start: schedule.start_time,
+                  end: schedule.end_time,
+                  reason: schedule.reason,
+                });
+                const {sql, values} = SQLBuilder.insert(
+                  TABLES.MAINTENANCE_SCHEDULE,
+                  {
+                    ...scheduleData,
+                    created_at: now,
+                  },
+                );
+                tx.executeSql(
+                  sql,
+                  values,
+                  (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                    const newId = results.insertId;
+                    savedIds.push(newId);
+                    console.log(`✅ [Maintenance DB] Schedule inserted with ID ${newId}`);
+                    handleComplete();
+                  },
+                  (tx: DatabaseTransaction, error: DatabaseError) => {
+                    console.error(`❌ [Maintenance DB] Error inserting schedule:`, error);
+                    handleComplete();
+                  },
+                );
+              }
+            });
+          } catch (error) {
+            reject(error);
+          }
+        },
+        (error: DatabaseError) => {
+          console.error('Transaction error during maintenance schedules save:', error);
+          reject(error);
+        },
+      );
+    });
+  }
+
+  /**
+   * Get active maintenance schedule (currently in maintenance period)
+   * @returns Active maintenance schedule or null
+   */
+  public async getActiveMaintenanceSchedule(): Promise<{
+    id: number;
+    start_time: string;
+    end_time: string;
+    reason: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+  } | null> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        console.log(`🔍 [Maintenance DB] Querying active schedule at ${now}`);
+        
+        // First, let's see ALL schedules (not just active) for debugging
+        tx.executeSql(
+          `SELECT * FROM ${TABLES.MAINTENANCE_SCHEDULE} 
+           ORDER BY ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} ASC`,
+          [],
+          (tx: DatabaseTransaction, allResults: ResultSetRowList) => {
+            console.log(`📋 [Maintenance DB] Found ${allResults.rows.length} total schedule(s) in DB:`);
+            for (let i = 0; i < allResults.rows.length; i++) {
+              const s = allResults.rows.item(i);
+              const startMoment = moment(s.start_time);
+              const endMoment = moment(s.end_time);
+              const nowMoment = moment(now);
+              const isInRange = nowMoment.isBetween(startMoment, endMoment, null, '[]');
+              console.log(`  Schedule ${i + 1}:`, {
+                id: s.id,
+                is_active: s.is_active,
+                start: s.start_time,
+                end: s.end_time,
+                reason: s.reason,
+                currentTime: now,
+                isInRange: isInRange,
+                startComparison: startMoment.isSameOrBefore(nowMoment),
+                endComparison: endMoment.isSameOrAfter(nowMoment),
+              });
+            }
+            
+            // Now check only active ones
+            tx.executeSql(
+              `SELECT * FROM ${TABLES.MAINTENANCE_SCHEDULE} 
+               WHERE ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 1 
+               ORDER BY ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} ASC`,
+              [],
+              (tx: DatabaseTransaction, activeResults: ResultSetRowList) => {
+                console.log(`📋 [Maintenance DB] Found ${activeResults.rows.length} active schedule(s) in DB:`);
+                for (let i = 0; i < activeResults.rows.length; i++) {
+                  const s = activeResults.rows.item(i);
+                  const startMoment = moment(s.start_time);
+                  const endMoment = moment(s.end_time);
+                  const nowMoment = moment(now);
+                  const isInRange = nowMoment.isBetween(startMoment, endMoment, null, '[]');
+                  console.log(`  Active Schedule ${i + 1}:`, {
+                    id: s.id,
+                    start: s.start_time,
+                    end: s.end_time,
+                    reason: s.reason,
+                    currentTime: now,
+                    isInRange: isInRange,
+                  });
+                }
+            
+                // Now query with proper comparison
+                tx.executeSql(
+                  `SELECT * FROM ${TABLES.MAINTENANCE_SCHEDULE} 
+                   WHERE ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 1 
+                   AND datetime(${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME}) <= datetime(?)
+                   AND datetime(${COLUMNS.MAINTENANCE_SCHEDULE.END_TIME}) >= datetime(?)
+                   ORDER BY ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} ASC 
+                   LIMIT 1`,
+                  [now, now],
+                  (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                    if (results.rows.length > 0) {
+                      const schedule = results.rows.item(0);
+                      console.log('✅ [Maintenance DB] Active schedule found:', {
+                        id: schedule.id,
+                        start: schedule.start_time,
+                        end: schedule.end_time,
+                        reason: schedule.reason,
+                      });
+                      resolve(schedule);
+                    } else {
+                      console.log('ℹ️ [Maintenance DB] No active schedule found matching time range');
+                      resolve(null);
+                    }
+                  },
+                  (tx: DatabaseTransaction, error: DatabaseError) => {
+                    console.error('❌ [Maintenance DB] Error getting active maintenance schedule:', error);
+                    reject(error);
+                  },
+                );
+              },
+              (tx: DatabaseTransaction, error: DatabaseError) => {
+                console.error('❌ [Maintenance DB] Error querying active schedules:', error);
+                // Continue with main query anyway
+              },
+            );
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('❌ [Maintenance DB] Error querying all schedules:', error);
+            // Fallback to original query without datetime() function
+            tx.executeSql(
+              `SELECT * FROM ${TABLES.MAINTENANCE_SCHEDULE} 
+               WHERE ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 1 
+               AND ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} <= ? 
+               AND ${COLUMNS.MAINTENANCE_SCHEDULE.END_TIME} >= ?
+               ORDER BY ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} ASC 
+               LIMIT 1`,
+              [now, now],
+              (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                if (results.rows.length > 0) {
+                  const schedule = results.rows.item(0);
+                  console.log('✅ [Maintenance DB] Active schedule found (fallback):', {
+                    id: schedule.id,
+                    start: schedule.start_time,
+                    end: schedule.end_time,
+                    reason: schedule.reason,
+                  });
+                  resolve(schedule);
+                } else {
+                  console.log('ℹ️ [Maintenance DB] No active schedule found');
+                  resolve(null);
+                }
+              },
+              (tx: DatabaseTransaction, error2: DatabaseError) => {
+                console.error('❌ [Maintenance DB] Error getting active maintenance schedule (fallback):', error2);
+                reject(error2);
+              },
+            );
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get all upcoming maintenance schedules (within next 7 days)
+   * @returns Array of maintenance schedules
+   */
+  public async getUpcomingMaintenanceSchedules(): Promise<
+    Array<{
+      id: number;
+      start_time: string;
+      end_time: string;
+      reason: string;
+      is_active: number;
+      created_at: string;
+      updated_at: string;
+    }>
+  > {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        const sevenDaysFromNow = moment()
+          .add(7, 'days')
+          .format('YYYY-MM-DD HH:mm:ss');
+        tx.executeSql(
+          `SELECT * FROM ${TABLES.MAINTENANCE_SCHEDULE} 
+           WHERE ${COLUMNS.MAINTENANCE_SCHEDULE.IS_ACTIVE} = 1 
+           AND ${COLUMNS.MAINTENANCE_SCHEDULE.END_TIME} >= ?
+           AND ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} <= ?
+           ORDER BY ${COLUMNS.MAINTENANCE_SCHEDULE.START_TIME} ASC`,
+          [now, sevenDaysFromNow],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            const schedules: any[] = [];
+            for (let i = 0; i < results.rows.length; i++) {
+              schedules.push(results.rows.item(i));
+            }
+            resolve(schedules);
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error getting upcoming maintenance schedules:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Check if current time is within maintenance period
+   * Checks all active schedules in the database
+   * @returns true if currently in maintenance, false otherwise
+   */
+  public async isInMaintenancePeriod(): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      this.getActiveMaintenanceSchedule()
+        .then(schedule => {
+          if (!schedule) {
+            console.log('ℹ️ [Maintenance DB] No schedule found, not in maintenance');
+            resolve(false);
+            return;
+          }
+
+          const now = moment();
+          const startTime = moment(schedule.start_time);
+          const endTime = moment(schedule.end_time);
+
+          // Check if current time is within the maintenance window
+          const isInMaintenance = now.isBetween(startTime, endTime, null, '[]'); // [] includes both start and end
+          
+          console.log(`🔍 [Maintenance DB] Checking if in maintenance:`, {
+            currentTime: now.format('YYYY-MM-DD HH:mm:ss'),
+            startTime: startTime.format('YYYY-MM-DD HH:mm:ss'),
+            endTime: endTime.format('YYYY-MM-DD HH:mm:ss'),
+            isInMaintenance: isInMaintenance,
+            isBeforeStart: now.isBefore(startTime),
+            isAfterEnd: now.isAfter(endTime),
+          });
+          
+          resolve(isInMaintenance);
+        })
+        .catch(error => {
+          console.error('❌ [Maintenance DB] Error checking maintenance period:', error);
+          reject(error);
+        });
     });
   }
 

@@ -81,3 +81,33 @@ export const cleanupOldData = (weeksOld: number = 1) =>
 
 export const optimizeDatabase = () =>
   DatabaseService.getInstance().optimizeDatabase();
+
+// Maintenance schedule methods
+export const saveMaintenanceSchedule = (schedule: {
+  id?: number;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+  is_active?: number;
+}) => DatabaseService.getInstance().saveMaintenanceSchedule(schedule);
+
+export const saveMaintenanceSchedules = (schedules: Array<{
+  id?: number;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+  is_active?: number;
+}>) => DatabaseService.getInstance().saveMaintenanceSchedules(schedules);
+
+export const getActiveMaintenanceSchedule = () =>
+  DatabaseService.getInstance().getActiveMaintenanceSchedule();
+
+export const getUpcomingMaintenanceSchedules = () =>
+  DatabaseService.getInstance().getUpcomingMaintenanceSchedules();
+
+export const isInMaintenancePeriod = () =>
+  DatabaseService.getInstance().isInMaintenancePeriod();
+
+// Migration method
+export const runMigrations = () =>
+  DatabaseService.getInstance().runMigrations();

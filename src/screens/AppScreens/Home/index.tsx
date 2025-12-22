@@ -22,7 +22,11 @@ import {
   getUnsyncedTransactionsSummary,
   cleanupOldData,
   optimizeDatabase,
+  saveMaintenanceSchedules,
+  getActiveMaintenanceSchedule,
+  isInMaintenancePeriod,
 } from '../../../database';
+import {getMaintenanceScheduleAPI} from '../../../helper/api';
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
 import Type from '../../../models/Type.ts';
@@ -33,6 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface RootState {
   auth: {
     user: any;
+    token: string;
   };
   types: {
     types: Type[];
@@ -42,6 +47,7 @@ interface RootState {
 const widthScreen = Dimensions.get('window').width;
 const Home = (props: any) => {
   const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
   const types = useSelector((state: RootState) => state.types.types);
   const {navigation} = props;
   const [currentDraw, setCurrentDraw] = useState<number | null>(null);
@@ -49,6 +55,13 @@ const Home = (props: any) => {
   // State for UI
   const [hasUnsyncedTransactions, setHasUnsyncedTransactions] = useState(false);
   const [unsyncedSummary, setUnsyncedSummary] = useState<any>(null);
+  // State for maintenance schedule
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [maintenanceSchedule, setMaintenanceSchedule] = useState<{
+    start_time: string;
+    end_time: string;
+    reason?: string;
+  } | null>(null);
 
   // Helper function to format draw names
   const getDrawName = (drawNumber: number): string => {
@@ -67,6 +80,111 @@ const Home = (props: any) => {
   // Helper function to format date
   const formatDate = (dateString: string): string => {
     return moment(dateString).format('MMM DD, YYYY');
+  };
+
+  // Load maintenance schedule from local database only (fast, no API call)
+  const loadMaintenanceScheduleFromDB = async () => {
+    try {
+      console.log('🔍 [Maintenance] Loading schedule from local database...');
+      const activeSchedule = await getActiveMaintenanceSchedule();
+      if (activeSchedule) {
+        const now = moment();
+        const startTime = moment(activeSchedule.start_time);
+        const endTime = moment(activeSchedule.end_time);
+        const isActive = now.isBetween(startTime, endTime, null, '[]');
+        console.log('✅ [Maintenance] Active schedule found in DB:', {
+          id: activeSchedule.id,
+          start: activeSchedule.start_time,
+          end: activeSchedule.end_time,
+          reason: activeSchedule.reason,
+          isCurrentlyActive: isActive,
+          currentTime: now.format('YYYY-MM-DD HH:mm:ss'),
+        });
+        setMaintenanceSchedule({
+          start_time: activeSchedule.start_time,
+          end_time: activeSchedule.end_time,
+          reason: activeSchedule.reason,
+        });
+      } else {
+        console.log('ℹ️ [Maintenance] No active schedule in local database');
+        setMaintenanceSchedule(null);
+      }
+    } catch (error) {
+      console.error('❌ [Maintenance] Error loading schedule from DB:', error);
+      setMaintenanceSchedule(null);
+    }
+  };
+
+  // Fetch and save maintenance schedules from API (fetches every time called)
+  const fetchMaintenanceScheduleFromAPI = async () => {
+    try {
+      if (!token) {
+        console.log('⚠️ [Maintenance] No token available, skipping API fetch');
+        return;
+      }
+
+      console.log('🌐 [Maintenance] Fetching from API...');
+      // Fetch all upcoming schedules (within 7 days) from API
+      const schedules = await getMaintenanceScheduleAPI(token);
+      console.log('📥 [Maintenance] API response:', {
+        count: schedules?.length || 0,
+        schedules: schedules,
+      });
+
+      if (schedules && schedules.length > 0) {
+        console.log(`💾 [Maintenance] Saving ${schedules.length} schedule(s) to database...`);
+        // Save all schedules to database
+        const savedIds = await saveMaintenanceSchedules(
+          schedules.map(schedule => ({
+            id: schedule.id,
+            start_time: schedule.start_time,
+            end_time: schedule.end_time,
+            reason: schedule.reason,
+            is_active: schedule.is_active !== undefined ? schedule.is_active : 1,
+          })),
+        );
+        console.log('✅ [Maintenance] Schedules saved:', savedIds);
+      } else {
+        console.log('ℹ️ [Maintenance] No schedules from API');
+      }
+
+      // After saving, reload from DB to update UI
+      await loadMaintenanceScheduleFromDB();
+    } catch (error) {
+      console.error('❌ [Maintenance] Error fetching maintenance schedule from API:', error);
+      // On error, just load from local DB (don't block)
+      await loadMaintenanceScheduleFromDB();
+    }
+  };
+
+  // Check if currently in maintenance period (fast - local DB only)
+  const checkMaintenanceStatus = async () => {
+    try {
+      // Fast check - only query local database, no API call
+      const inMaintenance = await isInMaintenancePeriod();
+      setIsMaintenanceMode(inMaintenance);
+      
+      // Update schedule display if needed
+      if (inMaintenance && !maintenanceSchedule) {
+        // If in maintenance but don't have schedule in state, load it
+        await loadMaintenanceScheduleFromDB();
+      } else if (!inMaintenance && maintenanceSchedule) {
+        // If not in maintenance but have schedule, clear it
+        setMaintenanceSchedule(null);
+      }
+      
+      if (inMaintenance && maintenanceSchedule) {
+        const now = moment();
+        const endTime = moment(maintenanceSchedule.end_time);
+        const timeUntilEnd = moment.duration(endTime.diff(now));
+        console.log(`📊 [Maintenance] Status: IN MAINTENANCE - Ends in ${timeUntilEnd.hours()}h ${timeUntilEnd.minutes()}m`);
+      } else {
+        console.log('📊 [Maintenance] Status: NOT IN MAINTENANCE');
+      }
+    } catch (error) {
+      console.error('❌ [Maintenance] Error checking maintenance status:', error);
+      setIsMaintenanceMode(false);
+    }
   };
 
   // Comprehensive check for unsynced transactions from previous draws
@@ -208,6 +326,17 @@ const Home = (props: any) => {
     // Enhanced cleanup logic for old transactions
     await performDatabaseCleanup();
 
+    // Check maintenance status from local DB first (fast, immediate)
+    await checkMaintenanceStatus();
+    
+    // Fetch from API in background (non-blocking, updates DB)
+    if (token) {
+      fetchMaintenanceScheduleFromAPI().catch(error => {
+        console.error('❌ [Maintenance] Background fetch failed:', error);
+        // Don't block - just log error
+      });
+    }
+
     // Check for unsynced transactions from previous draws
     // Only check if we have a valid current draw
     if (currentDraw !== null) {
@@ -346,8 +475,11 @@ const Home = (props: any) => {
     // Recalculate current draw initially when the component mounts
     recalculateCurrentDraw();
 
-    // Set up interval for periodic recalculation (every 30 seconds)
+    // Set up interval for periodic recalculation (every 10 seconds)
     const intervalId = setInterval(recalculateCurrentDraw, 10000);
+
+    // Set up interval for checking maintenance status from local DB (every 30 seconds, fast)
+    const maintenanceCheckInterval = setInterval(checkMaintenanceStatus, 30000);
 
     // Update cleanup info
     // updateNextCleanupInfo(); // This function is removed
@@ -358,24 +490,56 @@ const Home = (props: any) => {
     // Clean up intervals when the component unmounts
     return () => {
       clearInterval(intervalId);
+      clearInterval(maintenanceCheckInterval);
       // clearInterval(cleanupIntervalId); // This function is removed
     };
-  }, [navigation, types]); // Added types dependency to ensure we have types before checking
+  }, [navigation, types, token]); // Added types and token dependency to ensure we have types and token before checking
 
   // Refresh unsynced transaction check when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      console.log('🔄 [Maintenance] Home screen focused - refreshing maintenance data...');
+      
       // Check for unsynced transactions when returning to Home screen
       if (types.length > 0 && currentDraw !== null) {
         checkUnsyncedTransactionsFromPreviousDraws();
       }
 
+      // Check maintenance status from local DB first (fast, immediate)
+      checkMaintenanceStatus();
+      
+      // Fetch from API every time screen comes into focus (fresh data)
+      if (token) {
+        fetchMaintenanceScheduleFromAPI().catch(error => {
+          console.error('❌ [Maintenance] Focus fetch failed:', error);
+        });
+      }
+
       // Update cleanup info when screen comes into focus
       // updateNextCleanupInfo(); // This function is removed
-    }, [types, currentDraw]),
+    }, [types, currentDraw, token]),
   );
 
   const onTypePress = async (type: Type) => {
+    // Check if in maintenance mode
+    if (isMaintenanceMode) {
+      const reason = maintenanceSchedule?.reason
+        ? `\n\nReason: ${maintenanceSchedule.reason}`
+        : '';
+      const startTime = maintenanceSchedule
+        ? moment(maintenanceSchedule.start_time).format('MMM DD, YYYY HH:mm')
+        : '';
+      const endTime = maintenanceSchedule
+        ? moment(maintenanceSchedule.end_time).format('MMM DD, YYYY HH:mm')
+        : '';
+      Alert.alert(
+        'Maintenance Mode',
+        `Betting is currently unavailable due to scheduled maintenance.${reason}\n\nMaintenance Period:\n${startTime} - ${endTime}\n\nYou can still access History and Results.`,
+        [{text: 'OK'}],
+      );
+      return;
+    }
+
     // Additional safety check: prevent navigation if betting is closed
     if (currentDraw === null) {
       Alert.alert(
@@ -480,6 +644,38 @@ const Home = (props: any) => {
           </View>
         )} */}
 
+        {/* Maintenance Mode Banner */}
+        {isMaintenanceMode && maintenanceSchedule && (
+          <View style={styles.maintenanceBanner}>
+            <View style={styles.maintenanceHeader}>
+              <MaterialIcon name="build" size={24} color="#ff9800" />
+              <Text style={styles.maintenanceTitle}>Scheduled Maintenance</Text>
+            </View>
+
+            <View style={styles.maintenanceContent}>
+              <Text style={styles.maintenanceText}>
+                Betting is temporarily unavailable due to scheduled maintenance.
+              </Text>
+              {maintenanceSchedule.reason && (
+                <Text style={styles.maintenanceReason}>
+                  Reason: {maintenanceSchedule.reason}
+                </Text>
+              )}
+              <Text style={styles.maintenanceTime}>
+                Period:{' '}
+                {moment(maintenanceSchedule.start_time).format(
+                  'MMM DD, YYYY HH:mm',
+                )}{' '}
+                -{' '}
+                {moment(maintenanceSchedule.end_time).format('MMM DD, YYYY HH:mm')}
+              </Text>
+              <Text style={styles.maintenanceNote}>
+                You can still access History and Results.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Unsynced Transactions Warning Banner */}
         {hasUnsyncedTransactions && unsyncedSummary && (
           <View style={styles.unsyncedWarningBanner}>
@@ -553,9 +749,10 @@ const Home = (props: any) => {
             <ScrollView style={{marginTop: 20}}>
               {types.map((button, index) => {
                 // Button is disabled when:
-                // 1. Bet is closed (currentDraw === null) - no draws are active
-                // 2. This specific button's draw is not active (getCurrentDraw(button.draws) === null)
-                // 3. There are unsynced transactions from previous draws/dates
+                // 1. Maintenance mode is active
+                // 2. Bet is closed (currentDraw === null) - no draws are active
+                // 3. This specific button's draw is not active (getCurrentDraw(button.draws) === null)
+                // 4. There are unsynced transactions from previous draws/dates
                 const hasUnsyncedFromPreviousDraws =
                   unsyncedSummary &&
                   unsyncedSummary.previousDraws &&
@@ -564,14 +761,19 @@ const Home = (props: any) => {
                 const isBettingClosed =
                   currentDraw === null || getCurrentDraw(button.draws) === null;
                 const isButtonDisabled =
-                  isBettingClosed || hasUnsyncedFromPreviousDraws;
+                  isMaintenanceMode ||
+                  isBettingClosed ||
+                  hasUnsyncedFromPreviousDraws;
 
                 // Determine button style based on why it's disabled
                 let buttonStyle = styles.button;
                 let textStyle = styles.textStyle;
 
                 if (isButtonDisabled) {
-                  if (hasUnsyncedFromPreviousDraws) {
+                  if (isMaintenanceMode) {
+                    buttonStyle = styles.buttonDisabledMaintenance;
+                    textStyle = styles.textStyleDisabled;
+                  } else if (hasUnsyncedFromPreviousDraws) {
                     buttonStyle = styles.buttonDisabledUnsynced;
                     textStyle = styles.textStyleDisabled;
                   } else {
@@ -687,6 +889,20 @@ const styles = StyleSheet.create({
     borderColor: Colors.mediumRed,
   },
 
+  buttonDisabledMaintenance: {
+    elevation: 2,
+    backgroundColor: '#fff3e0', // Light orange background
+    borderRadius: 100,
+    padding: 10,
+    margin: 10,
+    height: 60,
+    width: widthScreen * 0.8,
+    justifyContent: 'center',
+    opacity: 0.8,
+    borderWidth: 2,
+    borderColor: '#ff9800',
+  },
+
   textStyle: {
     fontSize: 30,
     color: '#fff',
@@ -776,6 +992,57 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     alignSelf: 'center',
     textTransform: 'uppercase',
+  },
+  maintenanceBanner: {
+    backgroundColor: '#fff3e0',
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 10,
+    marginHorizontal: 10,
+    borderWidth: 2,
+    borderColor: '#ff9800',
+    elevation: 3,
+    shadowColor: Colors.Black,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  maintenanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  maintenanceTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ff9800',
+    marginLeft: 8,
+  },
+  maintenanceContent: {
+    marginBottom: 5,
+  },
+  maintenanceText: {
+    fontSize: 16,
+    color: Colors.darkGrey,
+    marginBottom: 5,
+  },
+  maintenanceReason: {
+    fontSize: 14,
+    color: Colors.darkGrey,
+    fontStyle: 'italic',
+    marginBottom: 5,
+  },
+  maintenanceTime: {
+    fontSize: 14,
+    color: Colors.darkGrey,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  maintenanceNote: {
+    fontSize: 14,
+    color: Colors.darkGrey,
+    marginTop: 5,
+    fontStyle: 'italic',
   },
 });
 

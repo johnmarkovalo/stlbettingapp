@@ -30,12 +30,12 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const checkAndInitializeDatabase = async () => {
       try {
+        const dbService = DatabaseService.getInstance();
         const isDatabaseInitialized = await AsyncStorage.getItem(
           'isDatabaseInitialized',
         );
         if (!isDatabaseInitialized) {
           try {
-            const dbService = DatabaseService.getInstance();
             await dbService.initializeDatabase();
             await AsyncStorage.setItem('isDatabaseInitialized', 'true');
             await AsyncStorage.setItem(
@@ -50,7 +50,6 @@ function App(): React.JSX.Element {
             // Clear the database and try again
             try {
               await clearDatabase();
-              const dbService = DatabaseService.getInstance();
               await dbService.initializeDatabase();
               await AsyncStorage.setItem('isDatabaseInitialized', 'true');
               await AsyncStorage.setItem(
@@ -62,6 +61,15 @@ function App(): React.JSX.Element {
               // Set as initialized to prevent infinite retry loops
               await AsyncStorage.setItem('isDatabaseInitialized', 'true');
             }
+          }
+        } else {
+          // Database already initialized, but run migrations for new tables
+          // This ensures new tables (like maintenance_schedule) are created
+          try {
+            await dbService.runMigrations();
+          } catch (migrationError) {
+            console.error('Error running database migrations:', migrationError);
+            // Don't block app startup if migrations fail
           }
         }
       } catch (error) {

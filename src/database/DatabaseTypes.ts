@@ -6,7 +6,7 @@ export interface DatabaseConfig {
 export interface DatabaseTransaction {
   executeSql: (
     sqlStatement: string,
-    arguments?: any[],
+    args?: any[],
     callback?: (transaction: any, resultSet: any) => void,
     errorCallback?: (transaction: any, error: any) => void,
   ) => void;
@@ -32,6 +32,7 @@ export const TABLES = {
   TRANS: 'trans',
   BET: 'bet',
   RESULT: 'result',
+  MAINTENANCE_SCHEDULE: 'maintenance_schedule',
 } as const;
 
 // Database column names
@@ -97,6 +98,15 @@ export const COLUMNS = {
     BETTIME: 'bettime',
     CREATED_AT: 'created_at',
   },
+  MAINTENANCE_SCHEDULE: {
+    ID: 'id',
+    START_TIME: 'start_time',
+    END_TIME: 'end_time',
+    REASON: 'reason',
+    IS_ACTIVE: 'is_active',
+    CREATED_AT: 'created_at',
+    UPDATED_AT: 'updated_at',
+  },
 } as const;
 
 // Database status values
@@ -125,4 +135,7 @@ export const INDEXES = {
 
   RESULT_CREATED_AT: 'result_created_at_index',
   RESULT_BETTYPEID: 'result_bettypeid_index',
+
+  MAINTENANCE_SCHEDULE_ACTIVE: 'maintenance_schedule_active_index',
+  MAINTENANCE_SCHEDULE_TIME: 'maintenance_schedule_time_index',
 } as const;

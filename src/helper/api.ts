@@ -64,6 +64,16 @@ export interface Result {
   created_at: string;
 }
 
+export interface MaintenanceSchedule {
+  id?: number;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+  is_active?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Extend Axios config to include retryCount
 interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
   retryCount?: number;
@@ -351,6 +361,53 @@ class ApiClient {
       }>;
     }>('POST', 'transactions/bulk-sync', token, {transactions});
   }
+
+  /**
+   * Fetch maintenance schedules from server (within 7 days)
+   * @param token - Auth token
+   * @returns Array of maintenance schedule objects or empty array
+   */
+  async getMaintenanceSchedule(token: string): Promise<MaintenanceSchedule[]> {
+    try {
+      console.log('🌐 [Maintenance API] Fetching maintenance schedules...');
+      const result = await this.makeRequest<MaintenanceSchedule[] | MaintenanceSchedule>(
+        'GET',
+        'maintenance-schedule',
+        token,
+      );
+      
+      // Handle both array and single object responses for backward compatibility
+      let schedules: MaintenanceSchedule[] = [];
+      if (Array.isArray(result)) {
+        schedules = result;
+        console.log(`📥 [Maintenance API] Received ${schedules.length} schedule(s) (array)`);
+      } else if (result && JSON.stringify(result) !== '{}') {
+        // Single object response - convert to array
+        schedules = [result];
+        console.log('📥 [Maintenance API] Received 1 schedule (object, converted to array)');
+      } else {
+        console.log('📥 [Maintenance API] No schedules received (empty response)');
+      }
+      
+      if (schedules.length > 0) {
+        schedules.forEach((schedule, index) => {
+          console.log(`📋 [Maintenance API] Schedule ${index + 1}:`, {
+            id: schedule.id,
+            start: schedule.start_time,
+            end: schedule.end_time,
+            reason: schedule.reason,
+            is_active: schedule.is_active,
+          });
+        });
+      }
+      
+      return schedules;
+    } catch (error) {
+      console.error('❌ [Maintenance API] Error fetching maintenance schedule:', error);
+      // Return empty array on error instead of throwing
+      return [];
+    }
+  }
 }
 
 // ============================================================================
@@ -395,3 +452,6 @@ export const getTransactionsBulkAPI = (token: string, ticketcodes: string[]) =>
 
 export const sendTransactionsBulkAPI = (token: string, transactions: any[]) =>
   apiClient.sendTransactionsBulk(token, transactions);
+
+export const getMaintenanceScheduleAPI = (token: string) =>
+  apiClient.getMaintenanceSchedule(token);
