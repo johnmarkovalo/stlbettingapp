@@ -111,3 +111,103 @@ export const isInMaintenancePeriod = () =>
 // Migration method
 export const runMigrations = () =>
   DatabaseService.getInstance().runMigrations();
+
+// Optimized transaction and bet fetching methods
+export const getTransactionsWithBets = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+) =>
+  DatabaseService.getInstance().getTransactionsWithBets(
+    betdate,
+    bettime,
+    bettypeid,
+  );
+
+export const getCombinationAmounts = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+  minutesAgo: number = 15,
+) =>
+  DatabaseService.getInstance().getCombinationAmounts(
+    betdate,
+    bettime,
+    bettypeid,
+    minutesAgo,
+  );
+
+export const getPOSCombinationAmounts = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+) =>
+  DatabaseService.getInstance().getPOSCombinationAmounts(
+    betdate,
+    bettime,
+    bettypeid,
+  );
+
+// Result and winner methods
+export const getResult = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+) =>
+  DatabaseService.getInstance().getResult(betdate, bettime, bettypeid);
+
+export const getWinners = (betType: any, result: any) =>
+  DatabaseService.getInstance().getWinners(betType, result);
+
+export const getWinningTransactionBets = (
+  transid: number,
+  result: any,
+) =>
+  DatabaseService.getInstance().getWinningTransactionBets(transid, result);
+
+// Delta sync optimized methods
+export const getLocalTicketcodes = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+) =>
+  DatabaseService.getInstance().getLocalTicketcodes(betdate, bettime, bettypeid);
+
+export const getTransactionCount = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+) =>
+  DatabaseService.getInstance().getTransactionCount(betdate, bettime, bettypeid);
+
+export const getTransactionsSummary = (
+  betdate: string,
+  bettime: number,
+  bettypeid: number,
+) =>
+  DatabaseService.getInstance().getTransactionsSummary(
+    betdate,
+    bettime,
+    bettypeid,
+  );
+
+export const transactionExists = (ticketcode: string) =>
+  DatabaseService.getInstance().transactionExists(ticketcode);
+
+export const getExistingTicketcodes = (ticketcodes: string[]) =>
+  DatabaseService.getInstance().getExistingTicketcodes(ticketcodes);
+
+export const batchInsertTransactions = (
+  transactions: Array<{
+    ticketcode: string;
+    betdate: string;
+    bettime: number;
+    bettypeid: number;
+    total: number;
+    status: string;
+    trans_data: string;
+    trans_no: number;
+    created_at: string;
+    bets: any[];
+  }>,
+) => DatabaseService.getInstance().batchInsertTransactions(transactions);

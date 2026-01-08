@@ -43,14 +43,13 @@ const ResultTransactionBets: React.FC<ResultTransactionBetsProps> = React.memo(
       }
 
       try {
-        await getWinningTransactionBets(
+        // Use optimized method that returns Promise instead of callback
+        const fetchedBets = await getWinningTransactionBets(
           transaction.id,
           result,
-          (fetchedBets: Bet[]) => {
-            console.log('Winning bets fetched:', fetchedBets);
-            setBets(fetchedBets);
-          },
         );
+        console.log('Winning bets fetched:', fetchedBets);
+        setBets(fetchedBets);
       } catch (error) {
         console.error('Error fetching winning bets:', error);
         setBets([]);

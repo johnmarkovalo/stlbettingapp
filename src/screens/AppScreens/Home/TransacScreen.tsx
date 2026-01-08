@@ -32,13 +32,13 @@ import {
   getCurrentDraw,
   sortNumber,
   isWithin15MinutesOfCutoff,
-  calculateCombinationAmounts,
-  calculatePOSCombinationAmounts,
 } from '../../../helper/functions';
 import {
   getLatestTransaction,
   insertTransaction,
   updateTransactionStatus,
+  getCombinationAmounts,
+  getPOSCombinationAmounts,
 } from '../../../database';
 import {printTransaction} from '../../../helper/printer';
 import {sendTransactionAPI, getSoldOutsAPI} from '../../../helper/api';
@@ -47,7 +47,6 @@ import {
   combinationAmountsActions,
   posCombinationCapActions,
 } from '../../../store/actions';
-import {getTransactions, getBetsByTransaction} from '../../../database';
 
 // Define types for Redux state
 interface RootState {
@@ -172,28 +171,19 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       }
     }, [betType, currentDraw]);
 
-    // Fetch and update combination amounts
+    // Fetch and update combination amounts (optimized - uses SQL aggregation)
     const fetchCombinationAmounts = useCallback(async () => {
       if (!isWithinCutoff || !currentDraw) return;
 
       try {
-        const transactions = (await getTransactions(
+        // Use optimized SQL aggregation instead of fetching all transactions and bets
+        const amounts = (await getCombinationAmounts(
           betDate,
           currentDraw,
           betType.id,
-        )) as any[];
-
-        // Get bets for all transactions
-        const betsByTransaction: Record<number, any[]> = {};
-        for (const transaction of transactions) {
-          const bets = (await getBetsByTransaction(transaction.id)) as any[];
-          betsByTransaction[transaction.id] = bets;
-        }
-
-        const amounts = calculateCombinationAmounts(
-          transactions,
-          betsByTransaction,
-        ) as Record<string, number>;
+          15, // 15 minutes window
+        )) as Record<string, number>;
+        
         dispatch(combinationAmountsActions.update(amounts));
       } catch (error) {
         console.error('Error fetching combination amounts:', error);
@@ -331,27 +321,18 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     );
 
     // Fetch and update POS combination amounts (for entire draw, not just 15 minutes)
+    // Optimized - uses SQL aggregation instead of fetching all transactions and bets
     const fetchPOSCombinationAmounts = useCallback(async () => {
       if (!currentDraw) return;
 
       try {
-        const transactions = (await getTransactions(
+        // Use optimized SQL aggregation instead of fetching all transactions and bets
+        const amounts = (await getPOSCombinationAmounts(
           betDate,
           currentDraw,
           betType.id,
-        )) as any[];
-
-        // Get bets for all transactions
-        const betsByTransaction: Record<number, any[]> = {};
-        for (const transaction of transactions) {
-          const bets = (await getBetsByTransaction(transaction.id)) as any[];
-          betsByTransaction[transaction.id] = bets;
-        }
-
-        const amounts = calculatePOSCombinationAmounts(
-          transactions,
-          betsByTransaction,
-        ) as Record<string, number>;
+        )) as Record<string, number>;
+        
         dispatch(posCombinationCapActions.update(amounts));
       } catch (error) {
         console.error('Error fetching POS combination amounts:', error);

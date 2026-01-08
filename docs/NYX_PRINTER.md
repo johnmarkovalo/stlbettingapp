@@ -290,4 +290,3 @@ The native Android module is located at:
 - Scanner results are emitted via `DeviceEventEmitter` with event name `onScanResult`
 - Always check printer status before printing to ensure the printer is ready
 - The printer service must be installed on the device for the module to work
-

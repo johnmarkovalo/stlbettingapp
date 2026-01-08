@@ -304,13 +304,8 @@ export class DatabaseService {
           [betdate, bettime, bettypeid],
           (tx: DatabaseTransaction, results: ResultSetRowList) => {
             try {
-              const rows = results.rows;
-              const transactions: any[] = [];
-
-              for (let i = 0; i < rows.length; i++) {
-                transactions.push(rows.item(i));
-              }
-
+              // Use rows.raw() for better performance
+              const transactions = results.rows.raw();
               resolve(transactions);
             } catch (error) {
               reject(error);
@@ -318,6 +313,179 @@ export class DatabaseService {
           },
           (tx: DatabaseTransaction, error: DatabaseError) => {
             console.error('Error fetching transactions:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Optimized method to get transactions with their bets in a single query
+   * This eliminates N+1 query problem by using JOIN
+   * Returns: { transactions: Transaction[], betsByTransaction: Record<number, Bet[]> }
+   */
+  public async getTransactionsWithBets(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<{
+    transactions: any[];
+    betsByTransaction: Record<number, any[]>;
+  }> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getTransactionsWithBets(betdate, bettime, bettypeid),
+          [betdate, bettime, bettypeid],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows.raw();
+              const transactionsMap = new Map<number, any>();
+              const betsByTransaction: Record<number, any[]> = {};
+
+              // Process joined results
+              rows.forEach((row: any) => {
+                const transId = row.trans_id;
+
+                // Build transaction object (only once per transaction)
+                if (!transactionsMap.has(transId)) {
+                  transactionsMap.set(transId, {
+                    id: row.trans_id,
+                    ticketcode: row.ticketcode,
+                    betdate: row.betdate,
+                    bettime: row.bettime,
+                    bettypeid: row.bettypeid,
+                    trans_no: row.trans_no,
+                    total: row.total,
+                    trans_data: row.trans_data,
+                    status: row.status,
+                    created_at: row.created_at,
+                  });
+                }
+
+                // Add bet if it exists (bet_id will be null if transaction has no bets)
+                if (row.bet_id) {
+                  if (!betsByTransaction[transId]) {
+                    betsByTransaction[transId] = [];
+                  }
+                  betsByTransaction[transId].push({
+                    id: row.bet_id,
+                    transid: row.transid,
+                    tranno: row.tranno,
+                    betNumber: row.betnumber,
+                    betNumberr: row.betnumberr,
+                    targetAmount: row.target,
+                    rambolAmount: row.rambol,
+                    subtotal: row.subtotal,
+                  });
+                }
+              });
+
+              resolve({
+                transactions: Array.from(transactionsMap.values()),
+                betsByTransaction,
+              });
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching transactions with bets:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get combination amounts directly from SQL aggregation (optimized)
+   * Returns aggregated amounts for 15-minute window
+   */
+  public async getCombinationAmounts(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+    minutesAgo: number = 15,
+  ): Promise<Record<string, number>> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getCombinationAmounts(
+            betdate,
+            bettime,
+            bettypeid,
+            minutesAgo,
+          ),
+          [
+            betdate,
+            bettime,
+            bettypeid,
+            betdate,
+            bettime,
+            bettypeid,
+          ],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows.raw();
+              const amounts: Record<string, number> = {};
+
+              rows.forEach((row: any) => {
+                amounts[row.key] = (amounts[row.key] || 0) + row.amount;
+              });
+
+              resolve(amounts);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching combination amounts:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get POS combination amounts directly from SQL aggregation (optimized)
+   * Returns aggregated amounts for entire draw
+   */
+  public async getPOSCombinationAmounts(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<Record<string, number>> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getPOSCombinationAmounts(betdate, bettime, bettypeid),
+          [
+            betdate,
+            bettime,
+            bettypeid,
+            betdate,
+            bettime,
+            bettypeid,
+          ],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows.raw();
+              const amounts: Record<string, number> = {};
+
+              rows.forEach((row: any) => {
+                amounts[row.key] = (amounts[row.key] || 0) + row.amount;
+              });
+
+              resolve(amounts);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching POS combination amounts:', error);
             reject(error);
           },
         );
@@ -333,22 +501,18 @@ export class DatabaseService {
           [transid],
           (tx: DatabaseTransaction, results: ResultSetRowList) => {
             try {
-              const rows = results.rows;
-              const bets: Bet[] = [];
-
-              for (let i = 0; i < rows.length; i++) {
-                const row = rows.item(i);
-                bets.push({
-                  id: row.id,
-                  transid: row.transid,
-                  tranno: row.tranno,
-                  betNumber: row.betnumber,
-                  betNumberr: row.betnumberr,
-                  targetAmount: row.target,
-                  rambolAmount: row.rambol,
-                  subtotal: row.subtotal,
-                });
-              }
+              // Use rows.raw() for better performance
+              const rows = results.rows.raw();
+              const bets: Bet[] = rows.map((row: any) => ({
+                id: row.id,
+                transid: row.transid,
+                tranno: row.tranno,
+                betNumber: row.betnumber,
+                betNumberr: row.betnumberr,
+                targetAmount: row.target,
+                rambolAmount: row.rambol,
+                subtotal: row.subtotal,
+              }));
 
               resolve(bets);
             } catch (error) {
@@ -412,13 +576,8 @@ export class DatabaseService {
           [betdate, bettime, bettypeid, limit, offset],
           (tx: DatabaseTransaction, results: ResultSetRowList) => {
             try {
-              const rows = results.rows;
-              const transactions: any[] = [];
-
-              for (let i = 0; i < rows.length; i++) {
-                transactions.push(rows.item(i));
-              }
-
+              // Use rows.raw() for better performance
+              const transactions = results.rows.raw();
               resolve(transactions);
             } catch (error) {
               reject(error);
@@ -469,13 +628,8 @@ export class DatabaseService {
           [currentDate, currentDate, currentDraw],
           (tx: DatabaseTransaction, results: ResultSetRowList) => {
             try {
-              const rows = results.rows;
-              const transactions: any[] = [];
-
-              for (let i = 0; i < rows.length; i++) {
-                transactions.push(rows.item(i));
-              }
-
+              // Use rows.raw() for better performance
+              const transactions = results.rows.raw();
               resolve(transactions);
             } catch (error) {
               reject(error);
@@ -501,13 +655,8 @@ export class DatabaseService {
           [],
           (tx: DatabaseTransaction, results: ResultSetRowList) => {
             try {
-              const rows = results.rows;
-              const transactions: any[] = [];
-
-              for (let i = 0; i < rows.length; i++) {
-                transactions.push(rows.item(i));
-              }
-
+              // Use rows.raw() for better performance
+              const transactions = results.rows.raw();
               resolve(transactions);
             } catch (error) {
               reject(error);
@@ -536,13 +685,8 @@ export class DatabaseService {
           [],
           (tx: DatabaseTransaction, results: ResultSetRowList) => {
             try {
-              const rows = results.rows;
-              const transactions: any[] = [];
-
-              for (let i = 0; i < rows.length; i++) {
-                transactions.push(rows.item(i));
-              }
-
+              // Use rows.raw() for better performance
+              const transactions = results.rows.raw();
               resolve(transactions);
             } catch (error) {
               reject(error);
@@ -1333,6 +1477,420 @@ export class DatabaseService {
           console.error('❌ [Maintenance DB] Error checking maintenance period:', error);
           reject(error);
         });
+    });
+  }
+
+  /**
+   * Get result for a specific date, draw, and bet type
+   */
+  public async getResult(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<Result | null> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getResult(betdate, bettime, bettypeid),
+          [betdate, bettime, bettypeid],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows.raw();
+              if (rows.length > 0) {
+                resolve(rows[0] as Result);
+              } else {
+                resolve(null);
+              }
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching result:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get winners (transactions with winning bets) using SQL aggregation
+   * This is optimized to calculate winnings directly in SQL
+   */
+  public async getWinners(
+    betType: Type,
+    result: Result,
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        // Calculate win multiplier for rambol based on whether result is double
+        const winRambol = checkIfDouble(result.result)
+          ? betType.winram2
+          : betType.winram;
+
+        tx.executeSql(
+          SQLBuilder.getWinners(betType, result),
+          [
+            result.result,
+            betType.wintar,
+            result.resultr,
+            winRambol,
+            result.result,
+            betType.wintar,
+            result.resultr,
+            winRambol,
+            result.betdate,
+            result.bettime,
+            result.bettypeid,
+            result.result,
+            result.resultr,
+          ],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              // Use rows.raw() for better performance
+              const rows = results.rows.raw();
+              // Filter out transactions with total = 0
+              const transactions = rows.filter(
+                (row: any) => row.total > 0,
+              );
+              resolve(transactions);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching winners:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get winning bets for a specific transaction
+   * Optimized to use rows.raw() for better performance
+   */
+  public async getWinningTransactionBets(
+    transid: number,
+    result: Result,
+  ): Promise<Bet[]> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          `SELECT * FROM ${TABLES.BET} 
+           WHERE ${COLUMNS.BET.TRANSID} = ? 
+           AND ((${COLUMNS.BET.BETNUMBER} = ? AND ${COLUMNS.BET.TARGET} > 0) 
+                OR (${COLUMNS.BET.BETNUMBERR} = ? AND ${COLUMNS.BET.RAMBOL} > 0))`,
+          [transid, result.result, result.resultr],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              // Use rows.raw() for better performance
+              const rows = results.rows.raw();
+              const bets: Bet[] = rows.map((row: any) => ({
+                id: row.id,
+                transid: row.transid,
+                tranno: row.tranno,
+                betNumber: row.betnumber,
+                betNumberr: row.betnumberr,
+                targetAmount: row.target,
+                rambolAmount: row.rambol,
+                subtotal: row.subtotal,
+              }));
+              resolve(bets);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching winning transaction bets:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  // ============================================================================
+  // Delta Sync Optimized Methods
+  // ============================================================================
+
+  /**
+   * Get all ticketcodes for a specific draw (optimized for delta comparison)
+   */
+  public async getLocalTicketcodes(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<Set<string>> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getLocalTicketcodes(betdate, bettime, bettypeid),
+          [betdate, bettime, bettypeid],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows.raw();
+              const ticketcodes = new Set<string>(rows.map((row: any) => row.ticketcode as string));
+              resolve(ticketcodes);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching local ticketcodes:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get transaction count for quick comparison
+   */
+  public async getTransactionCount(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getTransactionCount(betdate, bettime, bettypeid),
+          [betdate, bettime, bettypeid],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const count = results.rows.item(0).count;
+              resolve(count);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching transaction count:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get transactions summary (count, amount, sync status)
+   */
+  public async getTransactionsSummary(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): Promise<{
+    totalCount: number;
+    totalAmount: number;
+    syncedCount: number;
+    unsyncedCount: number;
+    lastTransactionTime: string | null;
+  }> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getTransactionsSummary(betdate, bettime, bettypeid),
+          [betdate, bettime, bettypeid],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const row = results.rows.item(0);
+              resolve({
+                totalCount: row.total_count || 0,
+                totalAmount: row.total_amount || 0,
+                syncedCount: row.synced_count || 0,
+                unsyncedCount: row.unsynced_count || 0,
+                lastTransactionTime: row.last_transaction_time || null,
+              });
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching transactions summary:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Check if a transaction exists by ticketcode (optimized)
+   */
+  public async transactionExists(ticketcode: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.transactionExists(ticketcode),
+          [ticketcode],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            resolve(results.rows.length > 0);
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error checking transaction exists:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get a transaction by ticketcode
+   * Returns the full transaction object or null if not found
+   */
+  public async getTransactionByTicketCode(ticketcode: string): Promise<any | null> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          `SELECT * FROM ${TABLES.TRANS} WHERE ${COLUMNS.TRANS.TICKETCODE} = ? LIMIT 1`,
+          [ticketcode],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            if (results.rows.length > 0) {
+              resolve(results.rows.item(0));
+            } else {
+              resolve(null);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching transaction by ticketcode:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get existing ticketcodes from a list (for batch insert optimization)
+   */
+  public async getExistingTicketcodes(ticketcodes: string[]): Promise<Set<string>> {
+    if (ticketcodes.length === 0) {
+      return new Set();
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getExistingTicketcodes(ticketcodes),
+          ticketcodes,
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const rows = results.rows.raw();
+              const existing = new Set<string>(rows.map((row: any) => row.ticketcode as string));
+              resolve(existing);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error fetching existing ticketcodes:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Batch insert transactions (optimized for delta sync)
+   */
+  public async batchInsertTransactions(
+    transactions: Array<{
+      ticketcode: string;
+      betdate: string;
+      bettime: number;
+      bettypeid: number;
+      total: number;
+      status: string;
+      trans_data: string;
+      trans_no: number;
+      created_at: string;
+      bets: any[];
+    }>,
+  ): Promise<{inserted: number; skipped: number}> {
+    let inserted = 0;
+    let skipped = 0;
+
+    // First, check which ticketcodes already exist
+    const ticketcodes = transactions.map(t => t.ticketcode);
+    const existing = await this.getExistingTicketcodes(ticketcodes);
+
+    // Filter to only new transactions
+    const newTransactions = transactions.filter(t => !existing.has(t.ticketcode));
+    skipped = transactions.length - newTransactions.length;
+
+    if (newTransactions.length === 0) {
+      return {inserted: 0, skipped};
+    }
+
+    return new Promise((resolve, reject) => {
+      this.db.transaction(
+        (tx: DatabaseTransaction) => {
+          for (const trans of newTransactions) {
+            // Insert transaction
+            tx.executeSql(
+              SQLBuilder.upsertTransaction(),
+              [
+                trans.ticketcode,
+                trans.betdate,
+                trans.bettime,
+                trans.bettypeid,
+                trans.total,
+                trans.status,
+                trans.trans_data,
+                trans.trans_no,
+                trans.created_at,
+              ],
+              (tx: DatabaseTransaction, results: ResultSetRowList) => {
+                const transId = results.insertId;
+                if (transId && trans.bets && trans.bets.length > 0) {
+                  // Insert bets
+                  for (const bet of trans.bets) {
+                    tx.executeSql(
+                      `INSERT INTO ${TABLES.BET} (
+                        ${COLUMNS.BET.TRANSID},
+                        ${COLUMNS.BET.TRANNO},
+                        ${COLUMNS.BET.BETNUMBER},
+                        ${COLUMNS.BET.BETNUMBERR},
+                        ${COLUMNS.BET.TARGET},
+                        ${COLUMNS.BET.RAMBOL},
+                        ${COLUMNS.BET.SUBTOTAL}
+                      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                      [
+                        transId,
+                        bet.tranno || 1,
+                        bet.betNumber || '',
+                        bet.betNumberr || bet.betNumber || '',
+                        bet.targetAmount || 0,
+                        bet.rambolAmount || 0,
+                        (bet.targetAmount || 0) + (bet.rambolAmount || 0),
+                      ],
+                    );
+                  }
+                }
+                inserted++;
+              },
+              (tx: DatabaseTransaction, error: DatabaseError) => {
+                console.error(`Error inserting transaction ${trans.ticketcode}:`, error);
+                skipped++;
+              },
+            );
+          }
+        },
+        (error: any) => {
+          console.error('Batch insert transaction error:', error);
+          reject(error);
+        },
+        () => {
+          resolve({inserted, skipped});
+        },
+      );
     });
   }
 

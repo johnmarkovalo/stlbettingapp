@@ -299,4 +299,226 @@ export class SQLBuilder {
   static reindexDatabase(): string {
     return 'REINDEX';
   }
+
+  // Optimized queries for transaction and bet fetching
+  /**
+   * Get transactions with their bets in a single JOIN query
+   * This eliminates N+1 query problem
+   */
+  static getTransactionsWithBets(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): string {
+    return `SELECT 
+              ${TABLES.TRANS}.${COLUMNS.TRANS.ID} as trans_id,
+              ${TABLES.TRANS}.${COLUMNS.TRANS.TICKETCODE},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.BETDATE},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.TRANS_NO},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.TOTAL},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.TRANS_DATA},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.STATUS},
+              ${TABLES.TRANS}.${COLUMNS.TRANS.CREATED_AT},
+              ${TABLES.BET}.${COLUMNS.BET.ID} as bet_id,
+              ${TABLES.BET}.${COLUMNS.BET.TRANSID},
+              ${TABLES.BET}.${COLUMNS.BET.TRANNO},
+              ${TABLES.BET}.${COLUMNS.BET.BETNUMBER},
+              ${TABLES.BET}.${COLUMNS.BET.BETNUMBERR},
+              ${TABLES.BET}.${COLUMNS.BET.TARGET},
+              ${TABLES.BET}.${COLUMNS.BET.RAMBOL},
+              ${TABLES.BET}.${COLUMNS.BET.SUBTOTAL}
+            FROM ${TABLES.TRANS}
+            LEFT JOIN ${TABLES.BET} ON ${TABLES.TRANS}.${COLUMNS.TRANS.ID} = ${TABLES.BET}.${COLUMNS.BET.TRANSID}
+            WHERE ${TABLES.TRANS}.${COLUMNS.TRANS.BETDATE} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
+            ORDER BY ${TABLES.TRANS}.${COLUMNS.TRANS.TRANS_NO} ASC, ${TABLES.BET}.${COLUMNS.BET.TRANNO} ASC`;
+  }
+
+  /**
+   * Get combination amounts aggregated directly in SQL (for 15-minute window)
+   * This calculates target and rambol amounts grouped by bet number
+   */
+  static getCombinationAmounts(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+    minutesAgo: number = 15,
+  ): string {
+    return `SELECT 
+              CAST(${bettypeid} AS TEXT) || '_' || CAST(${bettime} AS TEXT) || '_target_' || ${TABLES.BET}.${COLUMNS.BET.BETNUMBER} as key,
+              SUM(${TABLES.BET}.${COLUMNS.BET.TARGET}) as amount
+            FROM ${TABLES.TRANS}
+            INNER JOIN ${TABLES.BET} ON ${TABLES.TRANS}.${COLUMNS.TRANS.ID} = ${TABLES.BET}.${COLUMNS.BET.TRANSID}
+            WHERE ${TABLES.TRANS}.${COLUMNS.TRANS.BETDATE} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
+              AND ${TABLES.BET}.${COLUMNS.BET.TARGET} > 0
+              AND datetime(${TABLES.TRANS}.${COLUMNS.TRANS.CREATED_AT}) >= datetime('now', '-${minutesAgo} minutes')
+            GROUP BY ${TABLES.BET}.${COLUMNS.BET.BETNUMBER}
+            
+            UNION ALL
+            
+            SELECT 
+              CAST(${bettypeid} AS TEXT) || '_' || CAST(${bettime} AS TEXT) || '_rambol_' || ${TABLES.BET}.${COLUMNS.BET.BETNUMBERR} as key,
+              SUM(${TABLES.BET}.${COLUMNS.BET.RAMBOL}) as amount
+            FROM ${TABLES.TRANS}
+            INNER JOIN ${TABLES.BET} ON ${TABLES.TRANS}.${COLUMNS.TRANS.ID} = ${TABLES.BET}.${COLUMNS.BET.TRANSID}
+            WHERE ${TABLES.TRANS}.${COLUMNS.TRANS.BETDATE} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
+              AND ${TABLES.BET}.${COLUMNS.BET.RAMBOL} > 0
+              AND datetime(${TABLES.TRANS}.${COLUMNS.TRANS.CREATED_AT}) >= datetime('now', '-${minutesAgo} minutes')
+            GROUP BY ${TABLES.BET}.${COLUMNS.BET.BETNUMBERR}`;
+  }
+
+  /**
+   * Get POS combination amounts aggregated directly in SQL (for entire draw)
+   * This calculates target and rambol amounts grouped by bet number for the entire draw
+   */
+  static getPOSCombinationAmounts(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): string {
+    return `SELECT 
+              CAST(${bettypeid} AS TEXT) || '_' || CAST(${bettime} AS TEXT) || '_target_' || ${TABLES.BET}.${COLUMNS.BET.BETNUMBER} as key,
+              SUM(${TABLES.BET}.${COLUMNS.BET.TARGET}) as amount
+            FROM ${TABLES.TRANS}
+            INNER JOIN ${TABLES.BET} ON ${TABLES.TRANS}.${COLUMNS.TRANS.ID} = ${TABLES.BET}.${COLUMNS.BET.TRANSID}
+            WHERE ${TABLES.TRANS}.${COLUMNS.TRANS.BETDATE} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
+              AND ${TABLES.BET}.${COLUMNS.BET.TARGET} > 0
+            GROUP BY ${TABLES.BET}.${COLUMNS.BET.BETNUMBER}
+            
+            UNION ALL
+            
+            SELECT 
+              CAST(${bettypeid} AS TEXT) || '_' || CAST(${bettime} AS TEXT) || '_rambol_' || ${TABLES.BET}.${COLUMNS.BET.BETNUMBERR} as key,
+              SUM(${TABLES.BET}.${COLUMNS.BET.RAMBOL}) as amount
+            FROM ${TABLES.TRANS}
+            INNER JOIN ${TABLES.BET} ON ${TABLES.TRANS}.${COLUMNS.TRANS.ID} = ${TABLES.BET}.${COLUMNS.BET.TRANSID}
+            WHERE ${TABLES.TRANS}.${COLUMNS.TRANS.BETDATE} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
+              AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
+              AND ${TABLES.BET}.${COLUMNS.BET.RAMBOL} > 0
+            GROUP BY ${TABLES.BET}.${COLUMNS.BET.BETNUMBERR}`;
+  }
+
+  // ============================================================================
+  // Delta Sync Optimized Queries
+  // ============================================================================
+
+  /**
+   * Get all ticketcodes for a specific draw (for delta comparison)
+   */
+  static getLocalTicketcodes(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): string {
+    return `SELECT ${COLUMNS.TRANS.TICKETCODE} 
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.BETDATE} = ? 
+              AND ${COLUMNS.TRANS.BETTIME} = ? 
+              AND ${COLUMNS.TRANS.BETTYPEID} = ?`;
+  }
+
+  /**
+   * Get transaction count for quick comparison
+   */
+  static getTransactionCount(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): string {
+    return `SELECT COUNT(*) as count 
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.BETDATE} = ? 
+              AND ${COLUMNS.TRANS.BETTIME} = ? 
+              AND ${COLUMNS.TRANS.BETTYPEID} = ?`;
+  }
+
+  /**
+   * Get transactions with stats for sync summary
+   */
+  static getTransactionsSummary(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+  ): string {
+    return `SELECT 
+              COUNT(*) as total_count,
+              SUM(${COLUMNS.TRANS.TOTAL}) as total_amount,
+              SUM(CASE WHEN ${COLUMNS.TRANS.STATUS} = 'synced' THEN 1 ELSE 0 END) as synced_count,
+              SUM(CASE WHEN ${COLUMNS.TRANS.STATUS} != 'synced' THEN 1 ELSE 0 END) as unsynced_count,
+              MAX(${COLUMNS.TRANS.CREATED_AT}) as last_transaction_time
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.BETDATE} = ? 
+              AND ${COLUMNS.TRANS.BETTIME} = ? 
+              AND ${COLUMNS.TRANS.BETTYPEID} = ?`;
+  }
+
+  /**
+   * Check if a transaction exists by ticketcode (optimized single lookup)
+   */
+  static transactionExists(ticketcode: string): string {
+    return `SELECT 1 FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.TICKETCODE} = ? 
+            LIMIT 1`;
+  }
+
+  /**
+   * Bulk check for existing ticketcodes (for batch insert optimization)
+   */
+  static getExistingTicketcodes(ticketcodes: string[]): string {
+    const placeholders = ticketcodes.map(() => '?').join(',');
+    return `SELECT ${COLUMNS.TRANS.TICKETCODE} 
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.TICKETCODE} IN (${placeholders})`;
+  }
+
+  /**
+   * Get transactions that need to be uploaded (unsynced)
+   */
+  static getTransactionsToUpload(
+    betdate: string,
+    bettime: number,
+    bettypeid: number,
+    limit: number = 50,
+  ): string {
+    return `SELECT t.*, 
+              (SELECT GROUP_CONCAT(b.${COLUMNS.BET.ID}) 
+               FROM ${TABLES.BET} b 
+               WHERE b.${COLUMNS.BET.TRANSID} = t.${COLUMNS.TRANS.ID}) as bet_ids
+            FROM ${TABLES.TRANS} t
+            WHERE t.${COLUMNS.TRANS.BETDATE} = ? 
+              AND t.${COLUMNS.TRANS.BETTIME} = ? 
+              AND t.${COLUMNS.TRANS.BETTYPEID} = ? 
+              AND t.${COLUMNS.TRANS.STATUS} != 'synced'
+            ORDER BY t.${COLUMNS.TRANS.CREATED_AT} ASC
+            LIMIT ?`;
+  }
+
+  /**
+   * Upsert transaction (insert or update based on ticketcode)
+   * Note: SQLite doesn't support ON CONFLICT DO UPDATE on all versions,
+   * so we use INSERT OR REPLACE
+   */
+  static upsertTransaction(): string {
+    return `INSERT OR REPLACE INTO ${TABLES.TRANS} (
+              ${COLUMNS.TRANS.TICKETCODE},
+              ${COLUMNS.TRANS.BETDATE},
+              ${COLUMNS.TRANS.BETTIME},
+              ${COLUMNS.TRANS.BETTYPEID},
+              ${COLUMNS.TRANS.TOTAL},
+              ${COLUMNS.TRANS.STATUS},
+              ${COLUMNS.TRANS.TRANS_DATA},
+              ${COLUMNS.TRANS.TRANS_NO},
+              ${COLUMNS.TRANS.CREATED_AT}
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  }
 }

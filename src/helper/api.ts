@@ -7,6 +7,7 @@ import axios, {
 import {appConfig} from '../config/appConfig';
 import {store} from '../store/store';
 import {userActions} from '../store/actions';
+import {apiQueue} from './apiQueue';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -180,7 +181,33 @@ class ApiClient {
     token: string,
     data?: any,
     params?: any,
+    useQueue: boolean = true,
   ): Promise<T> {
+    // Use queue for GET requests to prevent duplicates and rate limiting
+    if (useQueue && method === 'GET') {
+      return apiQueue.enqueue(
+        url,
+        async () => {
+          const config: ExtendedAxiosRequestConfig = {
+            method,
+            url,
+            headers: this.createHeaders(token),
+            retryCount: 0,
+          };
+
+          if (data) config.data = data;
+          if (params) config.params = params;
+
+          const response = await this.client.request(config);
+          return response.data;
+        },
+        params,
+        data,
+        method === 'GET' ? 1 : 0, // GET requests have higher priority
+      );
+    }
+
+    // For POST/PUT/DELETE, execute directly (no deduplication needed)
     try {
       const config: ExtendedAxiosRequestConfig = {
         method,

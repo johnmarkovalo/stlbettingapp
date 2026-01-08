@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback, useRef} from 'react';
 import {
   Alert,
   Dimensions,
@@ -63,6 +63,14 @@ const Home = (props: any) => {
     reason?: string;
   } | null>(null);
 
+  // Refs for maintenance schedule caching and rate limiting
+  const maintenanceScheduleCache = useRef<{
+    data: any;
+    timestamp: number;
+  } | null>(null);
+  const isFetchingMaintenance = useRef(false);
+  const lastMaintenanceAPIFetch = useRef<number>(0);
+
   // Helper function to format draw names
   const getDrawName = (drawNumber: number): string => {
     switch (drawNumber) {
@@ -115,13 +123,30 @@ const Home = (props: any) => {
     }
   };
 
-  // Fetch and save maintenance schedules from API (fetches every time called)
-  const fetchMaintenanceScheduleFromAPI = async () => {
+  // Fetch and save maintenance schedules from API
+  // Optimized: Prevents duplicate fetches and adds rate limiting
+  const fetchMaintenanceScheduleFromAPI = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    if (isFetchingMaintenance.current) {
+      console.log('🔄 [Maintenance] API fetch already in progress, skipping...');
+      return;
+    }
+
+    // Rate limit: Only fetch from API once per minute
+    const now = Date.now();
+    if (now - lastMaintenanceAPIFetch.current < 60000) {
+      console.log('⏳ [Maintenance] API fetch rate limited, using cache...');
+      return;
+    }
+
     try {
       if (!token) {
         console.log('⚠️ [Maintenance] No token available, skipping API fetch');
         return;
       }
+
+      isFetchingMaintenance.current = true;
+      lastMaintenanceAPIFetch.current = now;
 
       console.log('🌐 [Maintenance] Fetching from API...');
       // Fetch all upcoming schedules (within 7 days) from API
@@ -148,35 +173,65 @@ const Home = (props: any) => {
         console.log('ℹ️ [Maintenance] No schedules from API');
       }
 
+      // Clear cache after updating
+      maintenanceScheduleCache.current = null;
+
       // After saving, reload from DB to update UI
       await loadMaintenanceScheduleFromDB();
     } catch (error) {
       console.error('❌ [Maintenance] Error fetching maintenance schedule from API:', error);
       // On error, just load from local DB (don't block)
       await loadMaintenanceScheduleFromDB();
+    } finally {
+      isFetchingMaintenance.current = false;
     }
-  };
+  }, [token]);
 
   // Check if currently in maintenance period (fast - local DB only)
-  const checkMaintenanceStatus = async () => {
+  // Optimized: Uses cache to prevent repeated queries
+  const checkMaintenanceStatus = useCallback(async () => {
     try {
+      // Use cached result if available and fresh (within 5 seconds)
+      const now = Date.now();
+      if (
+        maintenanceScheduleCache.current &&
+        now - maintenanceScheduleCache.current.timestamp < 5000
+      ) {
+        const cached = maintenanceScheduleCache.current.data;
+        setIsMaintenanceMode(cached.inMaintenance);
+        if (cached.schedule) {
+          setMaintenanceSchedule(cached.schedule);
+        }
+        return;
+      }
+
       // Fast check - only query local database, no API call
       const inMaintenance = await isInMaintenancePeriod();
       setIsMaintenanceMode(inMaintenance);
       
+      let schedule = null;
       // Update schedule display if needed
       if (inMaintenance && !maintenanceSchedule) {
         // If in maintenance but don't have schedule in state, load it
-        await loadMaintenanceScheduleFromDB();
+        schedule = await getActiveMaintenanceSchedule();
+        setMaintenanceSchedule(schedule);
       } else if (!inMaintenance && maintenanceSchedule) {
         // If not in maintenance but have schedule, clear it
         setMaintenanceSchedule(null);
+      } else if (inMaintenance) {
+        schedule = maintenanceSchedule;
       }
       
-      if (inMaintenance && maintenanceSchedule) {
-        const now = moment();
-        const endTime = moment(maintenanceSchedule.end_time);
-        const timeUntilEnd = moment.duration(endTime.diff(now));
+      // Cache the result
+      maintenanceScheduleCache.current = {
+        data: {inMaintenance, schedule},
+        timestamp: now,
+      };
+      
+      if (inMaintenance && schedule) {
+        const nowMoment = moment();
+        const endTime = moment(schedule.end_time);
+        const timeUntilEnd = moment.duration(endTime.diff(nowMoment));
         console.log(`📊 [Maintenance] Status: IN MAINTENANCE - Ends in ${timeUntilEnd.hours()}h ${timeUntilEnd.minutes()}m`);
       } else {
         console.log('📊 [Maintenance] Status: NOT IN MAINTENANCE');
@@ -185,7 +240,7 @@ const Home = (props: any) => {
       console.error('❌ [Maintenance] Error checking maintenance status:', error);
       setIsMaintenanceMode(false);
     }
-  };
+  }, [maintenanceSchedule]);
 
   // Comprehensive check for unsynced transactions from previous draws
   const checkUnsyncedTransactionsFromPreviousDraws = async () => {
@@ -478,8 +533,9 @@ const Home = (props: any) => {
     // Set up interval for periodic recalculation (every 10 seconds)
     const intervalId = setInterval(recalculateCurrentDraw, 10000);
 
-    // Set up interval for checking maintenance status from local DB (every 30 seconds, fast)
-    const maintenanceCheckInterval = setInterval(checkMaintenanceStatus, 30000);
+    // Set up interval for checking maintenance status from local DB
+    // Reduced frequency: Check every 60 seconds instead of 30 to reduce DB queries
+    const maintenanceCheckInterval = setInterval(checkMaintenanceStatus, 60000);
 
     // Update cleanup info
     // updateNextCleanupInfo(); // This function is removed

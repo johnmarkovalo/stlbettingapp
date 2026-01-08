@@ -1,0 +1,245 @@
+ LOG  📋 Query Params: {"date": "2026-01-07", "draw": 1, "type": 2}
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:10
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:10", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:10", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  ⏳ [Maintenance] API fetch rate limited, using cache...
+ LOG  ✅ API Response: 200 transactions/A1710566437/betTypes/2
+ LOG  📊 [SyncManager] Found 111 server transactions
+ LOG  📊 [SyncManager] 111 transactions to fetch
+ LOG  📦 [SyncManager] Using bulk API for 111 transactions
+ LOG  🚀 API Request: POST transactions/bulk
+ LOG  📦 Request Body: {"ticketcodes": ["6437-12-260107-085834", "6437-12-260107-085900", "6437-12-260107-085947", "6437-12-260107-085958", "6437-12-260107-090052", "6437-12-260107-090109", "6437-12-260107-090145", "6437-12-260107-090359", "6437-12-260107-090637", "6437-12-260107-090727", "6437-12-260107-090846", "6437-12-260107-090957", "6437-12-260107-091157", "6437-12-260107-091355", "6437-12-260107-091556", "6437-12-260107-091709", "6437-12-260107-092332", "6437-12-260107-092932", "6437-12-260107-093340", "6437-12-260107-093528", "6437-12-260107-094036", "6437-12-260107-094107", "6437-12-260107-094312", "6437-12-260107-094334", "6437-12-260107-094440", "6437-12-260107-094503", "6437-12-260107-095027", "6437-12-260107-095536", "6437-12-260107-095558", "6437-12-260107-095704"]}
+ LOG  ✅ API Response: 200 transactions/bulk
+ ERROR  ❌ Error saving transaction 6437-12-260107-085834: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-085900: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-085947: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-085958: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090052: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090109: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090145: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090359: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090637: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090727: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090846: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-090957: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-091157: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-091355: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-091556: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-091709: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-092332: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-092932: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-093340: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-093528: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-094036: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-094107: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-094312: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-094334: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-094440: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-094503: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-095027: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-095536: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-095558: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-095704: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ LOG  🚀 API Request: POST transactions/bulk
+ LOG  📦 Request Body: {"ticketcodes": ["6437-12-260107-095856", "6437-12-260107-100836", "6437-12-260107-100858", "6437-12-260107-101117", "6437-12-260107-101204", "6437-12-260107-101409", "6437-12-260107-101511", "6437-12-260107-101542", "6437-12-260107-101630", "6437-12-260107-101710", "6437-12-260107-101725", "6437-12-260107-101752", "6437-12-260107-101901", "6437-12-260107-102303", "6437-12-260107-103502", "6437-12-260107-111812", "6437-12-260107-111850", "6437-12-260107-111902", "6437-12-260107-111923", "6437-12-260107-112347", "6437-12-260107-112511", "6437-12-260107-112525", "6437-12-260107-112604", "6437-12-260107-112620", "6437-12-260107-112721", "6437-12-260107-113017", "6437-12-260107-113317", "6437-12-260107-113355", "6437-12-260107-113418", "6437-12-260107-113503"]}
+ LOG  ✅ API Response: 200 transactions/bulk
+ ERROR  ❌ Error saving transaction 6437-12-260107-095856: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-100836: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-100858: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101117: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101204: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101409: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101511: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101542: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101630: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101710: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101725: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101752: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-101901: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-102303: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-103502: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-111812: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-111850: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-111902: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-111923: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-112347: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-112511: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-112525: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-112604: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-112620: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-112721: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113017: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113317: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113355: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113418: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113503: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ LOG  🚀 API Request: POST transactions/bulk
+ LOG  📦 Request Body: {"ticketcodes": ["6437-12-260107-113539", "6437-12-260107-113602", "6437-12-260107-113627", "6437-12-260107-113918", "6437-12-260107-114013", "6437-12-260107-114107", "6437-12-260107-114251", "6437-12-260107-114359", "6437-12-260107-114431", "6437-12-260107-114519", "6437-12-260107-114715", "6437-12-260107-114746", "6437-12-260107-114820", "6437-12-260107-114848", "6437-12-260107-114911", "6437-12-260107-115305", "6437-12-260107-115558", "6437-12-260107-115625", "6437-12-260107-115712", "6437-12-260107-115830", "6437-12-260107-120233", "6437-12-260107-120311", "6437-12-260107-120329", "6437-12-260107-120349", "6437-12-260107-120416", "6437-12-260107-120448", "6437-12-260107-120556", "6437-12-260107-120616", "6437-12-260107-120853", "6437-12-260107-121121"]}
+ LOG  ✅ API Response: 200 transactions/bulk
+ ERROR  ❌ Error saving transaction 6437-12-260107-113539: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113602: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113627: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-113918: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114013: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114107: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114251: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114359: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114431: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114519: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114715: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114746: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114820: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114848: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-114911: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-115305: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-115558: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-115625: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-115712: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-115830: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120233: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120311: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120329: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120349: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120416: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120448: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120556: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120616: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-120853: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-121121: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG  currentDraw null
+ LOG  🧹 Database cleanup temporarily disabled
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:17
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:17", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:17", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:17
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:17", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:17", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  🌐 [Maintenance] Fetching from API...
+ LOG  🌐 [Maintenance API] Fetching maintenance schedules...
+ LOG  🚀 API Request: GET maintenance-schedule
+ LOG  ✅ API Response: 200 maintenance-schedule
+ LOG  📥 [Maintenance API] Received 0 schedule(s) (array)
+ LOG  📥 [Maintenance] API response: {"count": 0, "schedules": []}
+ LOG  ℹ️ [Maintenance] No schedules from API
+ LOG  🔍 [Maintenance] Loading schedule from local database...
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:18
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:18", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:18", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance] No active schedule in local database
+ LOG  🚀 API Request: POST transactions/bulk
+ LOG  📦 Request Body: {"ticketcodes": ["6437-12-260107-121149", "6437-12-260107-121326", "6437-12-260107-121352", "6437-12-260107-121715", "6437-12-260107-121848", "6437-12-260107-122311", "6437-12-260107-122426", "6437-12-260107-122443", "6437-12-260107-122544", "6437-12-260107-122830", "6437-12-260107-123022", "6437-12-260107-123059", "6437-12-260107-123141", "6437-12-260107-123152", "6437-12-260107-123203", "6437-12-260107-123720", "6437-12-260107-124001", "6437-12-260107-124049", "6437-12-260107-124145", "6437-12-260107-124215", "6437-12-260107-124332"]}
+ LOG  ✅ API Response: 200 transactions/bulk
+ ERROR  ❌ Error saving transaction 6437-12-260107-121149: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-121326: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-121352: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-121715: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-121848: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-122311: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-122426: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-122443: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-122544: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-122830: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-123022: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-123059: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-123141: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-123152: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-123203: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-123720: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-124001: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-124049: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-124145: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-124215: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ ERROR  ❌ Error saving transaction 6437-12-260107-124332: [TypeError: db.getTransactionByTicketCode is not a function (it is undefined)]
+ LOG  📤 [SyncManager] No unsynced transactions to upload
+ LOG  ✅ [SyncManager] Sync complete: 0 transactions, total: 0
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG  currentDraw null
+ LOG  🧹 Database cleanup temporarily disabled
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:27
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:27", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:27", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  ⏳ [Maintenance] API fetch rate limited, using cache...
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG  currentDraw null
+ LOG  🧹 Database cleanup temporarily disabled
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:37
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:37", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:37", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  ⏳ [Maintenance] API fetch rate limited, using cache...
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG  currentDraw null
+ LOG  🧹 Database cleanup temporarily disabled
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:47
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:47", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:47", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  ⏳ [Maintenance] API fetch rate limited, using cache...
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG  currentDraw null
+ LOG  🧹 Database cleanup temporarily disabled
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:37:57
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:37:57", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:37:57", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  ⏳ [Maintenance] API fetch rate limited, using cache...
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG     Is between: false
+ LOG  currentDraw null
+ LOG  🧹 Database cleanup temporarily disabled
+ LOG  🔍 [Maintenance DB] Querying active schedule at 2026-01-08 22:38:07
+ LOG  📋 [Maintenance DB] Found 1 total schedule(s) in DB:
+ LOG    Schedule 1: {"currentTime": "2026-01-08 22:38:07", "end": "2025-12-25 23:59:00", "endComparison": false, "id": 1, "isInRange": false, "is_active": 1, "reason": "Christmas Break", "start": "2025-12-23 23:59:00", "startComparison": true}
+ LOG  📋 [Maintenance DB] Found 1 active schedule(s) in DB:
+ LOG    Active Schedule 1: {"currentTime": "2026-01-08 22:38:07", "end": "2025-12-25 23:59:00", "id": 1, "isInRange": false, "reason": "Christmas Break", "start": "2025-12-23 23:59:00"}
+ LOG  ℹ️ [Maintenance DB] No active schedule found matching time range
+ LOG  ℹ️ [Maintenance DB] No schedule found, not in maintenance
+ LOG  📊 [Maintenance] Status: NOT IN MAINTENANCE
+ LOG  ⏳ [Maintenance] API fetch rate limited, using cache...
