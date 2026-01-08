@@ -251,6 +251,15 @@ export class SQLBuilder {
             ORDER BY ${COLUMNS.TRANS.BETDATE} DESC, ${COLUMNS.TRANS.BETTIME} DESC`;
   }
 
+  /**
+   * Get total count of ALL unsynced transactions (regardless of date/draw/type)
+   */
+  static getTotalUnsyncedCount(): string {
+    return `SELECT COUNT(*) as total_unsynced
+            FROM ${TABLES.TRANS} 
+            WHERE ${COLUMNS.TRANS.STATUS} != 'synced'`;
+  }
+
   // Improved transaction deletion queries
   static getOldTransactionsForDeletion(weeksOld: number = 1): string {
     return `SELECT 

@@ -674,6 +674,35 @@ export class DatabaseService {
     });
   }
 
+  /**
+   * Get total count of ALL unsynced transactions (regardless of date/draw/type)
+   */
+  public async getTotalUnsyncedCount(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getTotalUnsyncedCount(),
+          [],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              if (results.rows.length > 0) {
+                resolve(results.rows.item(0).total_unsynced || 0);
+              } else {
+                resolve(0);
+              }
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error getting total unsynced count:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
   // Improved transaction deletion methods
   public async getOldTransactionsForDeletion(
     weeksOld: number = 1,

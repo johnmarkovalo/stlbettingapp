@@ -45,6 +45,8 @@ interface RootState {
 }
 
 const widthScreen = Dimensions.get('window').width;
+const MAX_UNSYNCED_TRANSACTIONS = 15; // Maximum unsynced transactions before blocking new ones
+
 const Home = (props: any) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
@@ -610,6 +612,27 @@ const Home = (props: any) => {
       await checkUnsyncedTransactionsFromPreviousDraws();
     console.log('hasUnsyncedTransactions', hasUnsyncedTransactions);
 
+    // Check if too many unsynced transactions (15+ limit)
+    if (unsyncedSummary && unsyncedSummary.totalCount >= MAX_UNSYNCED_TRANSACTIONS) {
+      Alert.alert(
+        'Sync Required',
+        `You have ${unsyncedSummary.totalCount} unsynced transactions.\n\nMaximum allowed: ${MAX_UNSYNCED_TRANSACTIONS}\n\nPlease sync your transactions before creating new ones.`,
+        [
+          {
+            text: 'Go to History',
+            onPress: () => navigation.navigate('HistoryTab'),
+            style: 'default',
+          },
+          {
+            text: 'OK',
+            style: 'cancel',
+          },
+        ],
+        {cancelable: false},
+      );
+      return;
+    }
+
     if (hasUnsyncedTransactions) {
       // Check if there are unsynced transactions from previous draws/dates
       if (
@@ -746,6 +769,18 @@ const Home = (props: any) => {
                 worth ₱{unsyncedSummary.totalAmount.toLocaleString()}
               </Text>
 
+              {/* Show limit warning when 15+ unsynced */}
+              {unsyncedSummary.totalCount >= MAX_UNSYNCED_TRANSACTIONS && (
+                <View style={styles.limitWarningContainer}>
+                  <Text style={styles.limitWarning}>
+                    ⛔ LIMIT REACHED: Maximum {MAX_UNSYNCED_TRANSACTIONS} unsynced allowed!
+                  </Text>
+                  <Text style={styles.limitWarningSubtext}>
+                    You cannot place new bets until you sync.
+                  </Text>
+                </View>
+              )}
+
               {unsyncedSummary.previousDraws &&
                 unsyncedSummary.previousDraws.length > 0 && (
                   <View>
@@ -809,17 +844,23 @@ const Home = (props: any) => {
                 // 2. Bet is closed (currentDraw === null) - no draws are active
                 // 3. This specific button's draw is not active (getCurrentDraw(button.draws) === null)
                 // 4. There are unsynced transactions from previous draws/dates
+                // 5. Too many unsynced transactions (15+ limit)
                 const hasUnsyncedFromPreviousDraws =
                   unsyncedSummary &&
                   unsyncedSummary.previousDraws &&
                   unsyncedSummary.previousDraws.length > 0;
+
+                const hasTooManyUnsynced =
+                  unsyncedSummary &&
+                  unsyncedSummary.totalCount >= MAX_UNSYNCED_TRANSACTIONS;
 
                 const isBettingClosed =
                   currentDraw === null || getCurrentDraw(button.draws) === null;
                 const isButtonDisabled =
                   isMaintenanceMode ||
                   isBettingClosed ||
-                  hasUnsyncedFromPreviousDraws;
+                  hasUnsyncedFromPreviousDraws ||
+                  hasTooManyUnsynced;
 
                 // Determine button style based on why it's disabled
                 let buttonStyle = styles.button;
@@ -829,7 +870,7 @@ const Home = (props: any) => {
                   if (isMaintenanceMode) {
                     buttonStyle = styles.buttonDisabledMaintenance;
                     textStyle = styles.textStyleDisabled;
-                  } else if (hasUnsyncedFromPreviousDraws) {
+                  } else if (hasUnsyncedFromPreviousDraws || hasTooManyUnsynced) {
                     buttonStyle = styles.buttonDisabledUnsynced;
                     textStyle = styles.textStyleDisabled;
                   } else {
@@ -1020,6 +1061,26 @@ const styles = StyleSheet.create({
     color: Colors.mediumRed,
     fontWeight: 'bold',
     marginTop: 5,
+  },
+  limitWarningContainer: {
+    backgroundColor: '#ffebee',
+    padding: 10,
+    borderRadius: 6,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.mediumRed,
+  },
+  limitWarning: {
+    fontSize: 14,
+    color: Colors.mediumRed,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  limitWarningSubtext: {
+    fontSize: 12,
+    color: Colors.darkGrey,
+    textAlign: 'center',
+    marginTop: 4,
   },
   syncNowButton: {
     backgroundColor: Colors.primaryColor,

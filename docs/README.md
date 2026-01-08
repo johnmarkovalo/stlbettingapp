@@ -13,6 +13,13 @@ Welcome to the BettingApp documentation! This folder contains comprehensive docu
   - Error handling and troubleshooting
   - Usage examples
 
+- **[TRANSAC_SCREEN.md](./TRANSAC_SCREEN.md)** - TransacScreen optimization documentation
+  - Custom hooks (useInputReducer, useSoldoutChecker)
+  - Dirty flag data fetching pattern
+  - Soldout validation hierarchy
+  - Input flow and auto-focus logic
+  - Performance optimizations
+
 - **[OPTIMIZATIONS.md](./OPTIMIZATIONS.md)** - Performance optimizations and improvements
   - Database query optimizations (N+1 fixes, SQL aggregation)
   - API Queue system (rate limiting, deduplication, circuit breaker)
@@ -57,9 +64,11 @@ Welcome to the BettingApp documentation! This folder contains comprehensive docu
 1. Start with **[OPTIMIZATIONS.md](./OPTIMIZATIONS.md)** to understand the architecture
 2. Read **[HISTORY_SYNC.md](./HISTORY_SYNC.md)** for sync feature details
 3. Check **[DATABASE_MODULE.md](./DATABASE_MODULE.md)** for database structure
+4. Review **[TRANSAC_SCREEN.md](./TRANSAC_SCREEN.md)** for transaction screen patterns
 
 ### For Feature Development
 
+- **Transaction Screen**: See [TRANSAC_SCREEN.md](./TRANSAC_SCREEN.md)
 - **Sync Features**: See [HISTORY_SYNC.md](./HISTORY_SYNC.md)
 - **Database Operations**: See [DATABASE_SERVICE_USAGE.md](./DATABASE_SERVICE_USAGE.md)
 - **Performance**: See [OPTIMIZATIONS.md](./OPTIMIZATIONS.md)

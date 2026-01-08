@@ -63,6 +63,9 @@ export const getUnsyncedTransactionsFromPreviousDraws = (
 export const getUnsyncedTransactionsSummary = () =>
   DatabaseService.getInstance().getUnsyncedTransactionsSummary();
 
+export const getTotalUnsyncedCount = () =>
+  DatabaseService.getInstance().getTotalUnsyncedCount();
+
 // Database cleanup and optimization methods
 export const getOldTransactionsForDeletion = (weeksOld: number = 1) =>
   DatabaseService.getInstance().getOldTransactionsForDeletion(weeksOld);
