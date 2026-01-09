@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.10] - Version Code 20
+
+### Changed
+- Refactored Login screen to use standard pincode input instead of QR code scanning
+- Simplified login flow with cleaner UI (logo, pincode input, login button)
+- Removed camera and QR code dependencies from login process
+- Improved login screen styling with modern design
+
+---
+
 ## [2.9] - Version Code 19
 
 ### Added
