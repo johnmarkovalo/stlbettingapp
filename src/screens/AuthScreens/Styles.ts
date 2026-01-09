@@ -12,12 +12,75 @@ const heightScreen = Dimensions.get('window').height;
 const styles = StyleSheet.create({
   backgroundWrapper: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.White,
   },
   mainContainer: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
+  loginContent: {
+    alignItems: 'center',
+    paddingHorizontal: wp(8),
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: hp(4),
+  },
+  logoIcon: {
+    width: 120,
+    height: 120,
+  },
+  loginTitle: {
+    fontSize: 32,
+    fontFamily: 'Nunito-Bold',
+    color: Colors.textBlack,
+    marginBottom: hp(1),
+  },
+  loginSubtitle: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: Colors.darkGrey,
+    marginBottom: hp(4),
+    textAlign: 'center',
+  },
+  inputWrapper: {
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: hp(2),
+  },
+  pincodeInput: {
+    height: 56,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.White,
+    borderColor: Colors.mediumGrey,
+    fontSize: 18,
+    fontFamily: 'Nunito-Medium',
+    color: Colors.textBlack,
+    textAlign: 'center',
+    letterSpacing: 4,
+  },
+  loginButton: {
+    height: 56,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  loginButtonInner: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    fontSize: 18,
+    fontFamily: 'Nunito-ExtraBold',
+    color: Colors.White,
+  },
+  bottomSpacer: {
+    height: hp(10),
+  },
+  // Legacy styles kept for compatibility (can be removed if not used elsewhere)
   containerGroup: {
     alignItems: 'center',
   },
@@ -38,10 +101,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Bold',
     marginLeft: hp(1.5),
     paddingBottom: 5,
-  },
-  logoIcon: {
-    width: 100,
-    height: 100,
   },
   qrIcon: {
     width: 138,
@@ -124,7 +183,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
   },
-
   cameraStyle: {
     position: 'absolute',
     top: 0,
@@ -133,4 +191,5 @@ const styles = StyleSheet.create({
     right: 0,
   },
 });
+
 export default styles;

@@ -9,8 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import {ActivityIndicator, Text} from 'react-native-paper';
-import {useDispatch, useSelector} from 'react-redux';
-import {StackActions, useNavigation} from '@react-navigation/native';
+import {useDispatch} from 'react-redux';
 import FastImage from 'react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Styles from './Styles';
@@ -18,19 +17,9 @@ import Colors from '../../Styles/Colors';
 import Images from '../../Styles/Images';
 import {typesActions, userActions} from '../../store/actions';
 import LinearGradient from 'react-native-linear-gradient';
-import {launchImageLibrary} from 'react-native-image-picker';
-import RNQRGenerator from 'rn-qr-generator';
-import {PermissionsAndroid} from 'react-native';
-import {
-  Camera,
-  useCameraDevice,
-  useCodeScanner,
-} from 'react-native-vision-camera';
 import axios from 'axios';
 import {appConfig} from '../../config/appConfig';
-import _ from 'lodash';
-import {checkInternetConnection, formatBetTypes} from '../../helper';
-import debounce from 'lodash/debounce';
+import {formatBetTypes} from '../../helper';
 import {syncBetTypesAPI} from '../../helper/api';
 import {insertTypes} from '../../database';
 
@@ -38,68 +27,20 @@ interface LoginScreenProps {
   navigation: any;
 }
 
-const LoginScreen = (props: LoginScreenProps) => {
-  const internetStatusCheck = useRef(checkInternetConnection());
-  const [showLogin, setShowLogin] = useState(false);
+const LoginScreen: React.FC<LoginScreenProps> = () => {
   const dispatch = useDispatch();
+  const [pinCode, setPinCode] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
-  const [showQRCam, setShowQRCam] = useState(false);
-  const [enableQRCam, setEnableQRCam] = useState(false);
-  const [pinCode, onChangePinCode] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const cameraDevice = useCameraDevice('back');
+  const inputRef = useRef<TextInput>(null);
 
-  async function requestCameraPermission() {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-        {
-          title: 'Camera Permission',
-          message: 'App needs access to your camera.',
-          buttonPositive: 'OK',
-        },
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log('Camera permission granted');
-        // You can now proceed to use the camera
-      } else {
-        console.log('Camera permission denied');
-        // Handle denied permission
-      }
-    } catch (err) {
-      console.warn(err);
-    }
-  }
+  useEffect(() => {
+    // Auto focus the input on mount
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 500);
 
-  function handleSubmit() {
-    Keyboard.dismiss();
-    AsyncStorage.removeItem('API_URL');
-    if (pinCode.length && !loggingIn) {
-      try {
-        setLoggingIn(true);
-        axios
-          .post(appConfig.apiUrl + 'login', {
-            pinCode: pinCode,
-          })
-          .then((response: any) => {
-            console.log(response.data);
-            if (response?.data?.token) {
-              syncSettings(response.data.token);
-              dispatch(
-                userActions.login(response.data.agent, response.data.token),
-              );
-              setLoggingIn(false);
-            } else {
-              Alert.alert('Error', 'Invalid QR code');
-            }
-          });
-      } catch (e: any) {
-        Alert.alert('Error', e.message || 'An error occurred');
-      }
-    } else {
-      Alert.alert('Error', 'Username & password are required');
-    }
-  }
+    return () => clearTimeout(timer);
+  }, []);
 
   async function syncSettings(token: string) {
     const types = await syncBetTypesAPI(token);
@@ -110,144 +51,41 @@ const LoginScreen = (props: LoginScreenProps) => {
     }
   }
 
-  useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => setKeyboardVisible(true),
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => setKeyboardVisible(false),
-    );
-
-    requestCameraPermission();
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
-  const uploadQR = async () => {
-    setEnableQRCam(false);
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-    });
-
-    if (result.assets && result.assets.length > 0) {
-      RNQRGenerator.detect({
-        uri: result.assets[0].uri,
-      })
-        .then(response => {
-          const {values} = response; // Array of detected QR code values. Empty if nothing found.
-          console.log(values);
-          if (values && values.length > 0) {
-            const qr_token = values[0];
-            processQR(qr_token);
-          } else {
-            alert('Cannot detect QR code in image');
-          }
-        })
-        .catch(error => {
-          console.log(error);
-          alert('Cannot detect QR code in image');
-        });
+  async function handleLogin() {
+    Keyboard.dismiss();
+    
+    if (!pinCode.trim()) {
+      Alert.alert('Error', 'Please enter your pincode');
+      return;
     }
-  };
 
-  const processQR = async (qr_token: string) => {
+    if (loggingIn) {
+      return;
+    }
+
     setLoggingIn(true);
-    console.log('processQR');
-    setTimeout(function () {
-      console.log('timeout');
-      try {
-        console.log('axios');
-        axios
-          .post(appConfig.apiUrl + 'login', {
-            encodedString: qr_token,
-          })
-          .then((response: any) => {
-            console.log(response.data);
-            if (response?.data?.token) {
-              dispatch(
-                userActions.login(response.data.agent, response.data.token),
-              );
-              setLoggingIn(false);
-            } else {
-              setLoggingIn(false);
-              alert('Invalid QR code');
-            }
-          });
-      } catch (e) {
-        alert(e.message);
+    AsyncStorage.removeItem('API_URL');
+
+    try {
+      const response = await axios.post(appConfig.apiUrl + 'login', {
+        pinCode: pinCode.trim(),
+      });
+
+      if (response?.data?.token) {
+        syncSettings(response.data.token);
+        dispatch(userActions.login(response.data.agent, response.data.token));
+      } else {
+        Alert.alert('Error', 'Invalid pincode');
       }
-    }, 1000);
-  };
-
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr'],
-    onCodeScanned: codes => {
-      if (!internetStatusCheck.current.isConnected()) {
-        Alert.alert('No internet connection');
-      }
-      setEnableQRCam(false);
-      if (codes[0].value[codes[0].value.length - 12] === ':') {
-        setEnableQRCam(false);
-        setTimeout(async () => {
-          setShowQRCam(false);
-          console.log('timeout');
-        }, 300);
-        codes[0].value = codes[0].value.substring(
-          0,
-          codes[0].value.length - 12,
-        );
-        debouncedProcessQr(codes[0].value as string);
-      } else Alert.alert('Invalid QR code');
-    },
-  });
-
-  const debouncedProcessQr = debounce(processQR, 200);
-
-  const hideQRCam = () => {
-    setShowQRCam(false);
-    setEnableQRCam(false);
-  };
-
-  if (showQRCam) {
-    return (
-      <View style={{flex: 1}}>
-        {cameraDevice && (
-          <Camera
-            codeScanner={codeScanner}
-            style={Styles.cameraStyle}
-            device={cameraDevice}
-            isActive={enableQRCam}
-          />
-        )}
-        <View
-          style={{
-            flex: 1,
-            width: '100%',
-            justifyContent: 'flex-end',
-          }}>
-          <LinearGradient
-            colors={['#104156', '#041F2B']}
-            style={[Styles.loginBtn, {width: '50%'}]}>
-            <TouchableOpacity style={Styles.loginBtnInner} onPress={uploadQR}>
-              <Text style={Styles.loginBtnText}>Select a QR Image</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-          <LinearGradient
-            colors={['#104156', '#041F2B']}
-            style={[Styles.loginBtn, {width: '50%'}]}>
-            <TouchableOpacity
-              style={Styles.loginBtnInner}
-              onPress={() => hideQRCam()}>
-              <Text style={Styles.loginBtnText}>Back</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
-      </View>
-    );
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'An error occurred. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoggingIn(false);
+    }
   }
 
   return (
@@ -255,69 +93,57 @@ const LoginScreen = (props: LoginScreenProps) => {
       <KeyboardAvoidingView
         style={Styles.mainContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View>
-          {!keyboardVisible && (
-            <View style={[Styles.containerGroup, Styles.topBar]}>
-              <FastImage style={Styles.logoIcon} source={Images.zianLogo} />
-            </View>
-          )}
-          <TouchableOpacity
-            onPress={() => {
-              setEnableQRCam(true);
-              setShowQRCam(true);
-            }}
-            style={[Styles.containerGroup, Styles.qrContainer]}>
-            <FastImage
-              style={Styles.qrIcon}
-              source={Images.qrCode}
-              resizeMode={FastImage.resizeMode.contain}
-            />
-          </TouchableOpacity>
-          <View style={[Styles.containerGroup, Styles.qrTextContainer]}>
-            <Text style={Styles.logoText}>{'Login with QR code'}</Text>
-            <TouchableOpacity onPress={() => setShowLogin(true)}>
-              <Text style={Styles.qrText2}>Having trouble.</Text>
-            </TouchableOpacity>
+        <View style={Styles.loginContent}>
+          {/* Logo */}
+          <View style={Styles.logoContainer}>
+            <FastImage style={Styles.logoIcon} source={Images.zianLogo} />
           </View>
-          {showLogin && (
-            <View>
-              <View style={Styles.InputContainer}>
-                <TextInput
-                  style={Styles.loginInput}
-                  onChangeText={onChangePinCode}
-                  value={pinCode}
-                  placeholder="Pincode"
-                  placeholderTextColor={Colors.darkGrey}
-                />
-              </View>
-              <View style={Styles.InputContainer}>
-                <LinearGradient
-                  colors={['#C24B4B', '#FF0000']}
-                  style={Styles.loginBtn}>
-                  <TouchableOpacity
-                    style={Styles.loginBtnInner}
-                    onPress={handleSubmit}>
-                    <Text style={Styles.loginBtnText}>Login</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </View>
-            </View>
-          )}
 
-          {loggingIn && <ActivityIndicator />}
+          {/* Title */}
+          <Text style={Styles.loginTitle}>Welcome</Text>
+          <Text style={Styles.loginSubtitle}>Enter your pincode to continue</Text>
+
+          {/* Pincode Input */}
+          <View style={Styles.inputWrapper}>
+            <TextInput
+              ref={inputRef}
+              style={Styles.pincodeInput}
+              onChangeText={setPinCode}
+              value={pinCode}
+              placeholder="Enter Pincode"
+              placeholderTextColor={Colors.darkGrey}
+              secureTextEntry
+              keyboardType="number-pad"
+              maxLength={10}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+          </View>
+
+          {/* Login Button */}
+          <View style={Styles.inputWrapper}>
+            <LinearGradient
+              colors={[Colors.primaryColor, '#8B0000']}
+              style={Styles.loginButton}>
+              <TouchableOpacity
+                style={Styles.loginButtonInner}
+                onPress={handleLogin}
+                disabled={loggingIn}
+                activeOpacity={0.8}>
+                {loggingIn ? (
+                  <ActivityIndicator color={Colors.White} size="small" />
+                ) : (
+                  <Text style={Styles.loginButtonText}>Login</Text>
+                )}
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
         </View>
-        <View style={[Styles.containerGroup, Styles.bottomBar]}>
-          {/* <FastImage
-            style={Styles.imageLeft}
-            source={Images.leftImage}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-          <FastImage
-            style={Styles.imageRight}
-            source={Images.unidenLogo}
-            resizeMode={FastImage.resizeMode.contain}
-          /> */}
-        </View>
+
+        {/* Bottom spacer for keyboard */}
+        <View style={Styles.bottomSpacer} />
       </KeyboardAvoidingView>
     </View>
   );
