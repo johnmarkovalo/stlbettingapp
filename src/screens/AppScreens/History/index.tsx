@@ -90,6 +90,7 @@ const History: React.FC<any> = ({navigation}) => {
   // Sync state
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const [isReconciling, setIsReconciling] = useState(false);
 
   // Refs
   const internetStatusCheck = useRef(checkInternetConnection());
@@ -197,6 +198,59 @@ const History: React.FC<any> = ({navigation}) => {
 
     await performSync();
   }, [performSync]);
+
+  /**
+   * Handle reconciliation (long press on sync button)
+   * Checks synced transactions against server and fixes missing ones
+   */
+  const handleReconcile = useCallback(async () => {
+    if (isReconciling || historySyncManager.isSyncing()) {
+      return;
+    }
+
+    if (!internetStatusCheck.current.isConnected()) {
+      Alert.alert('Error', 'No internet connection');
+      return;
+    }
+
+    Alert.alert(
+      'Reconcile Sync Status',
+      'This will check all "synced" transactions against the server and fix any that are missing. Continue?',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Reconcile',
+          onPress: async () => {
+            setIsReconciling(true);
+            try {
+              const result = await historySyncManager.reconcileSyncedTransactions(
+                token,
+                progress => {
+                  console.log(`Reconcile progress: ${progress.checked}/${progress.total}`);
+                },
+              );
+
+              if (result.missing > 0) {
+                Alert.alert(
+                  'Reconciliation Complete',
+                  `Found ${result.missing} transactions missing from server.\nThey have been reset for re-sync.\n\nTap Sync to upload them now.`,
+                );
+              } else {
+                Alert.alert(
+                  'Reconciliation Complete',
+                  `Checked ${result.checked} transactions.\nAll are properly synced to server.`,
+                );
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to reconcile transactions');
+            } finally {
+              setIsReconciling(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [isReconciling, token]);
 
   /**
    * Handle pull-to-refresh
@@ -425,14 +479,16 @@ const History: React.FC<any> = ({navigation}) => {
           <View style={styles.headerButtons}>
             <TouchableOpacity
               onPress={handleManualSync}
+              onLongPress={handleReconcile}
+              delayLongPress={800}
               style={styles.syncButton}
-              disabled={isSyncing}>
+              disabled={isSyncing || isReconciling}>
               <MaterialIcon
-                name="sync"
+                name={isReconciling ? 'autorenew' : 'sync'}
                 size={30}
-                style={[styles.syncIcon, isSyncing && {opacity: 0.5}]}
+                style={[styles.syncIcon, (isSyncing || isReconciling) && {opacity: 0.5}]}
               />
-              {isSyncing && (
+              {(isSyncing || isReconciling) && (
                 <View style={styles.syncIndicator}>
                   <ActivityIndicator size="small" color={Colors.primaryColor} />
                 </View>

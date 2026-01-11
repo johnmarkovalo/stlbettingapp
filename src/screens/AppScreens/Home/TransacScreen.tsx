@@ -696,8 +696,21 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               bets,
             };
 
-            await sendTransactionAPI(token, newTransaction);
-            updateTransactionStatus(transactionId, 'synced');
+            try {
+              const response = await sendTransactionAPI(token, newTransaction);
+              // Only mark as synced if server confirmed success
+              if (response?.success === true) {
+                updateTransactionStatus(transactionId, 'synced');
+              } else {
+                // API returned but indicated failure
+                console.warn('Transaction sync failed:', response?.message || 'Unknown error');
+                setUnsyncedCount(prev => prev + 1);
+              }
+            } catch (syncError: any) {
+              // Network or server error - keep as unsynced for later retry
+              console.error('Failed to sync transaction:', syncError?.message || syncError);
+              setUnsyncedCount(prev => prev + 1);
+            }
           } else {
             // If offline, increment unsynced count
             setUnsyncedCount(prev => prev + 1);

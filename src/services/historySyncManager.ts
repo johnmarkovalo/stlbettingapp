@@ -11,6 +11,7 @@ import {
   getTransactionsBulkAPI,
   sendTransactionAPI,
   sendTransactionsBulkAPI,
+  checkTransactionsExistAPI,
 } from '../helper/api';
 import {convertToBets} from '../helper';
 import {processBatch} from '../helper/batchProcessor';
@@ -660,9 +661,13 @@ class HistorySyncManager {
             };
 
             const response = await sendTransactionAPI(params.token, payload);
-            if (response) {
+            // Validate response has success: true, not just that response exists
+            if (response?.success === true) {
               successfulCodes.push(tx.ticketcode);
               uploadedCount++;
+            } else if (response) {
+              // Response exists but success !== true - log the failure
+              console.warn(`⚠️ [SyncManager] Server rejected ${tx.ticketcode}:`, response.message || 'Unknown error');
             }
           } catch (error: any) {
             // If server returns 409 Conflict or indicates duplicate, mark as synced
@@ -713,6 +718,81 @@ class HistorySyncManager {
     this.abortController = null;
     this.currentParams = null;
     this.state = 'idle';
+  }
+
+  /**
+   * Reconcile local "synced" transactions against server
+   * Finds transactions marked as synced locally but missing from server
+   * Resets their status to "printed" for re-upload
+   *
+   * @param token - Auth token
+   * @param onProgress - Optional callback for progress updates
+   * @returns Object with counts of checked, missing, and fixed transactions
+   */
+  async reconcileSyncedTransactions(
+    token: string,
+    onProgress?: (progress: {checked: number; total: number; missing: number}) => void,
+  ): Promise<{checked: number; missing: number; fixed: number}> {
+    const BATCH_SIZE = 500; // Server accepts up to 1000, use 500 for safety
+    const db = DatabaseService.getInstance();
+
+    try {
+      console.log('🔄 [Reconcile] Starting reconciliation...');
+
+      // Get all locally "synced" ticketcodes
+      const syncedTransactions = await db.getTransactionsByStatus('synced');
+      const allTicketcodes = syncedTransactions.map(t => t.ticketcode);
+      const total = allTicketcodes.length;
+
+      if (total === 0) {
+        console.log('✅ [Reconcile] No synced transactions to check');
+        return {checked: 0, missing: 0, fixed: 0};
+      }
+
+      console.log(`📊 [Reconcile] Checking ${total} synced transactions...`);
+
+      const missingCodes: string[] = [];
+      let checked = 0;
+
+      // Process in batches
+      for (let i = 0; i < allTicketcodes.length; i += BATCH_SIZE) {
+        const batch = allTicketcodes.slice(i, i + BATCH_SIZE);
+
+        try {
+          const response = await checkTransactionsExistAPI(token, batch);
+
+          if (response?.success && Array.isArray(response.existing)) {
+            const existingSet = new Set(response.existing);
+            // Find codes in this batch that don't exist on server
+            for (const code of batch) {
+              if (!existingSet.has(code)) {
+                missingCodes.push(code);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`❌ [Reconcile] Batch check failed:`, error);
+          // Continue with next batch rather than failing entirely
+        }
+
+        checked += batch.length;
+        onProgress?.({checked, total, missing: missingCodes.length});
+      }
+
+      // Reset missing transactions to "printed" for re-sync
+      let fixed = 0;
+      if (missingCodes.length > 0) {
+        console.log(`⚠️ [Reconcile] Found ${missingCodes.length} missing transactions, resetting status...`);
+        await db.updateTransactionStatusBatch(missingCodes, 'printed');
+        fixed = missingCodes.length;
+      }
+
+      console.log(`✅ [Reconcile] Complete: checked=${checked}, missing=${missingCodes.length}, fixed=${fixed}`);
+      return {checked, missing: missingCodes.length, fixed};
+    } catch (error) {
+      console.error('❌ [Reconcile] Error during reconciliation:', error);
+      throw error;
+    }
   }
 }
 

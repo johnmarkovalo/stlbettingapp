@@ -363,6 +363,24 @@ class ApiClient {
   }
 
   /**
+   * Check which ticketcodes exist on server (lightweight)
+   * @param token - Auth token
+   * @param ticketcodes - Array of ticketcode strings to check
+   * @returns Object with existing ticketcodes array
+   */
+  async checkTransactionsExist(
+    token: string,
+    ticketcodes: string[],
+  ): Promise<{success: boolean; existing: string[]}> {
+    return this.makeRequest<{success: boolean; existing: string[]}>(
+      'POST',
+      'transactions/check-exists',
+      token,
+      {ticketcodes},
+    );
+  }
+
+  /**
    * Bulk send transactions to server
    * @param token - Auth token
    * @param transactions - Array of transaction objects to sync
@@ -476,6 +494,9 @@ export const checkTransactionAPI = (ticketcode: string, token: string) =>
 // Bulk API methods
 export const getTransactionsBulkAPI = (token: string, ticketcodes: string[]) =>
   apiClient.getTransactionsBulk(token, ticketcodes);
+
+export const checkTransactionsExistAPI = (token: string, ticketcodes: string[]) =>
+  apiClient.checkTransactionsExist(token, ticketcodes);
 
 export const sendTransactionsBulkAPI = (token: string, transactions: any[]) =>
   apiClient.sendTransactionsBulk(token, transactions);
