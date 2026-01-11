@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.0] - Version Code 21
+
+### Fixed
+- Fixed critical bug where transactions were marked as "synced" locally without validating server response
+- Added proper response validation (checks `success === true`) before updating sync status
+- TransacScreen now uses try-catch to handle sync errors gracefully
+
+### Added
+- **Reconciliation feature**: Long-press sync button in History screen to detect and fix falsely synced transactions
+- `checkTransactionsExistAPI` for lightweight server verification (batch check up to 500 ticketcodes)
+- `reconcileSyncedTransactions()` method in historySyncManager for automated sync status repair
+
+### Changed
+- historySyncManager now validates `response.success === true` instead of just checking if response exists
+- Sync button in History screen shows different icon during reconciliation
+
+---
+
 ## [2.10] - Version Code 20
 
 ### Changed
