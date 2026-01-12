@@ -155,6 +155,22 @@ const Setting = (props: any) => {
                 <Text style={styles.cardTitle}>Check for Updates</Text>
               </View>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                navigation.navigate('ResetStatus');
+              }}>
+              <View style={styles.cardAvatar}>
+                <MaterialIcon
+                  name="sync-problem"
+                  size={50}
+                  color={colors.darkGrey}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Reset Sync Status</Text>
+              </View>
+            </TouchableOpacity>
           </View>
           {/* <Text style={styles.cardSubTitle}>{APP_VERSION}</Text> */}
           <TouchableOpacity

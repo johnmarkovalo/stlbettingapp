@@ -213,9 +213,30 @@ export class SQLBuilder {
     status: string,
   ): string {
     const placeholders = ticketcodes.map(() => '?').join(',');
-    return `UPDATE ${TABLES.TRANS} 
-            SET ${COLUMNS.TRANS.STATUS} = ? 
+    return `UPDATE ${TABLES.TRANS}
+            SET ${COLUMNS.TRANS.STATUS} = ?
             WHERE ${COLUMNS.TRANS.TICKETCODE} IN (${placeholders})`;
+  }
+
+  /**
+   * Update all transaction statuses by betdate and bettime
+   * Used for resetting status to 'printed' for re-syncing
+   */
+  static updateTransactionStatusByDateTime(): string {
+    return `UPDATE ${TABLES.TRANS}
+            SET ${COLUMNS.TRANS.STATUS} = ?
+            WHERE ${COLUMNS.TRANS.BETDATE} = ?
+              AND ${COLUMNS.TRANS.BETTIME} = ?`;
+  }
+
+  /**
+   * Get count of transactions by betdate and bettime
+   */
+  static getTransactionCountByDateTime(): string {
+    return `SELECT COUNT(*) as count
+            FROM ${TABLES.TRANS}
+            WHERE ${COLUMNS.TRANS.BETDATE} = ?
+              AND ${COLUMNS.TRANS.BETTIME} = ?`;
   }
 
   // Check for unsynced transactions from previous draws

@@ -15,6 +15,9 @@ export * from './sqlite';
 // Batch syncing methods - access through DatabaseService instance
 import DatabaseService from './DatabaseService';
 
+// Export the singleton instance for direct access
+export const databaseService = DatabaseService.getInstance();
+
 export const getUnsyncedTransactionsCount = (
   betdate: string,
   bettime: number,

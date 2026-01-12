@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [3.1] - Version Code 22
+
+### Added
+- **Reset Sync Status feature**: New screen accessible from Settings to reset transaction sync status
+- Date and draw time selector for filtering transactions by specific date and draw (1st Draw 2PM, 2nd Draw 5PM, 3rd Draw 9PM)
+- Transaction count preview before reset operation
+- `getTransactionCountByDateTime()` method in DatabaseService to count transactions by date and draw
+- `updateTransactionStatusByDateTime()` method in DatabaseService to batch update transaction status
+- SQL query builders `getTransactionCountByDateTime()` and `updateTransactionStatusByDateTime()` in SQLBuilder
+- Confirmation dialog with transaction count before resetting status
+- Reset Status navigation route in BottomTabNavigator
+
+### Changed
+- Settings screen now includes "Reset Sync Status" menu item with sync-problem icon
+- Reset Status feature allows users to change transaction status from "synced" back to "printed" for re-syncing
+
+---
+
 ## [3.0] - Version Code 21
 
 ### Fixed

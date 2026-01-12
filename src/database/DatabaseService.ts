@@ -613,6 +613,65 @@ export class DatabaseService {
     });
   }
 
+  /**
+   * Update all transaction statuses by betdate and bettime
+   * Used for resetting status to 'printed' for re-syncing
+   */
+  public async updateTransactionStatusByDateTime(
+    betdate: string,
+    bettime: number,
+    status: string,
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.updateTransactionStatusByDateTime(),
+          [status, betdate, bettime],
+          (tx: DatabaseTransaction, results: any) => {
+            const rowsAffected = results.rowsAffected || 0;
+            console.log(
+              `Updated ${rowsAffected} transactions to status '${status}' for ${betdate} draw ${bettime}`,
+            );
+            resolve(rowsAffected);
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error updating transaction status by date/time:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
+  /**
+   * Get count of transactions by betdate and bettime
+   */
+  public async getTransactionCountByDateTime(
+    betdate: string,
+    bettime: number,
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: DatabaseTransaction) => {
+        tx.executeSql(
+          SQLBuilder.getTransactionCountByDateTime(),
+          [betdate, bettime],
+          (tx: DatabaseTransaction, results: ResultSetRowList) => {
+            try {
+              const count = results.rows.item(0).count;
+              resolve(count);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (tx: DatabaseTransaction, error: DatabaseError) => {
+            console.error('Error getting transaction count by date/time:', error);
+            reject(error);
+          },
+        );
+      });
+    });
+  }
+
   // Check for unsynced transactions from previous draws
   public async getUnsyncedTransactionsFromPreviousDraws(
     currentDate: string,

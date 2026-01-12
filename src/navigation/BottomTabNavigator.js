@@ -14,6 +14,7 @@ import History from '../screens/AppScreens/History';
 import Result from '../screens/AppScreens/Result';
 import Setting from '../screens/AppScreens/Setting';
 import PrinterSetup from '../screens/AppScreens/Setting/PrinterSetup';
+import ResetStatus from '../screens/AppScreens/Setting/ResetStatus';
 
 const navigationRef = React.createRef();
 
@@ -70,6 +71,7 @@ const SettingStacks = () => {
       }}>
       <SettingStack.Screen name="Setting" component={Setting} />
       <SettingStack.Screen name="PrinterSetup" component={PrinterSetup} />
+      <SettingStack.Screen name="ResetStatus" component={ResetStatus} />
     </SettingStack.Navigator>
   );
 };

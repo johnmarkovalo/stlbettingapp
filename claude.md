@@ -2,13 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Last Updated:** 2026-01-12
+> **Last Updated:** 2026-01-13
 > **Updated By:** Claude
 
 > **IMPORTANT:** Always update this file when making major changes to the codebase (new features, API changes, architectural changes, new services, etc.). Add entries to "Recent Changes" and update relevant sections.
 
 ## Recent Changes
 <!-- Claude appends here when making updates -->
+- 2026-01-13: Added Reset Sync Status feature - new screen in Settings to reset transaction status from "synced" back to "printed" for re-syncing by date and draw
 - 2026-01-12: Added Ecosystem Integration section showing relationship with ZianAdmin and zian-api
 - 2026-01-12: Fixed transaction sync bug - added response validation before marking as synced; added reconciliation feature (long-press sync button in History)
 - 2026-01-11: Initial comprehensive summary created with full architecture documentation and backend integration
@@ -204,6 +205,8 @@ BettingApp/
 │   │   │       ├── index.tsx      # Settings screen
 │   │   │       ├── PrinterSetup/
 │   │   │       │   └── index.tsx  # Printer configuration
+│   │   │       ├── ResetStatus/
+│   │   │       │   └── index.tsx  # Reset sync status screen
 │   │   │       └── Styles.ts
 │   │   └── AuthScreens/
 │   │       ├── LoginScreen.tsx    # Login/PIN entry screen
@@ -337,6 +340,8 @@ BettingApp/
 | `transactionExists()` | Existence check |
 | `batchInsertTransactions()` | Batch insert from server |
 | `updateTransactionStatusBatch()` | Batch status update |
+| `updateTransactionStatusByDateTime()` | Update status by date and draw time (for reset feature) |
+| `getTransactionCountByDateTime()` | Count transactions by date and draw time |
 | `insertTransaction()` | Insert with duplicate detection |
 | `getActiveMaintenanceSchedule()` | Check maintenance period |
 | `cleanupOldData()` | Delete old records |
@@ -414,7 +419,8 @@ RootNavigator
     ├── Home → Transaction entry, bet creation
     ├── History → Transaction history, sync
     ├── Result → Draw results, winners
-    └── Setting → Printer setup, logout
+    └── Setting → Printer setup, reset sync status, logout
+        └── ResetStatus → Reset transaction sync status by date/draw
 ```
 
 ---
@@ -547,6 +553,13 @@ Create transaction → Add bets → Calculate amounts → Print receipt → Sync
 - Check by ticketcode (unique)
 - Check by trans_data within 4 seconds
 
+### 4. Reset Sync Status Feature
+- Allows resetting transaction status from "synced" back to "printed"
+- Filter by date and draw time (1st Draw 2PM, 2nd Draw 5PM, 3rd Draw 9PM)
+- Preview transaction count before reset
+- Useful for re-syncing transactions that failed to sync or were incorrectly marked as synced
+- Accessible from Settings → Reset Sync Status
+
 ---
 
 ## CRITICAL: React Hooks Checklist
@@ -632,6 +645,7 @@ __tests__/
 | New Redux reducer/action | Added `voicemail.reducer.ts` | Update Redux Store section |
 | New SQLite table | Added `audit_log` table | Update Database section |
 | New screen/navigation | Added `ReportsScreen` | Update Navigation Structure |
+| New database method | Added `updateTransactionStatusByDateTime()` | Update DatabaseService Methods table |
 | New API endpoint | Added bulk delete | Update API Endpoints section |
 | New service | Added `printService.ts` | Update Services section |
 | Directory structure change | New folder added | Update Directory Structure |
