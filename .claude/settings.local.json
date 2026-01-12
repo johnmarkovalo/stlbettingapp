@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(cat:*)",
+      "Bash(+------+-------+ +------+-------+ +------+-------+)",
+      "Bash(__NEW_LINE__)",
+      "Bash(Transactions)",
+      "Bash(Proxy Requests)",
+      "Bash(+----------------------)",
+      "Bash(Results)",
+      "Bash(Dashboard Data)",
+      "Bash(Sold-outs)",
+      "Bash(Agent Management)",
+      "Bash(node:*)"
+    ]
+  }
+}

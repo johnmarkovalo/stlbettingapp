@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Recent Changes
 <!-- Claude appends here when making updates -->
+- 2026-01-12: Added Ecosystem Integration section showing relationship with ZianAdmin and zian-api
 - 2026-01-12: Fixed transaction sync bug - added response validation before marking as synced; added reconciliation feature (long-press sync button in History)
 - 2026-01-11: Initial comprehensive summary created with full architecture documentation and backend integration
 
@@ -18,7 +19,85 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 BettingApp is a React Native betting application built with TypeScript, Redux, SQLite, and React Navigation. It handles transactions, bets, results, and integrates with thermal printers for receipt printing. The app operates in an offline-first architecture with sync capabilities to the **zian-api** Laravel backend.
 
-**Backend Project:** `../zian-api/` (sibling directory)
+**Project Role:** Mobile Betting Application (Android/iOS)
+**Backend API:** `../zian-api/` (sibling directory)
+**Admin Portal:** `../ZianAdmin/` (sibling directory)
+
+---
+
+## Ecosystem Integration
+
+### Project Relationships
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Zian Gaming Ecosystem                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│   ┌──────────────┐        ┌──────────────┐        ┌──────────────┐     │
+│   │  BettingApp  │        │  ZianAdmin   │        │   zian-api   │     │
+│   │  (Mobile)    │        │  (Admin)     │        │  (Backend)   │     │
+│   │  ★ YOU ARE   │        │              │        │              │     │
+│   │    HERE      │        │              │        │              │     │
+│   └──────┬───────┘        └──────┬───────┘        └──────┬───────┘     │
+│          │                       │                        │             │
+│          │    Transactions       │    Proxy Requests      │             │
+│          ├──────────────────────►├──────────────────────►│             │
+│          │    Results            │    Dashboard Data      │             │
+│          ├──────────────────────►├──────────────────────►│             │
+│          │    Sold-outs          │    Agent Management    │             │
+│          ├──────────────────────►├──────────────────────►│             │
+│          │                       │                        │             │
+│          │         Direct API Calls (v2 endpoints)        │             │
+│          └───────────────────────────────────────────────►│             │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### BettingApp's Role in the Ecosystem
+
+| Responsibility | Description |
+|----------------|-------------|
+| **Transaction Creation** | Creates bets locally, syncs to zian-api |
+| **Offline-First** | Works without internet, syncs when available |
+| **Receipt Printing** | Prints tickets via thermal printer |
+| **Results Display** | Fetches and displays draw results |
+| **Sold-out Enforcement** | Blocks bets on sold-out combinations |
+
+### Data Flow Summary
+
+| Data Type | Direction | Flow |
+|-----------|-----------|------|
+| **Transactions** | App → API | Create locally → Print → Sync to zian-api |
+| **Results** | API → App | zian-api (auto-scraped) → App fetches |
+| **Sold-outs** | API → App | zian-api (auto-calculated) → App enforces |
+| **Bet Types** | API → App | Admin configures → API stores → App fetches |
+| **Agent Config** | API → App | Admin manages → API stores → App uses keycode |
+
+### API Endpoints Used (v2)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /v2/login` | Employee authentication |
+| `GET /v2/betTypes` | Fetch bet type configurations |
+| `GET /v2/soldOuts` | Fetch sold-out combinations |
+| `POST /v2/transactions` | Submit new transaction |
+| `POST /v2/transactions/bulk` | Bulk fetch transactions |
+| `POST /v2/transactions/bulk-sync` | Bulk sync transactions |
+| `GET /v2/results/{type}/draws/{draw}` | Fetch draw results |
+
+### Shared Database Tables (on zian-api)
+
+| Table | BettingApp Usage |
+|-------|------------------|
+| `employees` | Login authentication |
+| `transaction` | Sync destination |
+| `bet` | Bet details |
+| `results` | Draw results |
+| `sold_outs` | Combination blocking |
+| `settings` | Bet type configuration |
+
+---
 
 ## Commands
 
