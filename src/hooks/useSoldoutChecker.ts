@@ -8,7 +8,9 @@
  * 3. 15-minute Limit (50) - within cutoff only
  *
  * IMPORTANT: The 750 limit includes:
- * - Existing transactions from database (via posCombinationCap from Redux)
+ * - ALL existing transactions from database (synced + unsynced) via posCombinationCap from Redux
+ *   - The getPOSCombinationAmounts query includes ALL transactions regardless of status
+ *   - This prevents agents from exceeding quota across multiple offline transactions
  * - Current bets in the transaction being created (via currentBets prop)
  */
 

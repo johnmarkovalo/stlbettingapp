@@ -104,7 +104,7 @@ const widthScreen = Dimensions.get('window').width;
 const REFRESH_INTERVAL = 60000; // 60 seconds (reduced from 30s)
 const DRAW_CHECK_INTERVAL = 30000; // 30 seconds
 const MAX_BETS_PER_TRANSACTION = 10; // Maximum bets allowed per transaction
-const MAX_UNSYNCED_TRANSACTIONS = 15; // Maximum unsynced transactions before blocking new ones
+const MAX_UNSYNCED_TRANSACTIONS = 5; // Maximum unsynced transactions before blocking new ones (reduced from 15 to prevent quota violations)
 
 // ============================================================================
 // Component
@@ -750,7 +750,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     // ========================================
     // Soldouts Fetch
     // ========================================
-    const fetchSoldouts = useCallback(async () => {
+    const fetchSoldouts = useCallback(async (showAlert: boolean = false) => {
       if (!internetStatusCheck.current.isConnected()) return;
 
       setIsLoadingSoldouts(true);
@@ -759,9 +759,20 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
         if (soldoutsData) {
           dispatch(localSoldOutsActions.updateServerSoldouts(soldoutsData));
           clearCache(); // Clear cache when soldouts update
+        } else if (showAlert) {
+          Alert.alert(
+            'Warning',
+            'Failed to fetch sold-out data. Some combinations may be unavailable.',
+          );
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching soldouts:', error);
+        if (showAlert) {
+          Alert.alert(
+            'Warning',
+            'Failed to fetch sold-out data. Please check your connection.',
+          );
+        }
       } finally {
         setIsLoadingSoldouts(false);
       }
@@ -786,7 +797,8 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           previousDrawRef.current = draw;
 
           if (!hasInitialSync.current || drawChanged) {
-            await fetchSoldouts();
+            // Show alert only on initial sync, not on periodic draw changes
+            await fetchSoldouts(!hasInitialSync.current);
             hasInitialSync.current = true;
             markDataDirty(); // Mark dirty on draw change
           }

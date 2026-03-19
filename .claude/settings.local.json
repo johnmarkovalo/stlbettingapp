@@ -16,7 +16,14 @@
       "Bash(Dashboard Data)",
       "Bash(Sold-outs)",
       "Bash(Agent Management)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(.gradlew.bat assembleDebug:*)",
+      "Bash(cmd /c \"gradlew.bat assembleDebug\")"
+    ],
+    "additionalDirectories": [
+      "d:\\WORK\\Zian\\Repositories\\BettingApp-Native\\gradle",
+      "d:\\WORK\\Zian\\Repositories\\BettingApp-Native\\app"
     ]
   }
 }

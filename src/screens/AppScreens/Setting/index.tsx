@@ -77,16 +77,32 @@ const Setting = (props: any) => {
       Alert.alert('Error', 'Slow internet connection');
       return;
     }
-    const types = await syncBetTypesAPI(token);
-    if (types) {
-      insertTypes(types);
-      Alert.alert('Success', 'Settings are synced');
-      dispatch(typesActions.update(formatBetTypes(types)));
-    }
 
-    const soldouts = await getSoldOutsAPI(token);
-    if (soldouts) {
-      dispatch(localSoldOutsActions.updateServerSoldouts(soldouts));
+    try {
+      const types = await syncBetTypesAPI(token);
+      if (types && types.length > 0) {
+        insertTypes(types);
+        dispatch(typesActions.update(formatBetTypes(types)));
+
+        const soldouts = await getSoldOutsAPI(token);
+        if (soldouts) {
+          dispatch(localSoldOutsActions.updateServerSoldouts(soldouts));
+        }
+
+        Alert.alert('Success', 'Settings are synced');
+      } else {
+        Alert.alert(
+          'Sync Failed',
+          'No settings data received from server. Please try again.',
+        );
+      }
+    } catch (error: any) {
+      console.error('Sync settings error:', error);
+      const errorMessage =
+        error?.response?.status === 401
+          ? 'Session expired. Please log in again.'
+          : 'Failed to sync settings. Please check your connection and try again.';
+      Alert.alert('Sync Failed', errorMessage);
     }
   };
 

@@ -43,11 +43,24 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
   }, []);
 
   async function syncSettings(token: string) {
-    const types = await syncBetTypesAPI(token);
-    if (types) {
-      insertTypes(types);
-      Alert.alert('Success', 'Settings are synced');
-      dispatch(typesActions.update(formatBetTypes(types)));
+    try {
+      const types = await syncBetTypesAPI(token);
+      if (types && types.length > 0) {
+        insertTypes(types);
+        Alert.alert('Success', 'Settings are synced');
+        dispatch(typesActions.update(formatBetTypes(types)));
+      } else {
+        Alert.alert(
+          'Sync Warning',
+          'Login successful but failed to load bet types. Please go to Settings and tap "Sync Settings".',
+        );
+      }
+    } catch (error: any) {
+      console.error('Sync settings error:', error);
+      Alert.alert(
+        'Sync Warning',
+        'Login successful but failed to sync settings. Please go to Settings and tap "Sync Settings".',
+      );
     }
   }
 

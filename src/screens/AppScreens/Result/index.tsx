@@ -160,9 +160,21 @@ const Result: React.FC<any> = ({navigation}) => {
             title: 'Scanned Ticket',
             message: response.message as string,
           });
+        } else {
+          Alert.alert(
+            'Scan Failed',
+            'Unable to verify ticket. Please try again.',
+          );
         }
       } catch (e: any) {
-        console.error(e?.message || 'Unknown error');
+        console.error('QR scan error:', e?.message || 'Unknown error');
+        const errorMessage =
+          e?.response?.status === 401
+            ? 'Session expired. Please log in again.'
+            : e?.response?.status === 404
+              ? 'Ticket not found in the system.'
+              : 'Failed to verify ticket. Please check your connection.';
+        Alert.alert('Scan Failed', errorMessage);
       }
     },
     [token],
@@ -316,14 +328,23 @@ const Result: React.FC<any> = ({navigation}) => {
               handleEmptyResult();
             }
           }
-        } catch (syncError) {
+        } catch (syncError: any) {
           console.error('❌ Error syncing with server:', syncError);
           // Fallback to local result if server sync fails
           if (localResult) {
             setResult(localResult);
             await getNewWinners(localResult);
+            // Inform user that results might be outdated
+            Alert.alert(
+              'Sync Warning',
+              'Could not fetch latest results. Showing cached data.',
+            );
           } else {
             handleEmptyResult();
+            Alert.alert(
+              'Sync Failed',
+              'Could not fetch results. Please check your connection.',
+            );
           }
         }
       } else if (localResult) {
@@ -334,9 +355,10 @@ const Result: React.FC<any> = ({navigation}) => {
         // No internet and no local result
         handleNoInternet();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Result fetchData error:', error);
       handleEmptyResult();
+      Alert.alert('Error', 'Failed to load results. Please try again.');
     } finally {
       setRefresh(false);
       lastFetchTime.current = Date.now();

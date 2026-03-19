@@ -407,6 +407,12 @@ export class SQLBuilder {
   /**
    * Get POS combination amounts aggregated directly in SQL (for entire draw)
    * This calculates target and rambol amounts grouped by bet number for the entire draw
+   * 
+   * IMPORTANT: This query includes ALL transactions regardless of status (synced, saved, printed).
+   * This ensures that unsynced transactions are included in the quota check to prevent
+   * agents from exceeding the 750 limit per combo across multiple offline transactions.
+   * 
+   * No status filter is applied - all transactions for the draw are included.
    */
   static getPOSCombinationAmounts(
     betdate: string,
@@ -422,6 +428,7 @@ export class SQLBuilder {
               AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
               AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
               AND ${TABLES.BET}.${COLUMNS.BET.TARGET} > 0
+              -- Note: No status filter - includes all transactions (synced + unsynced)
             GROUP BY ${TABLES.BET}.${COLUMNS.BET.BETNUMBER}
             
             UNION ALL
@@ -435,6 +442,7 @@ export class SQLBuilder {
               AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTIME} = ?
               AND ${TABLES.TRANS}.${COLUMNS.TRANS.BETTYPEID} = ?
               AND ${TABLES.BET}.${COLUMNS.BET.RAMBOL} > 0
+              -- Note: No status filter - includes all transactions (synced + unsynced)
             GROUP BY ${TABLES.BET}.${COLUMNS.BET.BETNUMBERR}`;
   }
 
