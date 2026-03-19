@@ -8,8 +8,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
-import Colors from '../Styles/Colors';
+import Icon from './shared/Icon';
+import {palette} from '../theme/colors';
 import Bet from '../models/Bet';
 import Transaction from '../models/Transaction';
 import {TransactionBetItem} from './TransactionBetItem';
@@ -165,12 +165,12 @@ const TransactionBets: React.FC<TransactionBetsProps> = React.memo(
           disabled={isPrinting || !fullTransaction}>
           {isPrinting ? (
             <View style={styles.buttonContent}>
-              <ActivityIndicator size="small" color={Colors.White} />
+              <ActivityIndicator size="small" color={palette.white} />
               <Text style={styles.printButtonText}>Printing...</Text>
             </View>
           ) : (
             <View style={styles.buttonContent}>
-              <MaterialIcon name="print" size={20} color={Colors.White} />
+              <Icon name="Printer" size={20} color={palette.white} weight="bold" />
               <Text style={styles.printButtonText}>Print Transaction</Text>
             </View>
           )}
@@ -198,20 +198,20 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 20,
-    color: Colors.Black,
+    color: palette.gray[900],
     marginRight: 5,
   },
   totalAmount: {
     fontWeight: 'bold',
     fontSize: 30,
-    color: Colors.mediumGreen,
+    color: palette.success[500],
   },
   listContainer: {
     flexGrow: 1,
     paddingHorizontal: 10,
   },
   printButton: {
-    backgroundColor: Colors.primaryColor,
+    backgroundColor: palette.primary[500],
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   printButtonText: {
-    color: Colors.White,
+    color: palette.white,
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,

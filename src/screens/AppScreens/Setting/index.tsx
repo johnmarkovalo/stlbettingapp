@@ -4,15 +4,20 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
 
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Styles from './Styles';
-import colors from '../../../Styles/Colors';
+import {palette} from '../../../theme/colors';
+import {fontFamily, fontSize} from '../../../theme/typography';
+import {spacing, borderRadius} from '../../../theme/spacing';
+import {shadows} from '../../../theme/shadows';
+import Icon from '../../../components/shared/Icon';
+import ListItem from '../../../components/shared/ListItem';
+import Divider from '../../../components/shared/Divider';
+import Card from '../../../components/shared/Card';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -40,7 +45,6 @@ interface RootState {
   };
 }
 
-const widthScreen = Dimensions.get('window').width;
 const Setting = (props: any) => {
   const internetStatusCheck = useRef(checkInternetConnection());
   const {navigation} = props;
@@ -112,167 +116,114 @@ const Setting = (props: any) => {
         <View style={Styles.headerContainer}>
           <Text style={Styles.logoText}>{'Settings'}</Text>
         </View>
-        <View style={styles.container}>
-          <View style={styles.cardList}>
-            <View style={styles.card}>
-              <View style={styles.cardAvatar}>
-                <MaterialIcon
-                  name="account-circle"
-                  size={50}
-                  color={colors.darkGrey}
-                />
+
+        <ScrollView style={styles.scrollContent}>
+          {/* Profile Card */}
+          <Card style={styles.profileCard}>
+            <View style={styles.profileRow}>
+              <View style={styles.profileAvatar}>
+                <Icon name="UserCircle" size={44} color={palette.primary[500]} weight="fill" />
               </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>{agent.agent_name}</Text>
-                <Text style={styles.cardSubTitle}>{agent.agent_series}</Text>
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>{agent.agent_name}</Text>
+                <Text style={styles.profileSeries}>{agent.agent_series}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => {
-                syncBetTypes();
-              }}>
-              <View style={styles.cardAvatar}>
-                <MaterialIcon
-                  name="cloud-sync"
-                  size={50}
-                  color={colors.darkGrey}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Sync Settings</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => {
-                navigation.navigate('PrinterSetup');
-              }}>
-              <View style={styles.cardAvatar}>
-                <MaterialIcon name="print" size={50} color={colors.darkGrey} />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Printer Setup</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => {
-                manualUpdateCheck();
-              }}>
-              <View style={styles.cardAvatar}>
-                <MaterialIcon
-                  name="system-update"
-                  size={50}
-                  color={colors.darkGrey}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Check for Updates</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => {
-                navigation.navigate('ResetStatus');
-              }}>
-              <View style={styles.cardAvatar}>
-                <MaterialIcon
-                  name="sync-problem"
-                  size={50}
-                  color={colors.darkGrey}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Reset Sync Status</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-          {/* <Text style={styles.cardSubTitle}>{APP_VERSION}</Text> */}
-          <TouchableOpacity
-            style={styles.buttonStyle}
-            onLongPress={() => {
-              logout();
-            }}>
-            <Text style={styles.cardSubTitle}>{APP_VERSION}</Text>
-            {/* <Text style={styles.buttonTextStyle}>Logout</Text> */}
-          </TouchableOpacity>
-        </View>
+          </Card>
+
+          {/* Settings List */}
+          <Card style={styles.settingsCard}>
+            <ListItem
+              title="Sync Settings"
+              subtitle="Sync bet types and sold-outs"
+              icon="CloudArrowDown"
+              iconColor={palette.primary[500]}
+              onPress={syncBetTypes}
+            />
+            <Divider style={styles.listDivider} />
+            <ListItem
+              title="Printer Setup"
+              subtitle="Configure thermal printer"
+              icon="Printer"
+              iconColor={palette.accent[600]}
+              onPress={() => navigation.navigate('PrinterSetup')}
+            />
+            <Divider style={styles.listDivider} />
+            <ListItem
+              title="Check for Updates"
+              subtitle="Download latest version"
+              icon="ArrowSquareUp"
+              iconColor={palette.success[500]}
+              onPress={manualUpdateCheck}
+            />
+            <Divider style={styles.listDivider} />
+            <ListItem
+              title="Reset Sync Status"
+              subtitle="Reset transactions for re-sync"
+              icon="ArrowsClockwise"
+              iconColor={palette.warning[500]}
+              onPress={() => navigation.navigate('ResetStatus')}
+            />
+          </Card>
+        </ScrollView>
+
+        {/* Footer */}
+        <TouchableOpacity
+          style={styles.footer}
+          onLongPress={logout}>
+          <Text style={styles.versionText}>v{APP_VERSION}</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContent: {
     flex: 1,
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[4],
   },
-
-  cardList: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
+  profileCard: {
+    marginBottom: spacing[4],
   },
-
-  card: {
-    height: 65,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignContent: 'center',
+  profileRow: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
-
-  cardAvatar: {
+  profileAvatar: {
+    marginRight: spacing[3],
+  },
+  profileInfo: {
     flex: 1,
-    justifyContent: 'center',
+  },
+  profileName: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.lg,
+    color: palette.gray[900],
+  },
+  profileSeries: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
+    color: palette.gray[500],
+    marginTop: 2,
+  },
+  settingsCard: {
+    paddingHorizontal: 0,
+    paddingVertical: spacing[1],
+  },
+  listDivider: {
+    marginVertical: 0,
+    marginHorizontal: spacing[4],
+  },
+  footer: {
+    paddingVertical: spacing[4],
     alignItems: 'center',
   },
-
-  cardContent: {
-    flex: 4,
-    flexDirection: 'column',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    paddingVertical: 10,
-  },
-
-  cardTitle: {
-    fontSize: 16,
-    color: colors.primaryColor,
-    fontWeight: 'bold',
-  },
-
-  cardSubTitle: {
-    fontSize: 14,
-    color: colors.darkGrey,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-
-  verticalLine: {
-    height: '80%', // Adjust height as needed
-    width: 1,
-    backgroundColor: 'gray',
-  },
-
-  buttonStyle: {
-    width: wp(97),
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: 10,
-    height: 50,
-    // backgroundColor: colors.primaryColor,
-  },
-
-  buttonTextStyle: {
-    fontSize: 30,
-    color: colors.White,
-    fontWeight: 'bold',
-    alignSelf: 'center',
-    textTransform: 'uppercase',
+  versionText: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
+    color: palette.gray[400],
   },
 });
 

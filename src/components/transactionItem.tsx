@@ -1,9 +1,11 @@
 import React from 'react';
 import {TouchableOpacity, Text, StyleSheet, View} from 'react-native';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Transaction from '../models/Transaction';
-import Colors from '../Styles/Colors';
+import {palette} from '../theme/colors';
+import {fontFamily, fontSize} from '../theme/typography';
+import {spacing} from '../theme/spacing';
 import {convertDateTime, formatNumberWithCommas} from '../helper';
+import Badge from './shared/Badge';
 
 interface TransactionItemProps {
   item: Transaction;
@@ -16,42 +18,31 @@ const TransactionItem: React.FC<TransactionItemProps> = React.memo(
       return status === 'synced' || status === 'scanned';
     };
 
-    const renderTicketCode = () => {
-      const isValid = isValidStatus(item.status);
-      return (
-        <Text style={isValid ? styles.numberStyle : styles.syncedNumberStyle}>
-          {item.ticketcode}
-        </Text>
-      );
-    };
-
-    const renderTransactionNumber = () => (
-      <Text style={styles.transactionNumber}>{item.trans_no + '. '}</Text>
-    );
-
-    const renderTransactionInfo = () => (
-      <View style={styles.transactionInfo}>
-        {renderTicketCode()}
-        <Text style={styles.subNumberStyle}>
-          {convertDateTime(item.created_at)}
-        </Text>
-      </View>
-    );
-
-    const renderTotal = () => (
-      <Text style={styles.totalAmount}>
-        {formatNumberWithCommas(item.total)}
-      </Text>
-    );
+    const isSynced = isValidStatus(item.status);
 
     return (
       <View>
         <TouchableOpacity style={styles.container} onPress={onPress}>
           <View style={styles.leftContainer}>
-            {renderTransactionNumber()}
-            {renderTransactionInfo()}
+            <Text style={styles.transactionNumber}>{item.trans_no}. </Text>
+            <View style={styles.transactionInfo}>
+              <View style={styles.ticketRow}>
+                <Text style={styles.numberStyle}>{item.ticketcode}</Text>
+                {isSynced && (
+                  <Badge label="Synced" variant="success" />
+                )}
+                {!isSynced && item.status === 'printed' && (
+                  <Badge label="Printed" variant="warning" />
+                )}
+              </View>
+              <Text style={styles.subNumberStyle}>
+                {convertDateTime(item.created_at)}
+              </Text>
+            </View>
           </View>
-          {renderTotal()}
+          <Text style={styles.totalAmount}>
+            {formatNumberWithCommas(item.total)}
+          </Text>
         </TouchableOpacity>
         <View style={styles.line} />
       </View>
@@ -63,9 +54,8 @@ TransactionItem.displayName = 'TransactionItem';
 
 const styles = StyleSheet.create({
   container: {
-    padding: 5,
-    marginVertical: 0,
-    marginHorizontal: 8,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[2],
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -73,39 +63,43 @@ const styles = StyleSheet.create({
   leftContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   transactionNumber: {
-    color: Colors.darkGrey,
-    fontSize: 25,
+    color: palette.gray[400],
+    fontSize: fontSize.xl,
+    fontFamily: fontFamily.regular,
   },
   transactionInfo: {
     flexDirection: 'column',
+    flex: 1,
   },
-  syncedNumberStyle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.mediumRed,
+  ticketRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
   },
   numberStyle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.Black,
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.bold,
+    color: palette.gray[900],
   },
   subNumberStyle: {
-    fontSize: 14,
-    fontWeight: 'normal',
-    color: Colors.darkGrey,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[500],
+    marginTop: 2,
   },
   totalAmount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.mediumGreen,
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: palette.success[500],
   },
   line: {
     alignSelf: 'center',
     height: 1,
     width: '95%',
-    backgroundColor: Colors.darkGrey,
+    backgroundColor: palette.gray[200],
   },
 });
 

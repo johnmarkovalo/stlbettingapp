@@ -1,9 +1,10 @@
 import React from 'react';
-import {View, Image, Text} from 'react-native';
+import {View, Text, StyleSheet} from 'react-native';
 
-import Images from '../Styles/Images';
-import Colors from '../Styles/Colors';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import {palette} from '../theme/colors';
+import {fontFamily, fontSize} from '../theme/typography';
+import {spacing} from '../theme/spacing';
+import Icon from '../components/shared/Icon';
 
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createStackNavigator} from '@react-navigation/stack';
@@ -32,20 +33,17 @@ export const HomeStacks = () => {
   return (
     <HomeStack.Navigator
       initialRouteName="Home"
-      screenOptions={{
-        headerShown: false,
-      }}>
+      screenOptions={{headerShown: false}}>
       <HomeStack.Screen name="Home" component={Home} />
     </HomeStack.Navigator>
   );
 };
+
 const HistoryStacks = () => {
   return (
     <HistoryStack.Navigator
       initialRouteName="History"
-      screenOptions={{
-        headerShown: false,
-      }}>
+      screenOptions={{headerShown: false}}>
       <HistoryStack.Screen name="History" component={History} />
     </HistoryStack.Navigator>
   );
@@ -55,25 +53,29 @@ const ResultStacks = () => {
   return (
     <ResultStack.Navigator
       initialRouteName="Result"
-      screenOptions={{
-        headerShown: false,
-      }}>
+      screenOptions={{headerShown: false}}>
       <ResultStack.Screen name="Result" component={Result} />
     </ResultStack.Navigator>
   );
 };
+
 const SettingStacks = () => {
   return (
     <SettingStack.Navigator
       initialRouteName="Dial"
-      screenOptions={{
-        headerShown: false,
-      }}>
+      screenOptions={{headerShown: false}}>
       <SettingStack.Screen name="Setting" component={Setting} />
       <SettingStack.Screen name="PrinterSetup" component={PrinterSetup} />
       <SettingStack.Screen name="ResetStatus" component={ResetStatus} />
     </SettingStack.Navigator>
   );
+};
+
+const TAB_CONFIG = {
+  HomeTab: {icon: 'GameController', label: 'Home'},
+  HistoryTab: {icon: 'ListChecks', label: 'History'},
+  ResultTab: {icon: 'Trophy', label: 'Result'},
+  SettingTab: {icon: 'GearSix', label: 'Settings'},
 };
 
 export const BottomTabNavigator = props => {
@@ -83,57 +85,22 @@ export const BottomTabNavigator = props => {
       screenOptions={({route}) => ({
         headerShown: false,
         tabBarIcon: ({focused}) => {
-          let icon;
-          let name;
-          if (route.name === 'HomeTab') {
-            icon = 'dialpad';
-            name = 'Home';
-          } else if (route.name === 'HistoryTab') {
-            icon = 'list';
-            name = 'History';
-          } else if (route.name === 'ResultTab') {
-            icon = 'pin';
-            name = 'Result';
-          } else if (route.name === 'SettingTab') {
-            icon = 'settings';
-            name = 'Settings';
-          }
+          const config = TAB_CONFIG[route.name];
+          const color = focused ? palette.primary[500] : palette.gray[400];
 
           return (
-            <>
-              <View
-                style={{
-                  alignSelf: 'center',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <MaterialIcons
-                  name={icon}
-                  style={{
-                    marginTop: hp(1),
-                    fontSize: 20,
-                    color: focused ? Colors.primaryColor : Colors.mediumGrey,
-                  }}
-                />
-                <Text
-                  style={{
-                    marginTop: hp(1),
-                    fontSize: 12,
-                    fontFamily: 'Nunito-Medium',
-                    color: focused ? Colors.primaryColor : Colors.mediumGrey,
-                  }}>
-                  {name}
-                </Text>
-              </View>
-            </>
+            <View style={styles.tabItem}>
+              <Icon
+                name={config.icon}
+                size={22}
+                color={color}
+                weight={focused ? 'fill' : 'regular'}
+              />
+              <Text style={[styles.tabLabel, {color}]}>{config.label}</Text>
+            </View>
           );
         },
-        tabBarStyle: {
-          height: hp(9),
-          backgroundColor: Colors.White,
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
+        tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
       })}>
       <Tab.Screen name="HomeTab" component={HomeStacks} />
@@ -143,5 +110,26 @@ export const BottomTabNavigator = props => {
     </Tab.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  tabBar: {
+    height: hp(9),
+    backgroundColor: palette.white,
+    borderTopWidth: 1,
+    borderTopColor: palette.gray[200],
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  tabItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing[2],
+  },
+  tabLabel: {
+    marginTop: spacing[1],
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.xs,
+  },
+});
 
 export default BottomTabNavigator;

@@ -13,7 +13,7 @@ import {useDispatch} from 'react-redux';
 import FastImage from 'react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Styles from './Styles';
-import Colors from '../../Styles/Colors';
+import {palette} from '../../theme/colors';
 import Images from '../../Styles/Images';
 import {typesActions, userActions} from '../../store/actions';
 import LinearGradient from 'react-native-linear-gradient';
@@ -124,7 +124,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
               onChangeText={setPinCode}
               value={pinCode}
               placeholder="Enter Pincode"
-              placeholderTextColor={Colors.darkGrey}
+              placeholderTextColor={palette.gray[400]}
               secureTextEntry
               keyboardType="number-pad"
               maxLength={10}
@@ -138,7 +138,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
           {/* Login Button */}
           <View style={Styles.inputWrapper}>
             <LinearGradient
-              colors={[Colors.primaryColor, '#8B0000']}
+              colors={[palette.primary[500], palette.primary[700]]}
               style={Styles.loginButton}>
               <TouchableOpacity
                 style={Styles.loginButtonInner}
@@ -146,7 +146,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                 disabled={loggingIn}
                 activeOpacity={0.8}>
                 {loggingIn ? (
-                  <ActivityIndicator color={Colors.White} size="small" />
+                  <ActivityIndicator color={palette.white} size="small" />
                 ) : (
                   <Text style={Styles.loginButtonText}>Login</Text>
                 )}

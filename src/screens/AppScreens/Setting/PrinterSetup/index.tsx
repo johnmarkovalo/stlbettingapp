@@ -10,9 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
+import Icon from '../../../../components/shared/Icon';
 import Styles from '../Styles';
-import colors from '../../../../Styles/Colors';
+import {palette} from '../../../../theme/colors';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -125,17 +125,17 @@ const PrinterSetup = (props: any) => {
       let row3 = ["Orange", "1", "2.00", "2.00"];
       let row4 = ["Banana", "1", "2.00", "2.00"];
       let row5 = ["Cherry", "1", "2.00", "2.00"];
-      let styles = [
+      let styles2 = [
         { align: PrintAlign.CENTER },
         { align: PrintAlign.CENTER },
         { align: PrintAlign.CENTER },
         { align: PrintAlign.CENTER }
       ];
-      await NyxPrinter.printTableText(row1, weights, styles);
-      await NyxPrinter.printTableText(row2, weights, styles);
-      await NyxPrinter.printTableText(row3, weights, styles);
-      await NyxPrinter.printTableText(row4, weights, styles);
-      await NyxPrinter.printTableText(row5, weights, styles);
+      await NyxPrinter.printTableText(row1, weights, styles2);
+      await NyxPrinter.printTableText(row2, weights, styles2);
+      await NyxPrinter.printTableText(row3, weights, styles2);
+      await NyxPrinter.printTableText(row4, weights, styles2);
+      await NyxPrinter.printTableText(row5, weights, styles2);
       await NyxPrinter.printText("\nOrder Price: \t\t9999.00\n", { align: PrintAlign.CENTER });
       await NyxPrinter.printQrCode(Date.now().toString(), 300, 300, PrintAlign.CENTER);
       await NyxPrinter.printText("\n", {});
@@ -222,31 +222,32 @@ const PrinterSetup = (props: any) => {
         <View style={Styles.headerContainer}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={styles.backButton}>
-            <MaterialIcon name="arrow-back" size={24} color={colors.Black} />
+            style={localStyles.backButton}>
+            <Icon name="ArrowLeft" size={24} color={palette.black} weight="bold" />
           </TouchableOpacity>
           <Text style={Styles.logoText}>{'Printer Setup'}</Text>
-          <View style={styles.placeholder} />
+          <View style={localStyles.placeholder} />
         </View>
-        <ScrollView style={styles.container}>
-          <View style={styles.contentContainer}>
-            <View style={styles.printerContainer}>
-              <View style={styles.printerInfo}>
-                <MaterialIcon
-                  name="print"
+        <ScrollView style={localStyles.container}>
+          <View style={localStyles.contentContainer}>
+            <View style={localStyles.printerContainer}>
+              <View style={localStyles.printerInfo}>
+                <Icon
+                  name="Printer"
                   size={30}
-                  color={colors.primaryColor}
+                  color={palette.primary[500]}
+                  weight="bold"
                 />
-                <View style={styles.printerDetails}>
-                  <Text style={styles.printerName}>Nyx Built-in Printer</Text>
-                  <Text style={styles.printerStatus}>{printerStatus}</Text>
+                <View style={localStyles.printerDetails}>
+                  <Text style={localStyles.printerName}>Nyx Built-in Printer</Text>
+                  <Text style={localStyles.printerStatus}>{printerStatus}</Text>
                   {printerVersion && (
-                    <Text style={styles.printerVersionText}>
+                    <Text style={localStyles.printerVersionText}>
                       Version: {printerVersion}
                     </Text>
                   )}
                   {printerServiceVersion && (
-                    <Text style={styles.printerVersionText}>
+                    <Text style={localStyles.printerVersionText}>
                       Service: {printerServiceVersion}
                     </Text>
                   )}
@@ -254,119 +255,121 @@ const PrinterSetup = (props: any) => {
               </View>
             </View>
 
-            <View style={styles.infoContainer}>
-              <MaterialIcon
-                name="info-outline"
+            <View style={localStyles.infoContainer}>
+              <Icon
+                name="Info"
                 size={24}
-                color={colors.primaryColor}
+                color={palette.primary[500]}
+                weight="bold"
               />
-              <Text style={styles.infoText}>
+              <Text style={localStyles.infoText}>
                 This device uses the built-in Nyx printer. No Bluetooth pairing required.
                 The printer is automatically connected and ready to use.
               </Text>
             </View>
 
             <TouchableOpacity
-              style={[styles.testButton, isPrinting && styles.testButtonDisabled]}
+              style={[localStyles.testButton, isPrinting && localStyles.testButtonDisabled]}
               onPress={handleTestPrint}
               disabled={isPrinting}>
               {isPrinting ? (
-                <View style={styles.buttonContent}>
-                  <ActivityIndicator size="small" color={colors.White} />
-                  <Text style={styles.testButtonText}>Printing...</Text>
+                <View style={localStyles.buttonContent}>
+                  <ActivityIndicator size="small" color={palette.white} />
+                  <Text style={localStyles.testButtonText}>Printing...</Text>
                 </View>
               ) : (
-                <View style={styles.buttonContent}>
-                  <MaterialIcon name="print" size={20} color={colors.White} />
-                  <Text style={styles.testButtonText}>Test Print</Text>
+                <View style={localStyles.buttonContent}>
+                  <Icon name="Printer" size={20} color={palette.white} weight="bold" />
+                  <Text style={localStyles.testButtonText}>Test Print</Text>
                 </View>
               )}
             </TouchableOpacity>
 
             {/* Nyx Printer Demo Section */}
-            <View style={styles.nyxSection}>
+            <View style={localStyles.nyxSection}>
               <TouchableOpacity
-                style={styles.nyxHeader}
+                style={localStyles.nyxHeader}
                 onPress={() => setShowNyxDemo(!showNyxDemo)}>
-                <View style={styles.nyxHeaderContent}>
-                  <MaterialIcon
-                    name={showNyxDemo ? "expand-less" : "expand-more"}
+                <View style={localStyles.nyxHeaderContent}>
+                  <Icon
+                    name={showNyxDemo ? "CaretUp" : "CaretDown"}
                     size={24}
-                    color={colors.primaryColor}
+                    color={palette.primary[500]}
+                    weight="bold"
                   />
-                  <Text style={styles.nyxHeaderText}>Nyx Printer Demo</Text>
+                  <Text style={localStyles.nyxHeaderText}>Nyx Printer Demo</Text>
                 </View>
               </TouchableOpacity>
 
               {showNyxDemo && (
-                <View style={styles.nyxDemoContent}>
-                  <View style={styles.nyxInfoContainer}>
-                    <Text style={styles.nyxInfoText}>
+                <View style={localStyles.nyxDemoContent}>
+                  <View style={localStyles.nyxInfoContainer}>
+                    <Text style={localStyles.nyxInfoText}>
                       Printer Version: {printerVersion || 'Loading...'}
                     </Text>
-                    <Text style={styles.nyxInfoText}>
+                    <Text style={localStyles.nyxInfoText}>
                       Service Version: {printerServiceVersion || 'Loading...'}
                     </Text>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.nyxButton}
+                    style={localStyles.nyxButton}
                     onPress={_nyxPrintTest}>
-                    <MaterialIcon name="print" size={20} color={colors.White} />
-                    <Text style={styles.nyxButtonText}>Print Test Receipt</Text>
+                    <Icon name="Printer" size={20} color={palette.white} weight="bold" />
+                    <Text style={localStyles.nyxButtonText}>Print Test Receipt</Text>
                   </TouchableOpacity>
 
-                  <View style={styles.nyxButtonRow}>
+                  <View style={localStyles.nyxButtonRow}>
                     <TouchableOpacity
-                      style={[styles.nyxButtonSmall, styles.nyxButtonLeft]}
+                      style={[localStyles.nyxButtonSmall, localStyles.nyxButtonLeft]}
                       onPress={_showLcd}>
-                      <Text style={styles.nyxButtonSmallText}>LCD Show</Text>
+                      <Text style={localStyles.nyxButtonSmallText}>LCD Show</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.nyxButtonSmall, styles.nyxButtonRight]}
+                      style={[localStyles.nyxButtonSmall, localStyles.nyxButtonRight]}
                       onPress={_resetLcd}>
-                      <Text style={styles.nyxButtonSmallText}>LCD Reset</Text>
+                      <Text style={localStyles.nyxButtonSmallText}>LCD Reset</Text>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.nyxButtonRow}>
+                  <View style={localStyles.nyxButtonRow}>
                     <TouchableOpacity
-                      style={[styles.nyxButtonSmall, styles.nyxButtonLeft]}
+                      style={[localStyles.nyxButtonSmall, localStyles.nyxButtonLeft]}
                       onPress={_wakeupLcd}>
-                      <Text style={styles.nyxButtonSmallText}>LCD Wakeup</Text>
+                      <Text style={localStyles.nyxButtonSmallText}>LCD Wakeup</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.nyxButtonSmall, styles.nyxButtonRight]}
+                      style={[localStyles.nyxButtonSmall, localStyles.nyxButtonRight]}
                       onPress={_sleepLcd}>
-                      <Text style={styles.nyxButtonSmallText}>LCD Sleep</Text>
+                      <Text style={localStyles.nyxButtonSmallText}>LCD Sleep</Text>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.nyxButtonRow}>
+                  <View style={localStyles.nyxButtonRow}>
                     <TouchableOpacity
-                      style={[styles.nyxButtonSmall, styles.nyxButtonLeft]}
+                      style={[localStyles.nyxButtonSmall, localStyles.nyxButtonLeft]}
                       onPress={_cameraScan}>
-                      <Text style={styles.nyxButtonSmallText}>Camera Scan</Text>
+                      <Text style={localStyles.nyxButtonSmallText}>Camera Scan</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.nyxButtonSmall, styles.nyxButtonRight]}
+                      style={[localStyles.nyxButtonSmall, localStyles.nyxButtonRight]}
                       onPress={_infraredScan}>
-                      <Text style={styles.nyxButtonSmallText}>Infrared Scan</Text>
+                      <Text style={localStyles.nyxButtonSmallText}>Infrared Scan</Text>
                     </TouchableOpacity>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.nyxButton}
+                    style={localStyles.nyxButton}
                     onPress={_openCashBox}>
-                    <MaterialIcon name="account-balance-wallet" size={20} color={colors.White} />
-                    <Text style={styles.nyxButtonText}>Open Cash Box</Text>
+                    <Icon name="Wallet" size={20} color={palette.white} weight="bold" />
+                    <Text style={localStyles.nyxButtonText}>Open Cash Box</Text>
                   </TouchableOpacity>
 
                   {nyxLog && (
-                    <View style={styles.nyxLogContainer}>
-                      <Text style={styles.nyxLogTitle}>Log:</Text>
-                      <ScrollView style={styles.nyxLogScroll}>
-                        <Text style={styles.nyxLogText}>{nyxLog}</Text>
+                    <View style={localStyles.nyxLogContainer}>
+                      <Text style={localStyles.nyxLogTitle}>Log:</Text>
+                      <ScrollView style={localStyles.nyxLogScroll}>
+                        <Text style={localStyles.nyxLogText}>{nyxLog}</Text>
                       </ScrollView>
                     </View>
                   )}
@@ -380,7 +383,7 @@ const PrinterSetup = (props: any) => {
   );
 };
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -395,10 +398,10 @@ const styles = StyleSheet.create({
     width: 34, // Same width as back button to center the title
   },
   printerContainer: {
-    backgroundColor: colors.White,
+    backgroundColor: palette.white,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.mediumGrey,
+    borderColor: palette.gray[300],
     padding: wp(4),
     marginBottom: hp(3),
   },
@@ -412,25 +415,25 @@ const styles = StyleSheet.create({
   },
   printerName: {
     fontSize: 16,
-    color: colors.textColor,
+    color: palette.gray[800],
     fontWeight: 'bold',
     marginBottom: hp(0.5),
   },
   printerStatus: {
     fontSize: 14,
-    color: colors.mediumGreen,
+    color: palette.success[500],
     fontWeight: '500',
     marginTop: hp(0.5),
   },
   printerVersionText: {
     fontSize: 12,
-    color: colors.darkGrey,
+    color: palette.gray[500],
     marginTop: hp(0.3),
   },
   infoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: palette.gray[50],
     padding: wp(4),
     borderRadius: 8,
     marginTop: hp(2),
@@ -438,13 +441,13 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    color: colors.textColor,
+    color: palette.gray[800],
     marginLeft: wp(2),
     flex: 1,
     lineHeight: 20,
   },
   testButton: {
-    backgroundColor: colors.primaryColor,
+    backgroundColor: palette.primary[500],
     paddingVertical: hp(2.5),
     paddingHorizontal: wp(5),
     borderRadius: 8,
@@ -461,22 +464,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   testButtonText: {
-    color: colors.White,
+    color: palette.white,
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: wp(2),
   },
   nyxSection: {
     marginTop: hp(3),
-    backgroundColor: colors.White,
+    backgroundColor: palette.white,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.mediumGrey,
+    borderColor: palette.gray[300],
     overflow: 'hidden',
   },
   nyxHeader: {
     padding: wp(4),
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: palette.gray[50],
   },
   nyxHeaderContent: {
     flexDirection: 'row',
@@ -484,7 +487,7 @@ const styles = StyleSheet.create({
   },
   nyxHeaderText: {
     fontSize: 18,
-    color: colors.textColor,
+    color: palette.gray[800],
     fontWeight: 'bold',
     marginLeft: wp(2),
   },
@@ -492,18 +495,18 @@ const styles = StyleSheet.create({
     padding: wp(4),
   },
   nyxInfoContainer: {
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: palette.gray[50],
     padding: wp(3),
     borderRadius: 8,
     marginBottom: hp(2),
   },
   nyxInfoText: {
     fontSize: 14,
-    color: colors.textColor,
+    color: palette.gray[800],
     marginBottom: hp(0.5),
   },
   nyxButton: {
-    backgroundColor: colors.primaryColor,
+    backgroundColor: palette.primary[500],
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     borderRadius: 8,
@@ -513,7 +516,7 @@ const styles = StyleSheet.create({
     marginBottom: hp(1.5),
   },
   nyxButtonText: {
-    color: colors.White,
+    color: palette.white,
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: wp(2),
@@ -524,7 +527,7 @@ const styles = StyleSheet.create({
   },
   nyxButtonSmall: {
     flex: 1,
-    backgroundColor: colors.primaryColor,
+    backgroundColor: palette.primary[500],
     paddingVertical: hp(1.5),
     paddingHorizontal: wp(3),
     borderRadius: 8,
@@ -538,13 +541,13 @@ const styles = StyleSheet.create({
     marginLeft: wp(1),
   },
   nyxButtonSmallText: {
-    color: colors.White,
+    color: palette.white,
     fontSize: 14,
     fontWeight: '600',
   },
   nyxLogContainer: {
     marginTop: hp(2),
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: palette.gray[50],
     borderRadius: 8,
     padding: wp(3),
     maxHeight: hp(20),
@@ -552,7 +555,7 @@ const styles = StyleSheet.create({
   nyxLogTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: colors.textColor,
+    color: palette.gray[800],
     marginBottom: hp(1),
   },
   nyxLogScroll: {
@@ -560,10 +563,9 @@ const styles = StyleSheet.create({
   },
   nyxLogText: {
     fontSize: 12,
-    color: colors.darkGrey,
+    color: palette.gray[500],
     fontFamily: 'monospace',
   },
 });
 
 export default PrinterSetup;
-

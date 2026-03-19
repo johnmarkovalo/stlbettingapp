@@ -4,6 +4,9 @@ import {StyleSheet, Dimensions} from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import {typesActions} from '../store/actions';
 import BaseModal from './shared/BaseModal';
+import {palette} from '../theme/colors';
+import {fontFamily, fontSize} from '../theme/typography';
+import {borderRadius} from '../theme/spacing';
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -81,22 +84,25 @@ const styles = StyleSheet.create({
     width: widthScreen / 1.5,
     alignSelf: 'center',
     backgroundColor: 'transparent',
-    borderColor: '#ccc',
-    borderRadius: 8,
+    borderColor: palette.gray[300],
+    borderRadius: borderRadius.md,
   },
   dropdownContainer: {
     width: widthScreen / 1.5,
     zIndex: 1000,
     alignSelf: 'center',
-    backgroundColor: 'white',
-    borderColor: '#ccc',
-    borderRadius: 8,
+    backgroundColor: palette.white,
+    borderColor: palette.gray[300],
+    borderRadius: borderRadius.md,
   },
   placeholderStyle: {
-    color: '#999',
+    color: palette.gray[400],
+    fontFamily: fontFamily.regular,
   },
   textStyle: {
-    fontSize: 16,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.medium,
+    color: palette.gray[900],
   },
 });
 

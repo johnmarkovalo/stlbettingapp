@@ -13,13 +13,16 @@ import {
   RefreshControl,
 } from 'react-native';
 
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Styles from './Styles';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import Colors from '../../../Styles/Colors';
+import {palette} from '../../../theme/colors';
+import {fontFamily, fontSize} from '../../../theme/typography';
+import {spacing, borderRadius} from '../../../theme/spacing';
+import {shadows} from '../../../theme/shadows';
+import Icon from '../../../components/shared/Icon';
 import Transaction from '../../../models/Transaction';
 import {TransactionItem} from '../../../components/transactionItem';
 import {checkInternetConnection, formatNumberWithCommas} from '../../../helper';
@@ -313,7 +316,7 @@ const History: React.FC<any> = ({navigation}) => {
   const ListEmptyComponent = useMemo(
     () => (
       <View style={styles.emptyContainer}>
-        <MaterialIcon name="receipt-long" size={60} color={Colors.Black} />
+        <Icon name="Receipt" size={60} color={palette.gray[400]} />
         <Text style={styles.emptyText}>No transactions found</Text>
         <Text style={styles.emptySubText}>
           Transactions will appear here after you place bets
@@ -483,20 +486,21 @@ const History: React.FC<any> = ({navigation}) => {
               delayLongPress={800}
               style={styles.syncButton}
               disabled={isSyncing || isReconciling}>
-              <MaterialIcon
-                name={isReconciling ? 'autorenew' : 'sync'}
-                size={30}
-                style={[styles.syncIcon, (isSyncing || isReconciling) && {opacity: 0.5}]}
+              <Icon
+                name={isReconciling ? 'ArrowsClockwise' : 'CloudArrowUp'}
+                size={28}
+                color={(isSyncing || isReconciling) ? palette.primary[300] : palette.primary[500]}
+                weight="bold"
               />
               {(isSyncing || isReconciling) && (
                 <View style={styles.syncIndicator}>
-                  <ActivityIndicator size="small" color={Colors.primaryColor} />
+                  <ActivityIndicator size="small" color={palette.primary[500]} />
                 </View>
               )}
             </TouchableOpacity>
             {transactions.length > 0 && (
               <TouchableOpacity onPress={handlePrintSales}>
-                <MaterialIcon name="print" size={40} style={styles.printIcon} />
+                <Icon name="Printer" size={32} color={palette.primary[500]} weight="bold" />
               </TouchableOpacity>
             )}
           </View>
@@ -538,7 +542,7 @@ const History: React.FC<any> = ({navigation}) => {
         {showSyncProgress && (
           <View style={styles.syncProgressContainer}>
             <View style={styles.syncProgressHeader}>
-              <MaterialIcon name="sync" size={16} color={Colors.primaryColor} />
+              <Icon name="ArrowsClockwise" size={16} color={palette.primary[500]} />
               <Text style={styles.syncProgressTitle}>
                 {syncProgress?.message || 'Syncing...'}
               </Text>
@@ -572,7 +576,7 @@ const History: React.FC<any> = ({navigation}) => {
         {/* Refresh Indicator */}
         {refresh && !initialLoading && (
           <View style={styles.refreshIndicator}>
-            <ActivityIndicator size="small" color={Colors.primaryColor} />
+            <ActivityIndicator size="small" color={palette.primary[500]} />
             <Text style={styles.refreshText}>Syncing with server...</Text>
           </View>
         )}
@@ -603,8 +607,8 @@ const History: React.FC<any> = ({navigation}) => {
               <RefreshControl
                 refreshing={refresh}
                 onRefresh={onRefresh}
-                colors={[Colors.primaryColor]}
-                tintColor={Colors.primaryColor}
+                colors={[palette.primary[500]]}
+                tintColor={palette.primary[500]}
               />
             }
             showsVerticalScrollIndicator={false}
@@ -632,34 +636,26 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing[3],
   },
   syncButton: {
     position: 'relative',
-    padding: 5,
-  },
-  syncIcon: {
-    color: Colors.primaryColor,
+    padding: spacing[1],
   },
   syncIndicator: {
     position: 'absolute',
     top: -5,
     right: -5,
   },
-  printIcon: {
-    color: Colors.primaryColor,
-  },
   card: {
-    backgroundColor: Colors.White,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: palette.white,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing[4],
+    marginTop: spacing[3],
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: palette.gray[200],
+    ...shadows.sm,
   },
   cardContent: {
     flexDirection: 'row',
@@ -669,57 +665,62 @@ const styles = StyleSheet.create({
   filterButton: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing[2],
   },
   cardTitle: {
-    fontSize: 12,
-    color: Colors.Black,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.semiBold,
+    color: palette.gray[500],
+    marginBottom: spacing[1],
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   cardSubTitle: {
-    fontSize: 14,
-    color: Colors.Black,
-    fontWeight: '600',
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.bold,
+    color: palette.primary[500],
   },
   verticalLine: {
     width: 1,
     height: 40,
-    backgroundColor: Colors.lightGrey,
+    backgroundColor: palette.gray[200],
   },
   syncProgressContainer: {
-    backgroundColor: Colors.lightGrey,
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: palette.primary[50],
+    marginHorizontal: spacing[4],
+    marginTop: spacing[3],
+    padding: spacing[3],
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: palette.primary[200],
   },
   syncProgressHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing[2],
   },
   syncProgressTitle: {
-    marginLeft: 8,
-    fontSize: 13,
-    color: Colors.Black,
-    fontWeight: '500',
+    marginLeft: spacing[2],
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.medium,
+    color: palette.primary[700],
   },
   progressBar: {
     height: 4,
-    backgroundColor: Colors.White,
+    backgroundColor: palette.primary[100],
     borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 4,
+    marginBottom: spacing[1],
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.primaryColor,
+    backgroundColor: palette.primary[500],
     borderRadius: 2,
   },
   progressText: {
-    fontSize: 11,
-    color: Colors.Black,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.medium,
+    color: palette.primary[600],
     textAlign: 'right',
   },
   loaderContainer: {
@@ -728,55 +729,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loader: {
-    marginBottom: 10,
+    marginBottom: spacing[3],
   },
   loaderText: {
-    fontSize: 14,
-    color: Colors.Black,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.medium,
+    color: palette.gray[500],
   },
   refreshIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    backgroundColor: Colors.lightGrey,
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 8,
+    paddingVertical: spacing[2],
+    backgroundColor: palette.primary[50],
+    marginHorizontal: spacing[4],
+    marginTop: spacing[2],
+    borderRadius: borderRadius.md,
   },
   refreshText: {
-    marginLeft: 8,
-    fontSize: 12,
-    color: Colors.Black,
+    marginLeft: spacing[2],
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.medium,
+    color: palette.primary[600],
   },
   totalContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.White,
-    borderRadius: 8,
-    elevation: 1,
+    marginHorizontal: spacing[4],
+    marginVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    backgroundColor: palette.white,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: palette.gray[200],
+    ...shadows.sm,
   },
   totalLabel: {
-    fontSize: 16,
-    color: Colors.Black,
-    fontWeight: '500',
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.medium,
+    color: palette.gray[600],
   },
   totalAmount: {
-    fontSize: 20,
-    color: Colors.primaryColor,
-    fontWeight: '700',
+    fontSize: fontSize.xl,
+    fontFamily: fontFamily.bold,
+    color: palette.primary[500],
   },
   list: {
     flex: 1,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[5],
   },
   listContentEmpty: {
     flex: 1,
@@ -785,18 +790,19 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: spacing[10],
   },
   emptyText: {
-    fontSize: 16,
-    color: Colors.Black,
-    fontWeight: '600',
-    marginTop: 16,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.semiBold,
+    color: palette.gray[700],
+    marginTop: spacing[4],
   },
   emptySubText: {
-    fontSize: 13,
-    color: Colors.Black,
-    marginTop: 8,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[500],
+    marginTop: spacing[2],
     textAlign: 'center',
   },
 });

@@ -15,8 +15,8 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import Styles from './Styles';
-import Colors from '../../../Styles/Colors';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import {palette} from '../../../theme/colors';
+import Icon from '../../../components/shared/Icon';
 import moment from 'moment';
 import {useDispatch, useSelector, shallowEqual} from 'react-redux';
 import BottomDrawer, {
@@ -105,6 +105,17 @@ const REFRESH_INTERVAL = 60000; // 60 seconds (reduced from 30s)
 const DRAW_CHECK_INTERVAL = 30000; // 30 seconds
 const MAX_BETS_PER_TRANSACTION = 10; // Maximum bets allowed per transaction
 const MAX_UNSYNCED_TRANSACTIONS = 5; // Maximum unsynced transactions before blocking new ones (reduced from 15 to prevent quota violations)
+
+// ============================================================================
+// Icon name mapping for keyboard buttons
+// ============================================================================
+const ICON_MAP: Record<string, string> = {
+  'arrow-forward': 'ArrowRight',
+  'subdirectory-arrow-left': 'ArrowBendDownLeft',
+  'backspace': 'Backspace',
+  'done-all': 'CheckCircle',
+  'dialpad': 'Keypad',
+};
 
 // ============================================================================
 // Component
@@ -265,7 +276,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           betType.id,
           15,
         )) as Record<string, number>;
-        
+
         dispatch(combinationAmountsActions.update(amounts));
         needsRefresh.current.combinationAmounts = false;
         clearCache(); // Clear soldout cache when amounts change
@@ -290,7 +301,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
           currentDraw,
           betType.id,
         )) as Record<string, number>;
-        
+
         dispatch(posCombinationCapActions.update(amounts));
         needsRefresh.current.posCombinationAmounts = false;
         clearCache(); // Clear soldout cache when amounts change
@@ -371,7 +382,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     // ========================================
     // Input Handling (simplified)
     // ========================================
-    
+
     /**
      * Handle manual focus change (user taps on a field)
      * Uses 'manual' action type to prevent auto-advance
@@ -813,7 +824,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     // ========================================
     // Effects
     // ========================================
-    
+
     // Fetch unsynced count on mount
     useEffect(() => {
       fetchUnsyncedCount();
@@ -894,28 +905,28 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
     const keyboardButtons = useMemo(
       (): KeyboardButton[][] => [
         [
-          {key: '1', label: '1', color: Colors.primaryColor, action: () => onKeyPress('1')},
-          {key: '2', label: '2', color: Colors.primaryColor, action: () => onKeyPress('2')},
-          {key: '3', label: '3', color: Colors.primaryColor, action: () => onKeyPress('3')},
-          {key: 'next', label: '', color: Colors.teal, icon: 'arrow-forward', action: onNext},
+          {key: '1', label: '1', color: palette.primary[500], action: () => onKeyPress('1')},
+          {key: '2', label: '2', color: palette.primary[500], action: () => onKeyPress('2')},
+          {key: '3', label: '3', color: palette.primary[500], action: () => onKeyPress('3')},
+          {key: 'next', label: '', color: palette.accent[500], icon: 'ArrowRight', action: onNext},
         ],
         [
-          {key: '4', label: '4', color: Colors.primaryColor, action: () => onKeyPress('4')},
-          {key: '5', label: '5', color: Colors.primaryColor, action: () => onKeyPress('5')},
-          {key: '6', label: '6', color: Colors.primaryColor, action: () => onKeyPress('6')},
-          {key: 'noRambol', label: 'NR', color: Colors.mediumYellow, action: onNoRambol},
+          {key: '4', label: '4', color: palette.primary[500], action: () => onKeyPress('4')},
+          {key: '5', label: '5', color: palette.primary[500], action: () => onKeyPress('5')},
+          {key: '6', label: '6', color: palette.primary[500], action: () => onKeyPress('6')},
+          {key: 'noRambol', label: 'NR', color: palette.secondary[500], action: onNoRambol},
         ],
         [
-          {key: '7', label: '7', color: Colors.primaryColor, action: () => onKeyPress('7')},
-          {key: '8', label: '8', color: Colors.primaryColor, action: () => onKeyPress('8')},
-          {key: '9', label: '9', color: Colors.primaryColor, action: () => onKeyPress('9')},
-          {key: 'addBet', label: '', color: Colors.mediumBlue, icon: 'subdirectory-arrow-left', action: addBet},
+          {key: '7', label: '7', color: palette.primary[500], action: () => onKeyPress('7')},
+          {key: '8', label: '8', color: palette.primary[500], action: () => onKeyPress('8')},
+          {key: '9', label: '9', color: palette.primary[500], action: () => onKeyPress('9')},
+          {key: 'addBet', label: '', color: palette.primary[600], icon: 'ArrowBendDownLeft', action: addBet},
         ],
         [
           {key: 'clear', label: 'C', color: 'white', action: onClear},
-          {key: '0', label: '0', color: Colors.primaryColor, action: () => onKeyPress('0')},
-          {key: 'backspace', label: '', color: 'white', icon: 'backspace', action: onBackSpace},
-          {key: 'submit', label: '', color: Colors.mediumGreen, icon: 'done-all', action: showCreateTransactionAlert},
+          {key: '0', label: '0', color: palette.primary[500], action: () => onKeyPress('0')},
+          {key: 'backspace', label: '', color: 'white', icon: 'Backspace', action: onBackSpace},
+          {key: 'submit', label: '', color: palette.success[500], icon: 'CheckCircle', action: showCreateTransactionAlert},
         ],
       ],
       [onKeyPress, onNext, onNoRambol, addBet, onClear, onBackSpace, showCreateTransactionAlert],
@@ -946,13 +957,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               onLongPress={button.longPressAction}
               disabled={isSubmitting}>
               {button.icon ? (
-                <MaterialIcons
-                  style={[
-                    styles.keyButtonText,
-                    button.color === 'white' && styles.whiteButtonText,
-                  ]}
+                <Icon
                   name={button.icon as any}
                   size={20}
+                  color={button.color === 'white' ? palette.primary[500] : palette.white}
+                  weight="bold"
                 />
               ) : (
                 <Text
@@ -987,11 +996,11 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
             }}
             disabled={isBetClosed}>
             {isFocused && (
-              <MaterialIcons
-                style={styles.focusIndicator}
-                name="arrow-forward"
+              <Icon
+                name="ArrowRight"
                 size={25}
-                color={Colors.primaryColor}
+                color={palette.primary[500]}
+                weight="bold"
               />
             )}
             <Text
@@ -1019,7 +1028,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
       return (
         <SafeAreaView style={Styles.backgroundWrapper}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primaryColor} />
+            <ActivityIndicator size="large" color={palette.primary[500]} />
             <Text style={styles.loadingText}>Creating transaction...</Text>
           </View>
         </SafeAreaView>
@@ -1034,7 +1043,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.goBack()}>
-              <MaterialIcons name="arrow-back" size={40} color="black" />
+              <Icon name="ArrowLeft" size={40} color={palette.black} weight="bold" />
             </TouchableOpacity>
             <Text style={[Styles.logoText, styles.boldText]}>
               {betType.name}
@@ -1090,7 +1099,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               </Text>
               {isUnsyncedLimitReached && (
                 <Text style={styles.unsyncedWarning}>
-                  ⚠️ {unsyncedCount} unsynced
+                  {unsyncedCount} unsynced
                 </Text>
               )}
             </View>
@@ -1124,7 +1133,7 @@ const TransacScreen: React.FC<TransacScreenProps> = React.memo(
               style={styles.showKeyBoard}
               onPress={() => bottomDrawerRef?.current?.open(hp(45))}
               disabled={isBetClosed}>
-              <MaterialIcons name="dialpad" size={30} color="white" />
+              <Icon name="Keypad" size={30} color={palette.white} weight="bold" />
             </TouchableOpacity>
           </View>
 
@@ -1193,14 +1202,14 @@ const styles = StyleSheet.create({
   },
   cardSubTitle: {
     fontSize: 13,
-    color: Colors.primaryColor,
+    color: palette.primary[500],
     fontWeight: 'bold',
     alignSelf: 'center',
     textTransform: 'uppercase',
     textAlign: 'center',
   },
   betClosedText: {
-    color: Colors.mediumRed,
+    color: palette.warning[500],
   },
   verticalLine: {
     height: '80%',
@@ -1209,7 +1218,7 @@ const styles = StyleSheet.create({
   },
   totalAmount: {
     fontWeight: 'bold',
-    color: Colors.mediumGreen,
+    color: palette.success[500],
     marginLeft: 10,
   },
   inputContainerStyle: {
@@ -1219,12 +1228,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(114, 114, 114, 0.08)',
     height: 60,
     borderWidth: 1,
-    borderColor: Colors.primaryColor,
+    borderColor: palette.primary[500],
     justifyContent: 'center',
     alignItems: 'center',
   },
   inputContainerFocused: {
-    borderColor: Colors.mediumBlue,
+    borderColor: palette.primary[600],
     borderWidth: 2,
   },
   inputContainerDisabled: {
@@ -1233,14 +1242,14 @@ const styles = StyleSheet.create({
   },
   inputTextStyle: {
     fontSize: 30,
-    color: Colors.primaryColor,
+    color: palette.primary[500],
     fontWeight: 'bold',
     alignSelf: 'center',
     textAlign: 'center',
     textTransform: 'uppercase',
   },
   inputTextDisabled: {
-    color: Colors.darkGrey,
+    color: palette.gray[500],
   },
   focusIndicator: {
     position: 'absolute',
@@ -1254,7 +1263,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 13,
-    color: Colors.primaryColor,
+    color: palette.primary[500],
     fontWeight: 'bold',
     marginBottom: hp(0.3),
     textAlign: 'center',
@@ -1274,7 +1283,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: Colors.darkGrey,
+    color: palette.gray[500],
     textAlign: 'center',
   },
   keyBoardWrapper: {
@@ -1291,7 +1300,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 10,
-    backgroundColor: Colors.primaryColor,
+    backgroundColor: palette.primary[500],
   },
   keyboardContainer: {
     justifyContent: 'flex-start',
@@ -1309,20 +1318,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 10,
-    backgroundColor: Colors.primaryColor,
+    backgroundColor: palette.primary[500],
     height: hp(8),
   },
   whiteButton: {
     borderWidth: 1,
-    borderColor: Colors.primaryColor,
+    borderColor: palette.primary[500],
   },
   keyButtonText: {
     fontSize: 30,
     fontFamily: 'Nunito-ExtraBold',
-    color: Colors.White,
+    color: palette.white,
   },
   whiteButtonText: {
-    color: Colors.primaryColor,
+    color: palette.primary[500],
     fontWeight: 'bold',
   },
   loadingContainer: {
@@ -1333,7 +1342,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 20,
     fontSize: 18,
-    color: Colors.primaryColor,
+    color: palette.primary[500],
     fontWeight: 'bold',
   },
   inputCard: {
@@ -1370,16 +1379,16 @@ const styles = StyleSheet.create({
   },
   betCountText: {
     fontSize: 12,
-    color: Colors.darkGrey,
+    color: palette.gray[500],
     fontWeight: '600',
   },
   betCountWarning: {
-    color: Colors.mediumRed,
+    color: palette.warning[500],
     fontWeight: 'bold',
   },
   unsyncedWarning: {
     fontSize: 11,
-    color: Colors.mediumRed,
+    color: palette.warning[500],
     fontWeight: '600',
     marginTop: 2,
   },

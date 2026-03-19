@@ -13,7 +13,11 @@ import {
 import {useSelector, useDispatch} from 'react-redux';
 import {useFocusEffect} from '@react-navigation/native';
 import Styles from './Styles';
-import Colors from '../../../Styles/Colors.ts';
+import {palette} from '../../../theme/colors';
+import {fontFamily, fontSize} from '../../../theme/typography';
+import {spacing, borderRadius} from '../../../theme/spacing';
+import {shadows} from '../../../theme/shadows';
+import Icon from '../../../components/shared/Icon';
 import {
   checkLastDrawTransactionStatus,
   deleteLastWeekTransactions,
@@ -30,7 +34,6 @@ import {getMaintenanceScheduleAPI} from '../../../helper/api';
 import moment from 'moment';
 import {getCurrentDraw} from '../../../helper/functions.js';
 import Type from '../../../models/Type.ts';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define types for Redux state
@@ -695,10 +698,11 @@ const Home = (props: any) => {
             <TouchableOpacity
               style={styles.refreshButton}
               onPress={checkUnsyncedTransactionsFromPreviousDraws}>
-              <MaterialIcon
-                name="refresh"
+              <Icon
+                name="ArrowsClockwise"
                 size={24}
-                color={Colors.primaryColor}
+                color={palette.primary[500]}
+                weight="bold"
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -706,10 +710,11 @@ const Home = (props: any) => {
               onPress={performDatabaseCleanup}
               accessibilityLabel="Manual database cleanup"
               accessibilityHint="Runs database cleanup manually. Automatic cleanup runs before first draw (3:30-3:55 AM)">
-              <MaterialIcon
-                name="cleaning-services"
+              <Icon
+                name="Broom"
                 size={24}
-                color={Colors.mediumGreen}
+                color={palette.success[500]}
+                weight="bold"
               />
             </TouchableOpacity>
           </View>
@@ -727,7 +732,7 @@ const Home = (props: any) => {
         {isMaintenanceMode && maintenanceSchedule && (
           <View style={styles.maintenanceBanner}>
             <View style={styles.maintenanceHeader}>
-              <MaterialIcon name="build" size={24} color="#ff9800" />
+              <Icon name="Wrench" size={24} color={palette.warning[500]} weight="bold" />
               <Text style={styles.maintenanceTitle}>Scheduled Maintenance</Text>
             </View>
 
@@ -759,7 +764,7 @@ const Home = (props: any) => {
         {hasUnsyncedTransactions && unsyncedSummary && (
           <View style={styles.unsyncedWarningBanner}>
             <View style={styles.warningHeader}>
-              <MaterialIcon name="warning" size={24} color={Colors.mediumRed} />
+              <Icon name="Warning" size={24} color={palette.danger[500]} weight="fill" />
               <Text style={styles.warningTitle}>Unsynced Transactions</Text>
             </View>
 
@@ -908,257 +913,246 @@ const Home = (props: any) => {
 
 const styles = StyleSheet.create({
   card: {
-    height: 60,
-    elevation: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
+    backgroundColor: palette.white,
+    marginHorizontal: spacing[4],
+    marginTop: spacing[3],
+    padding: spacing[4],
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: palette.gray[200],
+    ...shadows.sm,
   },
-
   cardContent: {
-    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
+    alignItems: 'center',
   },
-
   cardTitle: {
-    fontSize: 16,
-    color: Colors.darkGrey,
-    fontWeight: 'bold',
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.semiBold,
+    color: palette.gray[500],
     alignSelf: 'center',
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-
   cardSubTitle: {
-    fontSize: 14,
-    color: Colors.primaryColor,
-    fontWeight: 'bold',
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.bold,
+    color: palette.primary[500],
     alignSelf: 'center',
     textTransform: 'uppercase',
+    marginTop: spacing[1],
   },
-
   verticalLine: {
-    height: '80%', // Adjust height as needed
+    height: 40,
     width: 1,
-    backgroundColor: 'gray',
+    backgroundColor: palette.gray[200],
   },
-
   container: {
     flex: 3,
     justifyContent: 'flex-start',
     alignItems: 'center',
   },
-
   button: {
-    elevation: 8,
-    backgroundColor: Colors.primaryColor,
-    borderRadius: 100,
-    padding: 10,
-    margin: 10,
+    backgroundColor: palette.primary[500],
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    margin: spacing[2],
     height: 60,
-    width: widthScreen * 0.8,
+    width: widthScreen * 0.85,
     justifyContent: 'center',
+    ...shadows.md,
   },
-
   buttonDisabled: {
-    elevation: 2,
-    backgroundColor: '#cccccc',
-    borderRadius: 100,
-    padding: 10,
-    margin: 10,
+    backgroundColor: palette.gray[300],
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    margin: spacing[2],
     height: 60,
-    width: widthScreen * 0.8,
+    width: widthScreen * 0.85,
     justifyContent: 'center',
     opacity: 0.6,
   },
-
   buttonDisabledUnsynced: {
-    elevation: 2,
-    backgroundColor: '#ffebee', // Light red background
-    borderRadius: 100,
-    padding: 10,
-    margin: 10,
+    backgroundColor: palette.danger[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    margin: spacing[2],
     height: 60,
-    width: widthScreen * 0.8,
+    width: widthScreen * 0.85,
     justifyContent: 'center',
     opacity: 0.8,
     borderWidth: 2,
-    borderColor: Colors.mediumRed,
+    borderColor: palette.danger[400],
   },
-
   buttonDisabledMaintenance: {
-    elevation: 2,
-    backgroundColor: '#fff3e0', // Light orange background
-    borderRadius: 100,
-    padding: 10,
-    margin: 10,
+    backgroundColor: palette.warning[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    margin: spacing[2],
     height: 60,
-    width: widthScreen * 0.8,
+    width: widthScreen * 0.85,
     justifyContent: 'center',
     opacity: 0.8,
     borderWidth: 2,
-    borderColor: '#ff9800',
+    borderColor: palette.warning[400],
   },
-
   textStyle: {
-    fontSize: 30,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontSize: fontSize['2xl'],
+    fontFamily: fontFamily.bold,
+    color: palette.white,
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
-
   closedMessage: {
-    backgroundColor: Colors.mediumRed,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: palette.danger[500],
+    padding: spacing[3],
+    borderRadius: borderRadius.md,
+    marginBottom: spacing[2],
     alignSelf: 'center',
-    width: widthScreen * 0.8,
+    width: widthScreen * 0.85,
   },
-
   closedMessageText: {
-    color: '#fff',
-    fontSize: 14,
+    color: palette.white,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.medium,
     textAlign: 'center',
   },
-
   unsyncedWarningBanner: {
-    backgroundColor: Colors.backgroundLight,
-    padding: 15,
-    borderRadius: 8,
-    marginTop: 10,
-    marginHorizontal: 10,
-    borderWidth: 2,
-    borderColor: Colors.mediumRed,
-    elevation: 3,
-    shadowColor: Colors.Black,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    backgroundColor: palette.danger[50],
+    padding: spacing[4],
+    borderRadius: borderRadius.lg,
+    marginTop: spacing[3],
+    marginHorizontal: spacing[4],
+    borderWidth: 1,
+    borderColor: palette.danger[200],
+    ...shadows.sm,
   },
   warningHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: spacing[1],
   },
   warningTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.mediumRed,
-    marginLeft: 8,
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: palette.danger[600],
+    marginLeft: spacing[2],
   },
   warningContent: {
-    marginBottom: 10,
+    marginBottom: spacing[3],
   },
   warningText: {
-    fontSize: 16,
-    color: Colors.darkGrey,
-    marginBottom: 5,
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[700],
+    marginBottom: spacing[1],
   },
   criticalWarning: {
-    fontSize: 14,
-    color: Colors.mediumRed,
-    fontWeight: 'bold',
-    marginTop: 5,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.bold,
+    color: palette.danger[600],
+    marginTop: spacing[1],
   },
   limitWarningContainer: {
-    backgroundColor: '#ffebee',
-    padding: 10,
-    borderRadius: 6,
-    marginVertical: 8,
+    backgroundColor: palette.danger[100],
+    padding: spacing[3],
+    borderRadius: borderRadius.md,
+    marginVertical: spacing[2],
     borderWidth: 1,
-    borderColor: Colors.mediumRed,
+    borderColor: palette.danger[300],
   },
   limitWarning: {
-    fontSize: 14,
-    color: Colors.mediumRed,
-    fontWeight: 'bold',
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.bold,
+    color: palette.danger[600],
     textAlign: 'center',
   },
   limitWarningSubtext: {
-    fontSize: 12,
-    color: Colors.darkGrey,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[600],
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: spacing[1],
   },
   syncNowButton: {
-    backgroundColor: Colors.primaryColor,
-    borderRadius: 100,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: palette.primary[500],
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing[2.5],
+    paddingHorizontal: spacing[5],
     alignSelf: 'center',
   },
   syncNowButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: palette.white,
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.bold,
   },
   refreshButton: {
-    marginLeft: 10,
+    padding: spacing[1],
   },
   cleanupButton: {
-    marginLeft: 10,
+    marginLeft: spacing[2],
+    padding: spacing[1],
   },
   headerButtons: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   textStyleDisabled: {
-    fontSize: 30,
-    color: '#888', // Grayed out text
-    fontWeight: 'bold',
+    fontSize: fontSize['2xl'],
+    fontFamily: fontFamily.bold,
+    color: palette.gray[400],
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
   maintenanceBanner: {
-    backgroundColor: '#fff3e0',
-    padding: 15,
-    borderRadius: 8,
-    marginTop: 10,
-    marginHorizontal: 10,
-    borderWidth: 2,
-    borderColor: '#ff9800',
-    elevation: 3,
-    shadowColor: Colors.Black,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    backgroundColor: palette.warning[50],
+    padding: spacing[4],
+    borderRadius: borderRadius.lg,
+    marginTop: spacing[3],
+    marginHorizontal: spacing[4],
+    borderWidth: 1,
+    borderColor: palette.warning[200],
+    ...shadows.sm,
   },
   maintenanceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: spacing[1],
   },
   maintenanceTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ff9800',
-    marginLeft: 8,
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: palette.warning[600],
+    marginLeft: spacing[2],
   },
   maintenanceContent: {
-    marginBottom: 5,
+    marginBottom: spacing[1],
   },
   maintenanceText: {
-    fontSize: 16,
-    color: Colors.darkGrey,
-    marginBottom: 5,
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[700],
+    marginBottom: spacing[1],
   },
   maintenanceReason: {
-    fontSize: 14,
-    color: Colors.darkGrey,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[600],
     fontStyle: 'italic',
-    marginBottom: 5,
+    marginBottom: spacing[1],
   },
   maintenanceTime: {
-    fontSize: 14,
-    color: Colors.darkGrey,
-    fontWeight: '600',
-    marginBottom: 5,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.semiBold,
+    color: palette.gray[700],
+    marginBottom: spacing[1],
   },
   maintenanceNote: {
-    fontSize: 14,
-    color: Colors.darkGrey,
-    marginTop: 5,
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[500],
+    marginTop: spacing[1],
     fontStyle: 'italic',
   },
 });

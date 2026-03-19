@@ -18,7 +18,11 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
-import Colors from '../../../Styles/Colors';
+import {palette} from '../../../theme/colors';
+import {fontFamily, fontSize} from '../../../theme/typography';
+import {spacing, borderRadius} from '../../../theme/spacing';
+import {shadows} from '../../../theme/shadows';
+import Icon from '../../../components/shared/Icon';
 import {ResultTransactionItem} from '../../../components/ResultTransactionItem';
 import {
   checkInternetConnection,
@@ -32,7 +36,6 @@ import DrawModal from '../../../components/DrawModal';
 import TypeModal from '../../../components/TypeModal';
 import Type from '../../../models/Type';
 import type ResultModel from '../../../models/Result';
-import Ionic from 'react-native-vector-icons/Ionicons';
 import {
   getResult,
   getWinners,
@@ -51,7 +54,6 @@ import {
 import {printHits, printSales} from '../../../helper/printer';
 import debounce from 'lodash/debounce';
 import {typesActions} from '../../../store/actions';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
 // Define types for Redux state
 interface RootState {
@@ -263,7 +265,7 @@ const Result: React.FC<any> = ({navigation}) => {
     // Debounce rapid successive calls
     const now = Date.now();
     if (lastFetchCallTime.current && now - lastFetchCallTime.current < 1000) {
-      console.log('🔄 Result fetchData - Debounced rapid call');
+      console.log('Result fetchData - Debounced rapid call');
       return;
     }
     lastFetchCallTime.current = now;
@@ -272,7 +274,7 @@ const Result: React.FC<any> = ({navigation}) => {
     try {
       // Validate parameters before making the call
       if (selectedDraw === undefined || selectedType === undefined) {
-        console.warn('⚠️ Result fetchData - Missing parameters:', {
+        console.warn('Result fetchData - Missing parameters:', {
           draw: selectedDraw,
           type: selectedType,
         });
@@ -280,7 +282,7 @@ const Result: React.FC<any> = ({navigation}) => {
         return;
       }
 
-      console.log('🔄 Result fetchData - Params:', {
+      console.log('Result fetchData - Params:', {
         date: formattedDate,
         draw: selectedDraw,
         type: selectedType,
@@ -296,7 +298,7 @@ const Result: React.FC<any> = ({navigation}) => {
 
       const localResult = normalizeResult(localResultRaw);
 
-      console.log('📊 Result fetchData - Local result:', localResultRaw);
+      console.log('Result fetchData - Local result:', localResultRaw);
 
       // If we have internet, sync with server
       if (hasInternet()) {
@@ -308,7 +310,7 @@ const Result: React.FC<any> = ({navigation}) => {
             formattedDate,
           );
 
-          console.log('📊 Result fetchData - Server result:', serverResultRaw);
+          console.log('Result fetchData - Server result:', serverResultRaw);
 
           const serverResult = normalizeResult(serverResultRaw);
 
@@ -329,7 +331,7 @@ const Result: React.FC<any> = ({navigation}) => {
             }
           }
         } catch (syncError: any) {
-          console.error('❌ Error syncing with server:', syncError);
+          console.error('Error syncing with server:', syncError);
           // Fallback to local result if server sync fails
           if (localResult) {
             setResult(localResult);
@@ -356,7 +358,7 @@ const Result: React.FC<any> = ({navigation}) => {
         handleNoInternet();
       }
     } catch (error: any) {
-      console.error('❌ Result fetchData error:', error);
+      console.error('Result fetchData error:', error);
       handleEmptyResult();
       Alert.alert('Error', 'Failed to load results. Please try again.');
     } finally {
@@ -481,7 +483,7 @@ const Result: React.FC<any> = ({navigation}) => {
     const dateChanged = prevDateRef.current !== formattedDate;
 
     if (drawChanged || typeChanged || dateChanged) {
-      console.log('🔄 Result - Draw/Type/Date changed, fetching new data...');
+      console.log('Result - Draw/Type/Date changed, fetching new data...');
       prevDrawRef.current = selectedDraw;
       prevTypeRef.current = selectedType;
       prevDateRef.current = formattedDate;
@@ -503,12 +505,12 @@ const Result: React.FC<any> = ({navigation}) => {
 
       if (shouldFetch) {
         console.log(
-          '🔄 Result - Screen focused, fetching data (stale data)...',
+          'Result - Screen focused, fetching data (stale data)...',
         );
         fetchData();
       } else {
         console.log(
-          '🔄 Result - Screen focused, data is fresh, skipping fetch',
+          'Result - Screen focused, data is fresh, skipping fetch',
         );
       }
     });
@@ -551,7 +553,7 @@ const Result: React.FC<any> = ({navigation}) => {
               <TouchableOpacity
                 onPress={hideAlertModal}
                 style={styles.closeButton}>
-                <Ionic name="close" size={30} style={styles.closeIcon} />
+                <Icon name="X" size={30} color={palette.black} weight="bold" />
               </TouchableOpacity>
             </View>
             <View style={styles.modalBodyContainer}>
@@ -614,7 +616,7 @@ const Result: React.FC<any> = ({navigation}) => {
           </Text>
           {(totalAmount.totalTarget > 0 || totalAmount.totalRambol > 0) && (
             <TouchableOpacity onPress={handlePrintHits}>
-              <MaterialIcon name="print" size={40} style={styles.printIcon} />
+              <Icon name="Printer" size={40} color={palette.black} weight="bold" />
             </TouchableOpacity>
           )}
         </View>
@@ -718,66 +720,81 @@ export default React.memo(Result);
 
 const styles = StyleSheet.create({
   card: {
-    height: 60,
-    elevation: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
+    backgroundColor: palette.white,
+    borderRadius: borderRadius.lg,
+    marginHorizontal: spacing[4],
+    marginTop: spacing[3],
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: palette.gray[200],
+    ...shadows.sm,
   },
   cardContent: {
-    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  filterButton: {
-    width: widthScreen / 3,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
+  filterButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing[2],
+  },
   cardTitle: {
-    fontSize: 16,
-    color: Colors.darkGrey,
-    fontWeight: 'bold',
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.semiBold,
+    color: palette.gray[500],
     alignSelf: 'center',
     textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: spacing[1],
   },
   cardSubTitle: {
-    fontSize: 14,
-    color: Colors.primaryColor,
-    fontWeight: 'bold',
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.bold,
+    color: palette.primary[500],
     alignSelf: 'center',
     textTransform: 'uppercase',
   },
   verticalLine: {
-    height: '80%',
+    height: 40,
     width: 1,
-    backgroundColor: 'gray',
+    backgroundColor: palette.gray[200],
   },
   resultDisplay: {
-    fontSize: 25,
-    color: Colors.Black,
-    marginRight: 5,
+    fontSize: fontSize['2xl'],
+    fontFamily: fontFamily.regular,
+    color: palette.gray[900],
+    marginRight: spacing[1],
   },
   resultNumber: {
-    fontWeight: 'bold',
-    fontSize: 35,
-    color: Colors.mediumBlue,
+    fontFamily: fontFamily.bold,
+    fontSize: 36,
+    color: palette.primary[600],
   },
   hitsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    marginHorizontal: spacing[4],
+    marginVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    backgroundColor: palette.white,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: palette.gray[200],
+    ...shadows.sm,
   },
   hitLabel: {
-    fontSize: 18,
-    color: Colors.Black,
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.medium,
+    color: palette.gray[600],
     alignSelf: 'center',
   },
   hitValue: {
-    fontWeight: 'bold',
-    fontSize: 25,
-    color: Colors.primaryColor,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.xl,
+    color: palette.primary[500],
   },
   emptyContainer: {
     flex: 3,
@@ -786,33 +803,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontWeight: 'bold',
-    fontSize: 30,
-    color: Colors.mediumBlue,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize['2xl'],
+    color: palette.gray[400],
   },
   scanButton: {
-    width: wp(96),
-    marginVertical: 5,
+    marginHorizontal: spacing[4],
+    marginVertical: spacing[2],
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: 10,
-    height: 50,
-    backgroundColor: Colors.primaryColor,
+    borderRadius: borderRadius.lg,
+    height: 52,
+    backgroundColor: palette.primary[500],
+    ...shadows.md,
   },
   scanButtonText: {
-    fontSize: 30,
-    color: Colors.White,
-    fontWeight: 'bold',
-    alignSelf: 'center',
+    fontSize: fontSize.xl,
+    fontFamily: fontFamily.bold,
+    color: palette.white,
     textTransform: 'uppercase',
   },
   loader: {
-    marginVertical: 20,
+    marginVertical: spacing[5],
   },
   listContainer: {
     flexGrow: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing[4],
   },
   centeredView: {
     flex: 1,
@@ -820,59 +836,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     width: widthScreen,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 5,
+    backgroundColor: palette.white,
+    borderRadius: borderRadius['2xl'],
+    padding: spacing[1],
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
     height: heightScreen * 0.4,
     width: widthScreen * 0.9,
+    ...shadows.lg,
   },
   modalHeaderContainer: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    width: widthScreen * 0.9,
-    padding: 10,
-    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
     position: 'relative',
   },
   modalBodyContainer: {
     flex: 1,
-    padding: 1,
+    padding: spacing[4],
+    justifyContent: 'center',
   },
   modalTitle: {
-    alignSelf: 'center',
     textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.Black,
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.bold,
+    color: palette.gray[900],
   },
   alertText: {
-    alignSelf: 'center',
     textAlign: 'center',
-    fontSize: 18,
-    color: Colors.Black,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[700],
   },
   closeButton: {
-    padding: 10,
-    alignSelf: 'flex-end',
+    padding: spacing[2],
     position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  closeIcon: {
-    color: '#000',
+    right: spacing[2],
+    top: spacing[2],
   },
   cameraButtonContainer: {
     flex: 1,
@@ -880,16 +885,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   cameraButton: {
-    width: wp(96),
-    marginVertical: 5,
+    marginHorizontal: spacing[4],
+    marginVertical: spacing[2],
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    borderRadius: 10,
-    height: 50,
-    backgroundColor: Colors.primaryColor,
-  },
-  printIcon: {
-    color: '#000',
+    borderRadius: borderRadius.lg,
+    height: 52,
+    backgroundColor: palette.primary[500],
   },
 });

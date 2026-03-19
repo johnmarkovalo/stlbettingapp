@@ -6,9 +6,9 @@ import {
   View,
   Dimensions,
 } from 'react-native';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Bet from '../models/Bet';
-import Colors from '../Styles/Colors';
+import Icon from './shared/Icon';
+import {palette} from '../theme/colors';
 
 const widthScreen = Dimensions.get('window').width;
 
@@ -20,7 +20,7 @@ interface BetItemProps {
 const BetItem: React.FC<BetItemProps> = React.memo(({item, onPress}) => {
   const renderBetNumber = () => (
     <View style={[styles.numberContainer, {width: 35}]}>
-      <Text style={[styles.numberStyle, {color: Colors.primaryColor}]}>
+      <Text style={[styles.numberStyle, {color: palette.primary[500]}]}>
         {item.betNumber}
       </Text>
     </View>
@@ -50,7 +50,7 @@ const BetItem: React.FC<BetItemProps> = React.memo(({item, onPress}) => {
 
   const renderDeleteButton = () => (
     <TouchableOpacity onPress={onPress} style={styles.deleteButton}>
-      <MaterialIcon name="delete" size={25} color={Colors.red} />
+      <Icon name="Trash" size={25} color={palette.danger[500]} weight="bold" />
     </TouchableOpacity>
   );
 
@@ -93,13 +93,13 @@ const styles = StyleSheet.create({
   numberStyle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.darkGrey,
+    color: palette.gray[500],
   },
   targetLabel: {
-    color: Colors.green,
+    color: palette.success[600],
   },
   rambolLabel: {
-    color: Colors.red,
+    color: palette.danger[500],
   },
   deleteButton: {
     padding: 5,

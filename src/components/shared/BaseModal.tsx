@@ -6,8 +6,11 @@ import {
   Dimensions,
   Text,
 } from 'react-native';
-import Ionic from 'react-native-vector-icons/Ionicons';
-import Colors from '../../Styles/Colors';
+import {palette} from '../../theme/colors';
+import {fontFamily, fontSize} from '../../theme/typography';
+import {borderRadius, spacing} from '../../theme/spacing';
+import {shadows} from '../../theme/shadows';
+import Icon from './Icon';
 
 const widthScreen = Dimensions.get('window').width;
 const heightScreen = Dimensions.get('window').height;
@@ -39,10 +42,11 @@ const BaseModal: React.FC<BaseModalProps> = ({
               style={styles.closeButton}
               accessibilityLabel="Close modal"
               accessibilityRole="button">
-              <Ionic name="close" size={30} style={styles.closeIcon} />
+              <Icon name="X" size={24} color={palette.gray[600]} weight="bold" />
             </TouchableOpacity>
           )}
         </View>
+        <View style={styles.divider} />
         {/* Content */}
         <View style={styles.modalBodyContainer}>{children}</View>
       </View>
@@ -57,55 +61,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'center',
     width: widthScreen,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 5,
+    backgroundColor: palette.white,
+    borderRadius: borderRadius['2xl'],
+    padding: spacing[1],
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
     width: widthScreen * 0.9,
+    ...shadows.lg,
   },
   modalHeaderContainer: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    width: widthScreen * 0.9,
-    padding: 10,
-    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
     position: 'relative',
+  },
+  divider: {
+    height: 1,
+    width: '90%',
+    backgroundColor: palette.gray[200],
   },
   modalBodyContainer: {
     flex: 1,
-    padding: 20,
+    padding: spacing[5],
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
-    alignSelf: 'center',
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.lg,
+    color: palette.gray[900],
     textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.Black,
   },
   closeButton: {
-    padding: 10,
-    alignSelf: 'flex-end',
+    padding: spacing[2],
     position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  closeIcon: {
-    color: '#000',
+    right: spacing[2],
+    top: spacing[2],
   },
 });
 

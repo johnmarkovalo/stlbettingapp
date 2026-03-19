@@ -1,5 +1,7 @@
 import {StyleSheet, Dimensions} from 'react-native';
-import Colors from '../../Styles/Colors';
+import {palette} from '../../theme/colors';
+import {fontFamily, fontSize} from '../../theme/typography';
+import {borderRadius, spacing} from '../../theme/spacing';
 
 import {
   widthPercentageToDP as wp,
@@ -12,7 +14,7 @@ const heightScreen = Dimensions.get('window').height;
 const styles = StyleSheet.create({
   backgroundWrapper: {
     flex: 1,
-    backgroundColor: Colors.White,
+    backgroundColor: palette.white,
   },
   mainContainer: {
     flex: 1,
@@ -31,15 +33,15 @@ const styles = StyleSheet.create({
     height: 120,
   },
   loginTitle: {
-    fontSize: 32,
-    fontFamily: 'Nunito-Bold',
-    color: Colors.textBlack,
+    fontSize: fontSize['4xl'],
+    fontFamily: fontFamily.bold,
+    color: palette.gray[900],
     marginBottom: hp(1),
   },
   loginSubtitle: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: Colors.darkGrey,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.regular,
+    color: palette.gray[500],
     marginBottom: hp(4),
     textAlign: 'center',
   },
@@ -51,19 +53,19 @@ const styles = StyleSheet.create({
   pincodeInput: {
     height: 56,
     borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.White,
-    borderColor: Colors.mediumGrey,
-    fontSize: 18,
-    fontFamily: 'Nunito-Medium',
-    color: Colors.textBlack,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing[4],
+    backgroundColor: palette.white,
+    borderColor: palette.gray[300],
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.medium,
+    color: palette.gray[900],
     textAlign: 'center',
     letterSpacing: 4,
   },
   loginButton: {
     height: 56,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
   loginButtonInner: {
@@ -73,14 +75,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginButtonText: {
-    fontSize: 18,
-    fontFamily: 'Nunito-ExtraBold',
-    color: Colors.White,
+    fontSize: fontSize.lg,
+    fontFamily: fontFamily.extraBold,
+    color: palette.white,
   },
   bottomSpacer: {
     height: hp(10),
   },
-  // Legacy styles kept for compatibility (can be removed if not used elsewhere)
+  // Legacy styles kept for compatibility
   containerGroup: {
     alignItems: 'center',
   },
@@ -97,8 +99,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   logoText: {
-    fontSize: 28,
-    fontFamily: 'Nunito-Bold',
+    fontSize: fontSize['3xl'],
+    fontFamily: fontFamily.bold,
     marginLeft: hp(1.5),
     paddingBottom: 5,
   },
@@ -107,16 +109,16 @@ const styles = StyleSheet.create({
     height: 120,
   },
   qrText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Medium',
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.medium,
     paddingBottom: 5,
     textAlign: 'center',
-    color: Colors.darkGrey,
+    color: palette.gray[500],
   },
   qrText2: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Medium',
-    color: Colors.darkGrey,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.medium,
+    color: palette.gray[500],
   },
   bottomBar: {
     display: 'flex',
@@ -143,12 +145,12 @@ const styles = StyleSheet.create({
     margin: 7,
     borderWidth: 1,
     padding: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.White,
-    borderColor: Colors.darkGrey,
+    borderRadius: borderRadius.md,
+    backgroundColor: palette.white,
+    borderColor: palette.gray[500],
     width: '100%',
     alignSelf: 'center',
-    color: Colors.darkBlue,
+    color: palette.primary[900],
   },
   keyboardVisible: {
     height: heightScreen / 2,
@@ -157,7 +159,7 @@ const styles = StyleSheet.create({
     height: 43,
     width: '100%',
     alignSelf: 'center',
-    borderRadius: 10,
+    borderRadius: borderRadius.md,
     margin: 5,
   },
   loginBtnInner: {
@@ -167,9 +169,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginBtnText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-ExtraBold',
-    color: Colors.White,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.extraBold,
+    color: palette.white,
   },
   qrSelectBtn: {
     height: 43,
@@ -177,8 +179,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderRadius: 5,
     margin: 5,
-    backgroundColor: Colors.White,
-    borderColor: Colors.darkGrey,
+    backgroundColor: palette.white,
+    borderColor: palette.gray[500],
     padding: 10,
     alignItems: 'center',
     borderWidth: 1,

@@ -1,23 +1,30 @@
+import {palette, colors as themeColors} from '../theme/colors';
+
+/**
+ * Legacy color map - bridges old references to new design system.
+ * New code should import from '../theme' directly.
+ */
 const colors = {
-  primaryColor: '#B22222',
-  Black: '#000000',
-  White: '#FFFFFF',
-  textColor: '#002743',
-  backgroundLight: '#F2FAFC',
-  lightGrey: '#F1F1F1',
-  grey: '#F8F8F8',
-  darkGrey: '#727272',
-  mediumGrey: '#C1C0BF',
-  darkBlue: '#041F2B',
-  textBlack: '#050E13',
-  cadietBlue: '#768391',
-  mediumBlue: '#005E9C',
-  mediumRed: '#F26C57',
-  mediumGreen: '#5CB85C',
-  mediumYellow: '#EBB30E',
-  red: '#FF0000',
-  green: '#00A300',
-  teal: 'teal',
+  // Mapped to new theme
+  primaryColor: palette.primary[500],
+  Black: palette.black,
+  White: palette.white,
+  textColor: palette.gray[800],
+  backgroundLight: palette.gray[50],
+  lightGrey: palette.gray[100],
+  grey: palette.gray[50],
+  darkGrey: palette.gray[500],
+  mediumGrey: palette.gray[300],
+  darkBlue: palette.primary[900],
+  textBlack: palette.gray[900],
+  cadietBlue: palette.gray[400],
+  mediumBlue: palette.primary[600],
+  mediumRed: palette.warning[500],
+  mediumGreen: palette.success[500],
+  mediumYellow: palette.secondary[500],
+  red: palette.danger[500],
+  green: palette.success[600],
+  teal: palette.accent[500],
 };
 
 export default colors;

@@ -1,8 +1,7 @@
 import React from 'react';
 import {TouchableOpacity, Text, StyleSheet, View} from 'react-native';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import Transaction from '../models/Transaction';
-import Colors from '../Styles/Colors';
+import {palette} from '../theme/colors';
 import {convertDateTime, formatNumberWithCommas} from '../helper';
 
 interface ResultTransactionItemProps {
@@ -76,7 +75,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   transactionNumber: {
-    color: Colors.darkGrey,
+    color: palette.gray[500],
     fontSize: 25,
   },
   transactionInfo: {
@@ -85,22 +84,22 @@ const styles = StyleSheet.create({
   numberStyle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.Black,
+    color: palette.gray[900],
   },
   scannedNumberStyle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.mediumGreen,
+    color: palette.success[500],
   },
   subNumberStyle: {
     fontSize: 14,
     fontWeight: 'normal',
-    color: Colors.darkGrey,
+    color: palette.gray[500],
   },
   totalAmount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.mediumRed,
+    color: palette.warning[500],
   },
 });
 

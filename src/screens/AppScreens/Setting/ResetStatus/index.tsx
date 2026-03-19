@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
+import Icon from '../../../../components/shared/Icon';
 import Styles from '../Styles';
-import colors from '../../../../Styles/Colors';
+import {palette} from '../../../../theme/colors';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -139,23 +139,24 @@ const ResetStatus = (props: any) => {
         <View style={Styles.headerContainer}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={styles.backButton}>
-            <MaterialIcon name="arrow-back" size={24} color={colors.Black} />
+            style={localStyles.backButton}>
+            <Icon name="ArrowLeft" size={24} color={palette.black} weight="bold" />
           </TouchableOpacity>
           <Text style={Styles.logoText}>{'Reset Status'}</Text>
-          <View style={styles.placeholder} />
+          <View style={localStyles.placeholder} />
         </View>
 
-        <View style={styles.container}>
-          <View style={styles.contentContainer}>
+        <View style={localStyles.container}>
+          <View style={localStyles.contentContainer}>
             {/* Info Section */}
-            <View style={styles.infoContainer}>
-              <MaterialIcon
-                name="info-outline"
+            <View style={localStyles.infoContainer}>
+              <Icon
+                name="Info"
                 size={24}
-                color={colors.primaryColor}
+                color={palette.primary[500]}
+                weight="bold"
               />
-              <Text style={styles.infoText}>
+              <Text style={localStyles.infoText}>
                 This tool resets all transaction statuses to "printed" for a
                 specific date and draw. This allows them to be re-synced to the
                 server.
@@ -163,46 +164,48 @@ const ResetStatus = (props: any) => {
             </View>
 
             {/* Date Selector */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Select Date</Text>
-              <View style={styles.dateSelector}>
+            <View style={localStyles.sectionContainer}>
+              <Text style={localStyles.sectionTitle}>Select Date</Text>
+              <View style={localStyles.dateSelector}>
                 <TouchableOpacity
-                  style={styles.dateArrowButton}
+                  style={localStyles.dateArrowButton}
                   onPress={() => adjustDate(-1)}>
-                  <MaterialIcon
-                    name="chevron-left"
+                  <Icon
+                    name="CaretLeft"
                     size={32}
-                    color={colors.primaryColor}
+                    color={palette.primary[500]}
+                    weight="bold"
                   />
                 </TouchableOpacity>
-                <View style={styles.dateDisplay}>
-                  <Text style={styles.dateText}>
+                <View style={localStyles.dateDisplay}>
+                  <Text style={localStyles.dateText}>
                     {formatDateForDisplay(selectedDate)}
                   </Text>
-                  <Text style={styles.dateSubText}>{selectedDate}</Text>
+                  <Text style={localStyles.dateSubText}>{selectedDate}</Text>
                 </View>
                 <TouchableOpacity
-                  style={styles.dateArrowButton}
+                  style={localStyles.dateArrowButton}
                   onPress={() => adjustDate(1)}>
-                  <MaterialIcon
-                    name="chevron-right"
+                  <Icon
+                    name="CaretRight"
                     size={32}
-                    color={colors.primaryColor}
+                    color={palette.primary[500]}
+                    weight="bold"
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Draw Time Selector */}
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Select Draw Time</Text>
-              <View style={styles.drawSelector}>
+            <View style={localStyles.sectionContainer}>
+              <Text style={localStyles.sectionTitle}>Select Draw Time</Text>
+              <View style={localStyles.drawSelector}>
                 {DRAW_TIMES.map(draw => (
                   <TouchableOpacity
                     key={draw.value}
                     style={[
-                      styles.drawButton,
-                      selectedDraw === draw.value && styles.drawButtonSelected,
+                      localStyles.drawButton,
+                      selectedDraw === draw.value && localStyles.drawButtonSelected,
                     ]}
                     onPress={() => {
                       setSelectedDraw(draw.value);
@@ -210,9 +213,9 @@ const ResetStatus = (props: any) => {
                     }}>
                     <Text
                       style={[
-                        styles.drawButtonText,
+                        localStyles.drawButtonText,
                         selectedDraw === draw.value &&
-                          styles.drawButtonTextSelected,
+                          localStyles.drawButtonTextSelected,
                       ]}>
                       {draw.label}
                     </Text>
@@ -223,15 +226,15 @@ const ResetStatus = (props: any) => {
 
             {/* Check Count Button */}
             <TouchableOpacity
-              style={styles.checkButton}
+              style={localStyles.checkButton}
               onPress={checkTransactionCount}>
-              <MaterialIcon name="search" size={20} color={colors.primaryColor} />
-              <Text style={styles.checkButtonText}>Check Transaction Count</Text>
+              <Icon name="MagnifyingGlass" size={20} color={palette.primary[500]} weight="bold" />
+              <Text style={localStyles.checkButtonText}>Check Transaction Count</Text>
             </TouchableOpacity>
 
             {transactionCount !== null && (
-              <View style={styles.countContainer}>
-                <Text style={styles.countText}>
+              <View style={localStyles.countContainer}>
+                <Text style={localStyles.countText}>
                   Found {transactionCount} transaction(s)
                 </Text>
               </View>
@@ -240,20 +243,20 @@ const ResetStatus = (props: any) => {
             {/* Reset Button */}
             <TouchableOpacity
               style={[
-                styles.resetButton,
-                isProcessing && styles.resetButtonDisabled,
+                localStyles.resetButton,
+                isProcessing && localStyles.resetButtonDisabled,
               ]}
               onPress={handleResetStatus}
               disabled={isProcessing}>
               {isProcessing ? (
-                <View style={styles.buttonContent}>
-                  <ActivityIndicator size="small" color={colors.White} />
-                  <Text style={styles.resetButtonText}>Processing...</Text>
+                <View style={localStyles.buttonContent}>
+                  <ActivityIndicator size="small" color={palette.white} />
+                  <Text style={localStyles.resetButtonText}>Processing...</Text>
                 </View>
               ) : (
-                <View style={styles.buttonContent}>
-                  <MaterialIcon name="refresh" size={20} color={colors.White} />
-                  <Text style={styles.resetButtonText}>
+                <View style={localStyles.buttonContent}>
+                  <Icon name="ArrowsClockwise" size={20} color={palette.white} weight="bold" />
+                  <Text style={localStyles.resetButtonText}>
                     Set Status to Printed
                   </Text>
                 </View>
@@ -261,13 +264,14 @@ const ResetStatus = (props: any) => {
             </TouchableOpacity>
 
             {/* Warning Section */}
-            <View style={styles.warningContainer}>
-              <MaterialIcon
-                name="warning"
+            <View style={localStyles.warningContainer}>
+              <Icon
+                name="Warning"
                 size={20}
-                color={colors.mediumYellow}
+                color={palette.secondary[500]}
+                weight="bold"
               />
-              <Text style={styles.warningText}>
+              <Text style={localStyles.warningText}>
                 Use this feature only if you need to re-sync transactions that
                 were already synced or if the sync process failed. After
                 resetting, go to History and tap the sync button.
@@ -280,7 +284,7 @@ const ResetStatus = (props: any) => {
   );
 };
 
-const styles = StyleSheet.create({
+const localStyles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -297,14 +301,14 @@ const styles = StyleSheet.create({
   infoContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: palette.gray[50],
     padding: wp(4),
     borderRadius: 8,
     marginBottom: hp(3),
   },
   infoText: {
     fontSize: 14,
-    color: colors.textColor,
+    color: palette.gray[800],
     marginLeft: wp(2),
     flex: 1,
     lineHeight: 20,
@@ -315,17 +319,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: colors.textColor,
+    color: palette.gray[800],
     marginBottom: hp(1.5),
   },
   dateSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.White,
+    backgroundColor: palette.white,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.mediumGrey,
+    borderColor: palette.gray[300],
     padding: wp(2),
   },
   dateArrowButton: {
@@ -338,56 +342,56 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.primaryColor,
+    color: palette.primary[500],
   },
   dateSubText: {
     fontSize: 12,
-    color: colors.darkGrey,
+    color: palette.gray[500],
     marginTop: 2,
   },
   drawSelector: {
     gap: hp(1),
   },
   drawButton: {
-    backgroundColor: colors.White,
+    backgroundColor: palette.white,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.mediumGrey,
+    borderColor: palette.gray[300],
     padding: wp(4),
     alignItems: 'center',
     marginBottom: hp(1),
   },
   drawButtonSelected: {
-    backgroundColor: colors.primaryColor,
-    borderColor: colors.primaryColor,
+    backgroundColor: palette.primary[500],
+    borderColor: palette.primary[500],
   },
   drawButtonText: {
     fontSize: 16,
-    color: colors.textColor,
+    color: palette.gray[800],
     fontWeight: '500',
   },
   drawButtonTextSelected: {
-    color: colors.White,
+    color: palette.white,
   },
   checkButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.White,
+    backgroundColor: palette.white,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.primaryColor,
+    borderColor: palette.primary[500],
     padding: wp(4),
     marginBottom: hp(2),
   },
   checkButtonText: {
     fontSize: 16,
-    color: colors.primaryColor,
+    color: palette.primary[500],
     fontWeight: '500',
     marginLeft: wp(2),
   },
   countContainer: {
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: palette.gray[50],
     borderRadius: 8,
     padding: wp(3),
     alignItems: 'center',
@@ -395,11 +399,11 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontSize: 16,
-    color: colors.textColor,
+    color: palette.gray[800],
     fontWeight: '600',
   },
   resetButton: {
-    backgroundColor: colors.primaryColor,
+    backgroundColor: palette.primary[500],
     paddingVertical: hp(2.5),
     paddingHorizontal: wp(5),
     borderRadius: 8,
@@ -416,7 +420,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   resetButtonText: {
-    color: colors.White,
+    color: palette.white,
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: wp(2),
